@@ -275,6 +275,12 @@ class _CubelessBase:
 
 class _OnePlyAnalyzer(_CubelessBase):
 
+    def __init__(self, weights, parallel_threads=0):
+        super().__init__(weights)
+        self._parallel_threads = (
+            parallel_threads if parallel_threads > 0 else _default_parallel_threads()
+        )
+
     def checker_play_analytics(
         self, board, die1, die2, cube_value=1, cube_owner="centered",
         progress_callback=None,
@@ -951,7 +957,7 @@ class _CubefulAnalyzer:
 
         # Non-rollout path: N-ply cubeful equity + promotion loop
         workers = getattr(inner, "_parallel_threads", 0)
-        if not isinstance(workers, int) or workers <= 1:
+        if not isinstance(workers, int) or workers <= 0:
             workers = max(2, os.cpu_count() or 2)
         workers = max(1, workers)
 
@@ -1246,7 +1252,9 @@ class BgBotAnalyzer:
                     self._bearoff_db = None
 
         if eval_level == "1ply":
-            inner: _CubelessBase = _OnePlyAnalyzer(weights)
+            inner: _CubelessBase = _OnePlyAnalyzer(
+                weights, parallel_threads=parallel_threads,
+            )
         elif eval_level in ("2ply", "3ply", "4ply"):
             n_plies = int(eval_level[0])
             inner = _MultiPlyAnalyzer(
