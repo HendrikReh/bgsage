@@ -21,6 +21,7 @@ from __future__ import annotations
 import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from functools import cached_property
 from typing import Any
 
 import bgbot_cpp
@@ -114,6 +115,10 @@ def _move_order_key(m: dict):
     return (-m["equity"], -m.get("cubeless_equity", m["equity"]), tuple(m["board"]))
 
 
+# Capability observed by integrations that verify Python candidate pools.
+SERIAL_CUBEFUL_1PLY = True
+
+
 class _CubelessBase:
     """Shared infrastructure for cubeless analyzers."""
 
@@ -122,6 +127,16 @@ class _CubelessBase:
         self._strategy_1ply = bgbot_cpp.create_strategy(
             weights.strategy_type, weights.weight_paths_list, weights.hidden_sizes_list)
         self._bearoff_db = None  # Set by BgBotAnalyzer after construction
+
+    @cached_property
+    def _cube_strategy(self):
+        # Cube evaluation historically creates a fresh base strategy, separate
+        # from the checker strategy's bearoff wrapper and root-routing controls.
+        # Keep that configuration, but load its immutable weights only once.
+        weights = self._weights
+        return bgbot_cpp.create_strategy(
+            weights.strategy_type, weights.weight_paths_list, weights.hidden_sizes_list
+        )
 
     def _score_candidates(
         self,
@@ -324,7 +339,7 @@ class _OnePlyAnalyzer(_CubelessBase):
             self._weights.hidden_sizes_list,
             away1=away1, away2=away2, is_crawford=is_crawford,
             jacoby=jacoby, beaver=beaver, **_cube_limit_kwargs(max_cube_value),
-            bearoff_db=self._bearoff_db,
+            bearoff_db=self._bearoff_db, strategy=self._cube_strategy,
         )
         return self._format_cube_result(r, eval_level="1-ply")
 
@@ -424,7 +439,7 @@ class _MultiPlyAnalyzer(_CubelessBase):
             away1=away1, away2=away2, is_crawford=is_crawford,
             jacoby=jacoby, beaver=beaver, **_cube_limit_kwargs(max_cube_value),
             bearoff_db=self._bearoff_db,
-            incl_2ply_details=incl_2ply_details,
+            incl_2ply_details=incl_2ply_details, strategy=self._cube_strategy,
         )
         result = self._format_cube_result(r, eval_level=f"{self._n_plies}-ply")
 
@@ -1030,8 +1045,11 @@ class _CubefulAnalyzer:
                 )
                 return cubeless_eq, cf_eq
 
-            with ThreadPoolExecutor(max_workers=workers) as pool:
-                converted = list(pool.map(_convert_move_legacy, results))
+            if isinstance(inner, _OnePlyAnalyzer):
+                converted = list(map(_convert_move_legacy, results))
+            else:
+                with ThreadPoolExecutor(max_workers=workers) as pool:
+                    converted = list(pool.map(_convert_move_legacy, results))
 
             for m, (cubeless_eq, cf_eq) in zip(results, converted):
                 m["cubeless_equity"] = m["equity"]

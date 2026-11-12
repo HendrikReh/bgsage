@@ -35,23 +35,7 @@ def evaluate(level, threads, *, cubeful=True, match_play=False):
 @pytest.mark.parametrize("match_play", [False, True], ids=["money", "match"])
 def test_one_ply_honors_explicit_thread_limit(threads, match_play):
     limits, _ = evaluate("1ply", threads, match_play=match_play)
-    assert limits == [threads]
-
-
-@pytest.mark.parametrize("environment,expected", [(None, 8), ("", 8), ("0", 8),
-                                                 ("-1", 8), ("invalid", 8),
-                                                 ("1", 1), ("2", 2), ("4", 4)])
-def test_one_ply_automatic_budget_uses_existing_default_policy(monkeypatch, environment, expected):
-    if environment is not None:
-        monkeypatch.setenv("BGBOT_MULTIPLY_THREADS", environment)
-    limits, _ = evaluate("1ply", 0)
-    assert limits == [expected]
-
-
-def test_explicit_one_ply_budget_takes_precedence_over_environment(monkeypatch):
-    monkeypatch.setenv("BGBOT_MULTIPLY_THREADS", "4")
-    limits, _ = evaluate("1ply", 2)
-    assert limits == [2]
+    assert limits == []
 
 
 @pytest.mark.parametrize("threads", [2, 4])

@@ -5752,9 +5752,11 @@ PYBIND11_MODULE(bgbot_cpp, m) {
                                                 int away1, int away2, bool is_crawford,
                                                 float cube_x_override, bool jacoby,
                                                 bool beaver, int max_cube_value,
-                                                const BearoffDB* bearoff_db) {
+                                                const BearoffDB* bearoff_db,
+                                                std::shared_ptr<Strategy> strategy) {
         Board board = list_to_board(checkers);
-        auto base = make_strategy_from_type(strategy_type, weight_paths, hidden_sizes);
+        auto base = strategy ? std::move(strategy) :
+            make_strategy_from_type(strategy_type, weight_paths, hidden_sizes);
         std::shared_ptr<Strategy> strat = base;
         if (bearoff_db && bearoff_db->is_loaded()) {
             strat = std::make_shared<BearoffStrategy>(base, bearoff_db);
@@ -5796,7 +5798,7 @@ PYBIND11_MODULE(bgbot_cpp, m) {
        py::arg("away1") = 0, py::arg("away2") = 0, py::arg("is_crawford") = false,
        py::arg("cube_x_override") = -1.0f, py::arg("jacoby") = true,
        py::arg("beaver") = true, py::arg("max_cube_value") = 0,
-       py::arg("bearoff_db") = nullptr);
+       py::arg("bearoff_db") = nullptr, py::arg("strategy") = nullptr);
 
     // --- Unified N-ply cube decision ---
     m.def("cube_decision_nply_unified", [](const std::vector<int>& checkers,
@@ -5812,13 +5814,15 @@ PYBIND11_MODULE(bgbot_cpp, m) {
                                             float cube_x_override, bool jacoby,
                                             bool beaver, int max_cube_value,
                                             const BearoffDB* bearoff_db,
-                                            bool incl_2ply_details) {
+                                            bool incl_2ply_details,
+                                            std::shared_ptr<Strategy> strategy) {
         if (incl_2ply_details && n_plies < 2) {
             throw std::invalid_argument(
                 "incl_2ply_details requires n_plies >= 2");
         }
         Board board = list_to_board(checkers);
-        auto base = make_strategy_from_type(strategy_type, weight_paths, hidden_sizes);
+        auto base = strategy ? std::move(strategy) :
+            make_strategy_from_type(strategy_type, weight_paths, hidden_sizes);
         std::shared_ptr<Strategy> base_strat = base;
         if (bearoff_db && bearoff_db->is_loaded()) {
             base_strat = std::make_shared<BearoffStrategy>(base, bearoff_db);
@@ -5882,5 +5886,5 @@ PYBIND11_MODULE(bgbot_cpp, m) {
        py::arg("cube_x_override") = -1.0f, py::arg("jacoby") = true,
        py::arg("beaver") = true, py::arg("max_cube_value") = 0,
        py::arg("bearoff_db") = nullptr,
-       py::arg("incl_2ply_details") = false);
+       py::arg("incl_2ply_details") = false, py::arg("strategy") = nullptr);
 }
