@@ -12,8 +12,14 @@ Only the top candidates (filtered by TINY: top 5 within 0.08 of best) are
 rolled out, plus the strategy's chosen move.
 
 Usage:
-  python python/generate_benchmark_pr.py [--n-games 200] [--seed 42] [--resume]
-  python python/generate_benchmark_pr.py --estimate-only  # time estimate
+  python scripts/generate_benchmark_pr.py [--n-games 200] [--seed 42] [--resume]
+  python scripts/generate_benchmark_pr.py --estimate-only  # time estimate
+
+  # Roll out only every 20th saved decision's candidates (resumable):
+  python scripts/generate_benchmark_pr.py --resume --decision-step 20
+
+Without --resume the games are re-simulated and data/benchmark_pr/decisions.json
+is overwritten.
 """
 
 import os
@@ -27,7 +33,7 @@ import concurrent.futures
 
 # Setup import paths
 script_dir = os.path.dirname(os.path.abspath(__file__))
-project_dir = os.path.dirname(os.path.dirname(script_dir))
+project_dir = os.path.dirname(script_dir)  # the bgsage repo root
 build_dir = os.path.join(project_dir, 'build')
 
 if sys.platform == 'win32':
@@ -38,7 +44,7 @@ if sys.platform == 'win32':
         os.add_dll_directory(build_dir)
 
 sys.path.insert(0, build_dir)
-sys.path.insert(0, os.path.join(project_dir, 'bgsage', 'python'))
+sys.path.insert(0, os.path.join(project_dir, 'python'))
 
 import bgbot_cpp
 
@@ -407,7 +413,16 @@ def main():
                         help='Rollout trials per position (default: 1296)')
     parser.add_argument('--skip-rollout', action='store_true',
                         help='Stop after saving decisions (skip local rollout)')
+    parser.add_argument('--decision-step', type=int, default=1,
+                        help='Roll out only every Nth decision (1 = all). Needs '
+                             '--resume, so the saved decisions are sampled rather '
+                             'than re-simulated and overwritten.')
     args = parser.parse_args()
+    if args.decision_step < 1:
+        parser.error('--decision-step must be >= 1')
+    if args.decision_step > 1 and not args.resume:
+        parser.error('--decision-step > 1 needs --resume (it samples the saved '
+                     'decisions; without --resume they would be re-simulated)')
 
     weights = get_weights()
     if weights is None:
@@ -467,6 +482,12 @@ def main():
                 'decisions': all_decisions,
             }, f)
         log(log_file, f"  Saved decisions to {decisions_file}")
+
+    # Optional sampling: roll out (and score) every Nth decision only.
+    if args.decision_step > 1:
+        all_decisions = all_decisions[::args.decision_step]
+        log(log_file, f"Sampling every {args.decision_step}th decision: "
+            f"{len(all_decisions)} decisions")
 
     # Step 2: Collect unique positions needing rollouts
     positions = collect_unique_positions(all_decisions)
