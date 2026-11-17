@@ -229,12 +229,14 @@ def main():
     args = parser.parse_args()
 
     import bgbot_cpp
-    from bgsage import STARTING_BOARD
+    from bgsage import BgBotAnalyzer, STARTING_BOARD
 
     w = WeightConfig.from_args(args)
     w.validate()
 
-    CubeOwner = bgbot_cpp.CubeOwner
+    # Model-independent 1-ply cube analysis (works for 5-NN, pair and the
+    # backgame-aware production layouts alike).
+    analyzer = BgBotAnalyzer(weights=w, eval_level="1ply")
 
     from bgsage.settings import gnubg_path
     if not os.path.isfile(gnubg_path()):
@@ -305,13 +307,16 @@ def main():
             away1 = match_len - sc1
             away2 = match_len - sc2
 
-        our = bgbot_cpp.evaluate_cube_decision(
-            pos, 1, CubeOwner.CENTERED, *w.weight_args,
+        cube = analyzer.cube_action(
+            pos, cube_value=1, cube_owner="centered",
             away1=away1, away2=away2, is_crawford=is_craw,
         )
+        our = {"equity_nd": cube.equity_nd, "equity_dt": cube.equity_dt,
+               "equity_dp": cube.equity_dp}
 
-        our_a = our_action_str(our["should_double"], our["should_take"])
-        our_probs = list(our["probs"])
+        our_a = our_action_str(cube.should_double, cube.should_take)
+        p = cube.probs
+        our_probs = [p.win, p.gammon_win, p.backgammon_win, p.gammon_loss, p.backgammon_loss]
 
         # GNUbg evaluation
         cmd = build_gnubg_command(pos, match_len, sc1, sc2, is_craw)
