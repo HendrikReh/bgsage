@@ -8,8 +8,29 @@
 #include <mutex>
 #include <numeric>
 #include <utility>
+#include <cstdint>
+#if defined(_MSC_VER)
+  #include <intrin.h>
+#endif
 
 namespace bgbot {
+
+// ======================== Bit helpers ========================
+// Portable lowest/highest set bit and popcount (C++17 has no <bit>).
+// lowest_bit / highest_bit require m != 0.
+#if defined(_MSC_VER)
+static inline int lowest_bit(uint32_t m) {
+    unsigned long i; _BitScanForward(&i, m); return static_cast<int>(i);
+}
+static inline int highest_bit(uint32_t m) {
+    unsigned long i; _BitScanReverse(&i, m); return static_cast<int>(i);
+}
+static inline int popcount64(uint64_t m) { return static_cast<int>(__popcnt64(m)); }
+#else
+static inline int lowest_bit(uint32_t m) { return __builtin_ctz(m); }
+static inline int highest_bit(uint32_t m) { return 31 - __builtin_clz(m); }
+static inline int popcount64(uint64_t m) { return __builtin_popcountll(m); }
+#endif
 
 // ======================== Escape Lookup Tables (GNUbg-style) ========================
 // Precomputed tables mapping a 12-bit bitmap of blocked points to escape roll counts.
@@ -294,27 +315,54 @@ static inline int roll_key(int d1, int d2) {
     return (d1 > d2) ? d1 * 7 + d2 : d2 * 7 + d1;
 }
 
+// Roll mask (keys hi*7+lo, hi >= lo) of every roll containing die d, d = 1-6.
+struct RollsWithDie {
+    uint64_t m[7] = {};
+    constexpr RollsWithDie() {
+        for (int d = 1; d <= 6; ++d) {
+            for (int k = 1; k <= 6; ++k) {
+                const int hi = d > k ? d : k;
+                const int lo = d < k ? d : k;
+                m[d] |= 1ULL << (hi * 7 + lo);
+            }
+        }
+    }
+};
+static constexpr RollsWithDie kRollsWithDie{};
+
+// Canonical roll keys hi*7+lo (6 >= hi >= lo >= 1), and the doubles among them.
+static constexpr uint64_t roll_keys_mask(bool doubles_only) {
+    uint64_t m = 0;
+    for (int hi = 1; hi <= 6; ++hi)
+        for (int lo = 1; lo <= hi; ++lo)
+            if (!doubles_only || lo == hi) m |= 1ULL << (hi * 7 + lo);
+    return m;
+}
+static constexpr uint64_t kCanonicalRolls = roll_keys_mask(false);
+static constexpr uint64_t kDoubleRolls = roll_keys_mask(true);
+
 int hitting_shots(const Board& board) {
     // Use a bitmask to track unique rolls that hit.
     // Keys: d_high * 7 + d_low, max = 6*7+6 = 48, so 49 bits needed → uint64_t.
     uint64_t rolls_mask = 0;
 
+    // Player checkers on points 1-24 (the bar is not a hitter here).
+    uint32_t player_pts = 0;
+    for (int j = 1; j <= 24; ++j) {
+        if (board[j] > 0) player_pts |= 1u << j;
+    }
+
     for (int i = 1; i <= 24; ++i) {
         if (board[i] != -1) continue;  // need exactly one opponent checker (a blot)
 
-        // Look for player checkers that could hit this blot
-        for (int j = i + 1; j <= 24; ++j) {
-            if (board[j] <= 0) continue;  // need a player checker
-
+        // Player checkers above this blot that could hit it
+        for (uint32_t m = player_pts & ~((2u << i) - 1); m; m &= m - 1) {
+            const int j = lowest_bit(m);
             int distance = j - i;
 
             if (distance <= 6) {
                 // Any roll containing this distance hits
-                for (int k = 1; k <= 6; ++k) {
-                    int hi = (distance > k) ? distance : k;
-                    int lo = (distance < k) ? distance : k;
-                    rolls_mask |= (1ULL << (hi * 7 + lo));
-                }
+                rolls_mask |= kRollsWithDie.m[distance];
 
                 // Check short doubles that can reach via multiple steps
                 if (distance == 2 && board[i + 1] > -2) {
@@ -376,135 +424,152 @@ int hitting_shots(const Board& board) {
     }
 
     // Count rolls: doubles count as 1, non-doubles count as 2
-    int total = 0;
-    for (int d1 = 1; d1 <= 6; ++d1) {
-        for (int d2 = 1; d2 <= d1; ++d2) {
-            if (rolls_mask & (1ULL << (d1 * 7 + d2))) {
-                total += (d1 == d2) ? 1 : 2;
-            }
-        }
-    }
-    return total;
+    rolls_mask &= kCanonicalRolls;
+    return 2 * popcount64(rolls_mask & ~kDoubleRolls) + popcount64(rolls_mask & kDoubleRolls);
 }
 
 // ======================== Double Hitting Shots ========================
 
-int double_hitting_shots(const Board& board) {
-    // Find all opponent blots and the distances from which player checkers can hit them
-    struct BlotInfo {
-        int point;          // board point with opponent blot
-        int dists[24];      // distances of player checkers that can hit this blot
-        int n_dists;
-    };
-    BlotInfo blots[24];     // max 24 opponent blots
-    int n_blots = 0;
+// In the shot counters below, a "distance mask" has bit d set for each
+// distance d; a "roll mask" has one bit per roll (d1,d2).
 
+// Transpose an 8x8 bit matrix stored row-major in 64 bits (bit r*8+c ->
+// bit c*8+r), by three delta swaps (Hacker's Delight 7-3).
+static inline uint64_t transpose_8x8(uint64_t x) {
+    uint64_t t;
+    t = (x ^ (x >> 7)) & 0x00AA00AA00AA00AAULL;  x ^= t ^ (t << 7);
+    t = (x ^ (x >> 14)) & 0x0000CCCC0000CCCCULL; x ^= t ^ (t << 14);
+    t = (x ^ (x >> 28)) & 0x00000000F0F0F0F0ULL; x ^= t ^ (t << 28);
+    return x;
+}
+
+int double_hitting_shots(const Board& board) {
+    // Roll keys here are d1*8+d2 (an 8x8 bit matrix, row d1, column d2).
+    // Every non-double roll the counter records is recorded in both orders
+    // and doubles sit on the diagonal, so the final roll mask is symmetric:
+    // accumulate one ordering in `rows` and mirror it once at the end.
+    //
+    // player_pts: bit p set when the player has a checker on point p (1-25,
+    // 25 = bar). For a blot on point i, (player_pts >> i) is then the mask of
+    // distances d from which a player checker can hit it.
+    uint32_t player_pts = 0;
+    for (int p = 1; p <= 25; ++p) {
+        if (board[p] > 0) player_pts |= 1u << p;
+    }
+
+    // opp_blocks: bit p set when the opponent holds point p (1-24). 64 bits
+    // so that probing p up to 24+12 needs no range check.
+    uint64_t opp_blocks = 0;
+    for (int p = 1; p <= 24; ++p) {
+        if (board[p] < -1) opp_blocks |= 1ULL << p;
+    }
+    auto blocked_at = [&](int pt) { return ((opp_blocks >> pt) & 1) != 0; };
+
+    constexpr uint32_t DIE_DISTS = 0x7E;  // distances 1-6
+
+    int blot_pt[24];
+    uint32_t blot_dists[24];  // bits 1-24: hitting distances
+    uint32_t blot_dice[24];   // bits g (1-6): a hit from distance g
+    uint32_t blot_x2[24];     // bits g (1-6): a hit from distance 2g
+    uint32_t blot_x3[24];     // bits g (1-6): a hit from distance 3g
+    int n_blots = 0;
     for (int i = 1; i <= 24; ++i) {
         if (board[i] != -1) continue;
-
-        blots[n_blots].point = i;
-        blots[n_blots].n_dists = 0;
-
-        for (int d = 1; d <= 24; ++d) {
-            if (i + d < 26 && board[i + d] > 0) {  // includes bar(25) if player checker there
-                blots[n_blots].dists[blots[n_blots].n_dists++] = d;
-            }
+        const uint32_t d = player_pts >> i;
+        uint32_t x2 = 0, x3 = 0;
+        for (int g = 1; g <= 6; ++g) {
+            x2 |= ((d >> (2 * g)) & 1u) << g;
+            x3 |= ((d >> (3 * g)) & 1u) << g;
         }
+        blot_pt[n_blots] = i;
+        blot_dists[n_blots] = d;
+        blot_dice[n_blots] = d & DIE_DISTS;
+        blot_x2[n_blots] = x2;
+        blot_x3[n_blots] = x3;
         n_blots++;
     }
 
-    // Use bitmask for dedup: key = d1*7+d2 for d1,d2 in 1..6 (both orderings for non-doubles)
-    // Need 49 bits → uint64_t
-    uint64_t pairs_mask = 0;
+    uint64_t rows = 0;
+    uint32_t doubles = 0;  // bits g: the double g-g counts
 
-    // Case 1: Two different player checkers hit two different blots
+    // Case 1: two different player checkers hit two different blots.
     for (int bi = 0; bi < n_blots; ++bi) {
-        for (int hi = 0; hi < blots[bi].n_dists; ++hi) {
-            int d1 = blots[bi].dists[hi];
-            for (int bk = bi + 1; bk < n_blots; ++bk) {
-                for (int hk = 0; hk < blots[bk].n_dists; ++hk) {
-                    int d2 = blots[bk].dists[hk];
+        const int pi = blot_pt[bi];
+        const uint32_t di1 = blot_dice[bi];
+        for (int bk = bi + 1; bk < n_blots; ++bk) {
+            const int pk = blot_pt[bk];
+            const uint32_t dk1 = blot_dice[bk];
 
-                    // Both must be single die rolls (<=6) for non-double case
-                    if (d1 < 7 && d2 < 7) {
-                        // Check that the two hits use different source checkers,
-                        // or the source point has more than one checker
-                        if (blots[bi].point + d1 != blots[bk].point + d2 ||
-                            board[blots[bi].point + d1] > 1) {
-                            pairs_mask |= (1ULL << (d1 * 7 + d2));
-                            if (d1 != d2) {
-                                pairs_mask |= (1ULL << (d2 * 7 + d1));
-                            }
-                        }
-                    }
-
-                    // Check doubles: if gcd divides both distances evenly and
-                    // total steps < 5, it's possible with a double
-                    int g = std::gcd(d1, d2);
-                    int n1 = d1 / g;
-                    int n2 = d2 / g;
-                    if (g < 7 && n1 + n2 < 5) {
-                        // Check intermediate points aren't blocked
-                        bool blocked = false;
-                        for (int m = 1; m < n1; ++m) {
-                            int pt = blots[bi].point + g * m;
-                            if (pt < 25 && board[pt] < -1) {
-                                blocked = true;
-                                break;
-                            }
-                        }
-                        if (!blocked) {
-                            for (int m = 1; m < n2; ++m) {
-                                int pt = blots[bk].point + g * m;
-                                if (pt < 25 && board[pt] < -1) {
-                                    blocked = true;
-                                    break;
-                                }
-                            }
-                        }
-                        if (!blocked) {
-                            pairs_mask |= (1ULL << (g * 7 + g));
-                        }
-                    }
+            // Non-double (d1, d2), both single dice. Allowed unless both hits
+            // come from the same single checker: pi+d1 == pk+d2 with
+            // board[pi+d1] == 1.
+            if (dk1) {
+                for (uint32_t m = di1; m; m &= m - 1) {
+                    const int d1 = lowest_bit(m);
+                    uint32_t allowed = dk1;
+                    const int d2_same = pi + d1 - pk;
+                    if (d2_same >= 1 && board[pi + d1] <= 1) allowed &= ~(1u << d2_same);
+                    rows |= static_cast<uint64_t>(allowed) << (d1 * 8);
                 }
+            }
+
+            // Double g-g: distances d1 = n1*g, d2 = n2*g with gcd(n1,n2) = 1,
+            // n1+n2 < 5 and g <= 6 — (n1,n2) in {(1,1),(1,2),(2,1),(1,3),(3,1)} —
+            // with the intermediate landing points of both hits unblocked.
+            doubles |= di1 & dk1;  // (1,1): no intermediate points
+            for (uint32_t m = (di1 & blot_x2[bk]) & ~doubles; m; m &= m - 1) {
+                const int g = lowest_bit(m);                       // (1,2)
+                if (!blocked_at(pk + g)) doubles |= 1u << g;
+            }
+            for (uint32_t m = (blot_x2[bi] & dk1) & ~doubles; m; m &= m - 1) {
+                const int g = lowest_bit(m);                       // (2,1)
+                if (!blocked_at(pi + g)) doubles |= 1u << g;
+            }
+            for (uint32_t m = (di1 & blot_x3[bk]) & ~doubles; m; m &= m - 1) {
+                const int g = lowest_bit(m);                       // (1,3)
+                if (!blocked_at(pk + g) && !blocked_at(pk + 2 * g)) doubles |= 1u << g;
+            }
+            for (uint32_t m = (blot_x3[bi] & dk1) & ~doubles; m; m &= m - 1) {
+                const int g = lowest_bit(m);                       // (3,1)
+                if (!blocked_at(pi + g) && !blocked_at(pi + 2 * g)) doubles |= 1u << g;
             }
         }
     }
+    for (uint32_t m = doubles; m; m &= m - 1) {
+        const int g = lowest_bit(m);
+        rows |= 1ULL << (g * 9);
+    }
 
-    // Case 2: One checker steps through a blot to hit another blot beyond
+    // Case 2: one checker steps through a blot to hit another blot beyond.
     for (int bi = 0; bi < n_blots; ++bi) {
-        int pnt = blots[bi].point;
+        const int pnt = blot_pt[bi];
 
-        for (int hi = 0; hi < blots[bi].n_dists; ++hi) {
-            int d1 = blots[bi].dists[hi];
-            if (d1 > 6) continue;
+        // Distances d2 (1-6) to a blot below this one.
+        uint32_t below = 0;
+        for (int d2 = 1; d2 <= 6 && pnt - d2 > 0; ++d2) {
+            if (board[pnt - d2] == -1) below |= 1u << d2;
+        }
 
-            // Non-double: check if there's a blot d2 below this blot
-            for (int d2 = 1; d2 <= 6; ++d2) {
-                if (pnt - d2 > 0 && board[pnt - d2] == -1) {
-                    pairs_mask |= (1ULL << (d1 * 7 + d2));
-                    if (d1 != d2) {
-                        pairs_mask |= (1ULL << (d2 * 7 + d1));
-                    }
-                }
-                // Doubles: step through with multiple die
-                if (d1 == d2) {
-                    if (pnt - d1 > 0 && board[pnt - d1] < -1) continue;
-                    if (pnt - 2 * d1 > 0 && board[pnt - 2 * d1] == -1) {
-                        pairs_mask |= (1ULL << (d1 * 7 + d1));
-                    }
-                    if (pnt - 2 * d1 > 0 && board[pnt - 2 * d1] < -1) continue;
-                    if (pnt - 3 * d1 > 0 && board[pnt - 3 * d1] == -1) {
-                        pairs_mask |= (1ULL << (d1 * 7 + d1));
-                    }
-                }
+        for (uint32_t m = blot_dists[bi] & DIE_DISTS; m; m &= m - 1) {
+            const int d1 = lowest_bit(m);
+            rows |= static_cast<uint64_t>(below) << (d1 * 8);
+
+            // Doubles: step through with the same die.
+            if (pnt - d1 > 0 && board[pnt - d1] < -1) continue;
+            if (pnt - 2 * d1 > 0 && board[pnt - 2 * d1] == -1) {
+                rows |= 1ULL << (d1 * 9);
+            }
+            if (pnt - 2 * d1 > 0 && board[pnt - 2 * d1] < -1) continue;
+            if (pnt - 3 * d1 > 0 && board[pnt - 3 * d1] == -1) {
+                rows |= 1ULL << (d1 * 9);
             }
         }
     }
+    uint64_t pairs_mask = rows;
 
     // Case 3: One checker steps through multiple blots on doubles
     for (int bi = 0; bi < n_blots; ++bi) {
-        int pnt = blots[bi].point;
+        int pnt = blot_pt[bi];
 
         for (int d = 1; d <= 6; ++d) {
             bool found_second = false;
@@ -517,7 +582,7 @@ int double_hitting_shots(const Board& board) {
             if (pnt + 2 * d < 25) {
                 if (board[pnt + 2 * d] == -1) found_second = true;
                 if (board[pnt + 2 * d] > 0 && found_second) {
-                    pairs_mask |= (1ULL << (d * 7 + d));
+                    pairs_mask |= (1ULL << (d * 9));
                 }
                 if (board[pnt + 2 * d] < -1) continue;
             }
@@ -526,32 +591,22 @@ int double_hitting_shots(const Board& board) {
                 // Note: reference checks pnt + 2*d for second blot here too
                 if (board[pnt + 2 * d] == -1) found_second = true;
                 if (board[pnt + 3 * d] > 0 && found_second) {
-                    pairs_mask |= (1ULL << (d * 7 + d));
+                    pairs_mask |= (1ULL << (d * 9));
                 }
                 if (board[pnt + 3 * d] < -1) continue;
             }
 
             if (pnt + 4 * d < 25) {
                 if (board[pnt + 4 * d] > 0 && found_second) {
-                    pairs_mask |= (1ULL << (d * 7 + d));
+                    pairs_mask |= (1ULL << (d * 9));
                 }
             }
         }
     }
 
-    // Count: each entry in pairs_mask is a unique (d1, d2) pair representing one roll
-    // But we stored both orderings for non-doubles. Each unique roll is:
-    // - Doubles (d,d): appears once at (d*7+d)
-    // - Non-doubles: appears at both (d1*7+d2) and (d2*7+d1)
-    // The Python code counts len(pairs) where pairs contains both orderings.
-    // So we just popcount the mask.
-    int count = 0;
-    uint64_t m = pairs_mask;
-    while (m) {
-        count += (m & 1);
-        m >>= 1;
-    }
-    return count;
+    // Each unique roll counts once per ordering: doubles (d,d) once, non-doubles
+    // at both (d1,d2) and (d2,d1) — so after mirroring, popcount the mask.
+    return popcount64(pairs_mask | transpose_8x8(pairs_mask));
 }
 
 // ======================== Back Escapes ========================
@@ -732,46 +787,11 @@ float backbone(const Board& board) {
     // GNUbg: scan from point 23 down to 1 (0-indexed) for anchors (>=2 checkers)
     // Our: scan from point 24 down to 2 for player anchors
 
+    // GNUbg accumulates, for each anchor, its weight c against the PREVIOUS
+    // anchor's checker count: w += c * anBoard[pa]; tot += anBoard[pa].
     int pa = -1;  // previous anchor point (0-indexed)
     int w = 0;
     int tot = 0;
-
-    for (int pt = 24; pt >= 2; --pt) {
-        if (board[pt] >= 2) {
-            int gnubg_pt = pt - 1;  // convert to 0-indexed
-            if (pa == -1) {
-                pa = gnubg_pt;
-                continue;
-            }
-
-            int d = pa - gnubg_pt;
-            int c = 0;
-            if (d <= 6) {
-                c = 11;
-            } else if (d <= 11) {
-                c = 13 - d;
-            }
-
-            w += c * board[pt + (pa - gnubg_pt)];  // wait, need to use checkers at pa+1
-            // Actually GNUbg uses anBoard[pa] which is the previous anchor's checker count
-            // pa is in 0-indexed, so anBoard[pa] = our board[pa+1]
-            w += c * board[pa + 1] - c * board[pa + 1];  // this is wrong, let me redo
-
-            // Re-reading GNUbg: w += c * anBoard[pa]; where pa is the PREVIOUS anchor
-            // and anBoard[pa] is the checker count at that anchor
-            // After computing w, tot += anBoard[pa]
-            // Then pa = np (current anchor)
-            // So we accumulate w and tot for the PREVIOUS anchor's checkers
-            // Let me rewrite this correctly:
-            pa = -1;  // reset and redo properly
-            break;
-        }
-    }
-
-    // Redo backbone properly
-    pa = -1;
-    w = 0;
-    tot = 0;
 
     for (int gnubg_pt = 23; gnubg_pt > 0; --gnubg_pt) {
         int our_pt = gnubg_pt + 1;
@@ -968,21 +988,20 @@ int mobility(const Board& board) {
 int moment2(const Board& board) {
     // GNUbg I_MOMENT2: one-sided second moment above weighted mean
 
+    // Player checkers per GNUbg point (0-indexed; 24 = bar), negatives clamped.
+    int checkers[25];
+    for (int gnubg_i = 0; gnubg_i < 24; ++gnubg_i) {
+        const int n = board[gnubg_i + 1];
+        checkers[gnubg_i] = n > 0 ? n : 0;
+    }
+    checkers[24] = board[25] > 0 ? board[25] : 0;
+
     // Compute weighted mean of checker positions (0-indexed)
     int total_checkers = 0;
     int total_weighted = 0;
     for (int gnubg_i = 0; gnubg_i < 25; ++gnubg_i) {
-        int checkers;
-        if (gnubg_i < 24) {
-            int our_pt = gnubg_i + 1;
-            checkers = (board[our_pt] > 0) ? board[our_pt] : 0;
-        } else {
-            checkers = board[25];  // bar
-        }
-        if (checkers > 0) {
-            total_checkers += checkers;
-            total_weighted += gnubg_i * checkers;
-        }
+        total_checkers += checkers[gnubg_i];
+        total_weighted += gnubg_i * checkers[gnubg_i];
     }
 
     int mean = 0;
@@ -994,17 +1013,8 @@ int moment2(const Board& board) {
     int k = 0;
     int j = 0;
     for (int gnubg_i = mean + 1; gnubg_i < 25; ++gnubg_i) {
-        int checkers;
-        if (gnubg_i < 24) {
-            int our_pt = gnubg_i + 1;
-            checkers = (board[our_pt] > 0) ? board[our_pt] : 0;
-        } else {
-            checkers = board[25];
-        }
-        if (checkers > 0) {
-            j += checkers;
-            k += checkers * (gnubg_i - mean) * (gnubg_i - mean);
-        }
+        j += checkers[gnubg_i];
+        k += checkers[gnubg_i] * (gnubg_i - mean) * (gnubg_i - mean);
     }
 
     if (j > 0) {
@@ -1067,7 +1077,7 @@ static const int aanCombination[24][5] = {
     {38, -1, -1, -1, -1}    /* 24 */
 };
 
-static const PiplossInter aIntermediate[39] = {
+static constexpr PiplossInter aIntermediate[39] = {
     {1, {0, 0, 0}, 1, 1},   /*  0: 1x hits 1 */
     {1, {0, 0, 0}, 1, 2},   /*  1: 2x hits 2 */
     {1, {1, 0, 0}, 2, 2},   /*  2: 11 hits 2 */
@@ -1109,6 +1119,29 @@ static const PiplossInter aIntermediate[39] = {
     {1, {6, 12, 18}, 4, 24} /* 38: 66 hits 24 */
 };
 
+// Per hit combination: the intermediate offsets whose blocking matters, and
+// whether ANY blocked offset stops the hit (fAll) or only ALL of them do.
+// Derived from aIntermediate; one-face fAll hits get an empty mask.
+struct PiplossBlockRule {
+    uint32_t offsets[39] = {};
+    bool any[39] = {};
+    constexpr PiplossBlockRule() {
+        for (int c = 0; c < 39; ++c) {
+            const PiplossInter& p = aIntermediate[c];
+            if (p.fAll) {
+                any[c] = true;
+                if (p.nFaces > 1) {
+                    for (int k = 0; k < 3 && p.anIntermediate[k] > 0; ++k)
+                        offsets[c] |= 1u << p.anIntermediate[k];
+                }
+            } else {
+                offsets[c] = (1u << p.anIntermediate[0]) | (1u << p.anIntermediate[1]);
+            }
+        }
+    }
+};
+static constexpr PiplossBlockRule kPiplossBlockRule{};
+
 static const int aaRoll[21][4] = {
     {0, 2, 5, 9},           /* 11 */
     {0, 1, 4, -1},          /* 21 */
@@ -1133,18 +1166,9 @@ static const int aaRoll[21][4] = {
     {13, 31, 36, 38}        /* 66 */
 };
 
-int compute_piploss(const Board& board) {
-    // This implements GNUbg's piploss calculation from CalculateHalfInputs.
-    // We need to work in GNUbg's coordinate system.
-    // GNUbg anBoard = player's checkers (0-indexed, unsigned)
-    // GNUbg anBoardOpp = opponent's checkers (0-indexed from opponent's perspective)
-
-    // Extract half-boards in GNUbg format
-    int anBoard[25];
-    int anBoardOpp[25];
-    extract_player_half(board, anBoard);
-    extract_opponent_half(board, anBoardOpp);
-
+// Piploss from GNUbg-format half-boards (anBoard = extract_player_half,
+// anBoardOpp = extract_opponent_half of the same board).
+static int compute_piploss_hb(const int anBoard[25], const int anBoardOpp[25]) {
     // Find opponent's back checker
     int nOppBack = -1;
     for (int i = 24; i >= 0; --i) {
@@ -1164,41 +1188,44 @@ int compute_piploss(const Board& board) {
     int aHit[39];
     memset(aHit, 0, sizeof(aHit));
 
+    // Points (0-24, 24 = bar) the player may hit from: occupied, and not a
+    // home-board anchor of exactly two (don't break home anchors).
+    uint32_t hitters = 0;
+    for (int j = 0; j < 25; j++) {
+        if (anBoard[j] && !(j < 6 && anBoard[j] == 2)) hitters |= 1u << j;
+    }
+
+    // opp_points_rev: bit q set when anBoardOpp[23 - q] > 1 (opponent point
+    // made). For a blot at i, (opp_points_rev >> (23 - i)) has bit k set when
+    // anBoardOpp[i - k] > 1 — the blocked intermediate offsets for that blot.
+    uint32_t opp_points_rev = 0;
+    for (int q = 0; q < 24; q++) {
+        if (anBoardOpp[23 - q] > 1) opp_points_rev |= 1u << q;
+    }
+
     // For every point we'd consider hitting a blot on
     for (int i = (nBoard > 2) ? 23 : 21; i >= 0; i--) {
         if (anBoardOpp[i] != 1) continue;
+        const uint32_t blocked_offsets = opp_points_rev >> (23 - i);
 
-        for (int j = 24 - i; j < 25; j++) {
-            if (!anBoard[j]) continue;
-            if (j < 6 && anBoard[j] == 2) continue;  // don't break home anchors
-
+        // Hitters at j >= 24 - i (dist = j - (24 - i) is then 0..i, always < 24)
+        for (uint32_t hm = hitters & ~((1u << (24 - i)) - 1); hm; hm &= hm - 1) {
+            const int j = lowest_bit(hm);
             int dist = j - (24 - i);
-            if (dist < 0 || dist >= 24) continue;
 
             for (int n = 0; n < 5; n++) {
-                if (aanCombination[dist][n] == -1) break;
+                const int c = aanCombination[dist][n];
+                if (c == -1) break;
 
-                const PiplossInter* pi = &aIntermediate[aanCombination[dist][n]];
-
-                if (pi->fAll) {
-                    if (pi->nFaces > 1) {
-                        bool blocked = false;
-                        for (int k = 0; k < 3 && pi->anIntermediate[k] > 0; k++) {
-                            if (anBoardOpp[i - pi->anIntermediate[k]] > 1) {
-                                blocked = true;
-                                break;
-                            }
-                        }
-                        if (blocked) continue;
-                    }
-                } else {
-                    if (anBoardOpp[i - pi->anIntermediate[0]] > 1 &&
-                        anBoardOpp[i - pi->anIntermediate[1]] > 1) {
-                        continue;
-                    }
+                // fAll: blocked if ANY intermediate point is made (never for
+                // one-face hits, whose mask is empty); otherwise only if BOTH are.
+                const uint32_t need = kPiplossBlockRule.offsets[c] & blocked_offsets;
+                if (kPiplossBlockRule.any[c] ? need != 0
+                                             : need == kPiplossBlockRule.offsets[c]) {
+                    continue;
                 }
 
-                aHit[aanCombination[dist][n]] |= (1 << j);
+                aHit[c] |= (1 << j);
             }
         }
     }
@@ -1219,33 +1246,34 @@ int compute_piploss(const Board& board) {
                 const PiplossInter* pi = &aIntermediate[r];
 
                 if (pi->nFaces == 1) {
-                    for (int k = 23; k > 0; k--) {
-                        if (aHit[r] & (1 << k)) {
-                            if (n != k || anBoard[k] > 1)
-                                aRoll[i].nChequers++;
-                            n = k;
-                            if (k - pi->nPips + 1 > aRoll[i].nPips)
-                                aRoll[i].nPips = k - pi->nPips + 1;
-                            if (aaRoll[i][3] >= 0 && aHit[r] & ~(1 << k))
-                                aRoll[i].nChequers++;
-                            break;
-                        }
+                    // Highest hitting point k in 1..23
+                    const uint32_t hk = static_cast<uint32_t>(aHit[r]) & 0x00FFFFFEu;
+                    if (hk) {
+                        const int k = highest_bit(hk);
+                        if (n != k || anBoard[k] > 1)
+                            aRoll[i].nChequers++;
+                        n = k;
+                        if (k - pi->nPips + 1 > aRoll[i].nPips)
+                            aRoll[i].nPips = k - pi->nPips + 1;
+                        if (aaRoll[i][3] >= 0 && aHit[r] & ~(1 << k))
+                            aRoll[i].nChequers++;
                     }
                 } else {
                     if (!aRoll[i].nChequers)
                         aRoll[i].nChequers = 1;
-                    for (int k = 23; k >= 0; k--)
-                        if (aHit[r] & (1 << k)) {
-                            if (k - pi->nPips + 1 > aRoll[i].nPips)
-                                aRoll[i].nPips = k - pi->nPips + 1;
-                            // Check for blots on intermediate points
-                            for (int l = 0; l < 3 && pi->anIntermediate[l] > 0; l++)
-                                if (anBoardOpp[23 - k + pi->anIntermediate[l]] == 1) {
-                                    aRoll[i].nChequers++;
-                                    break;
-                                }
-                            break;
-                        }
+                    // Highest hitting point k in 0..23
+                    const uint32_t hk = static_cast<uint32_t>(aHit[r]) & 0x00FFFFFFu;
+                    if (hk) {
+                        const int k = highest_bit(hk);
+                        if (k - pi->nPips + 1 > aRoll[i].nPips)
+                            aRoll[i].nPips = k - pi->nPips + 1;
+                        // Check for blots on intermediate points
+                        for (int l = 0; l < 3 && pi->anIntermediate[l] > 0; l++)
+                            if (anBoardOpp[23 - k + pi->anIntermediate[l]] == 1) {
+                                aRoll[i].nChequers++;
+                                break;
+                            }
+                    }
                 }
             }
         }
@@ -1310,6 +1338,17 @@ int compute_piploss(const Board& board) {
     }
 
     return np;
+}
+
+int compute_piploss(const Board& board) {
+    // GNUbg's piploss from CalculateHalfInputs, in GNUbg's coordinate system:
+    // anBoard = player's checkers, anBoardOpp = opponent's checkers (each
+    // 0-indexed from its owner's perspective).
+    int anBoard[25];
+    int anBoardOpp[25];
+    extract_player_half(board, anBoard);
+    extract_opponent_half(board, anBoardOpp);
+    return compute_piploss_hb(anBoard, anBoardOpp);
 }
 
 // ======================== Extended 244-input Encoding ========================
@@ -1456,7 +1495,7 @@ static void compute_side_features(
 {
     out_break_contact = break_contact_fast(board, opp_back);
     out_free_pip = free_pip_fast(board, opp_back);
-    out_piploss = compute_piploss(board);
+    out_piploss = compute_piploss_hb(player_hb, opp_hb);
     out_acontain = acontainment_fast(player_hb, opp_back);
     out_contain = containment_fast(player_hb);
     out_mobility = mobility_fast(board, opp_hb);

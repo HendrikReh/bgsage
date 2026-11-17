@@ -65,6 +65,22 @@ public:
     std::array<float, NN_OUTPUTS> forward_from_base(
         const float* inputs, const float* saved_base, const float* saved_inputs) const;
 
+    // Evaluate `count` input vectors stored contiguously (stride n_inputs_),
+    // writing outputs[0..count). The batched candidate kernels call this.
+    //
+    // Portable builds run the delta evaluation those kernels always used —
+    // forward_save_base() on row 0, forward_from_base() on the rest — so the
+    // results are bit-identical to calling those two directly. Builds with
+    // BGBOT_USE_ACCELERATE (Apple arm64) instead run each layer as one dense
+    // matrix multiply through Accelerate, which executes on the CPU's matrix
+    // unit (SME on M4, AMX on earlier Apple chips) — 1.09 -> 0.59 us per
+    // position for a 14-candidate group on an M4 Pro. That path's hidden
+    // sigmoid is the exact Cephes one the x86 AVX2 kernels use (not the NEON
+    // lookup table), so values differ from the delta path by up to ~1e-4 in
+    // probability.
+    void forward_group(const float* inputs, int count,
+                       std::array<float, NN_OUTPUTS>* outputs) const;
+
     // Ensure transposed hidden weights are up-to-date for forward().
     // Rebuilt lazily after td_update() invalidates them.
     // Thread-safe: multiple threads may call this concurrently during benchmark
@@ -165,6 +181,13 @@ private:
     float& ow(int o, int h)       { return output_weights_[o * (n_hidden_ + 1) + h]; }
     float  ow(int o, int h) const { return output_weights_[o * (n_hidden_ + 1) + h]; }
 };
+
+// Encode boards[idx[j]] for j < n with the encoding `nn` takes (Tesauro inputs
+// when `purerace`, extended contact inputs otherwise) and evaluate them all in
+// one nn.forward_group() call. outputs[j] receives the probs of boards[idx[j]].
+void evaluate_board_group(const NeuralNetwork& nn, bool purerace,
+                          const std::vector<Board>& boards, const int* idx, int n,
+                          std::array<float, NN_OUTPUTS>* outputs);
 
 
 // Strategy subclass that uses a NeuralNetwork for position evaluation.

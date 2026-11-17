@@ -840,9 +840,10 @@ Need `#define NOMINMAX` before `#include <windows.h>` (std::min/max conflict).
 ### macOS (CPU-only)
 
 ```bash
-mkdir build && cd build
-cmake ../cpp -DCMAKE_BUILD_TYPE=Release -f ../cpp/CMakeLists_cpu.txt
-make -j
+cmake -S . -B build/cmake -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -Dpybind11_DIR="$(python -c 'import pybind11; print(pybind11.get_cmake_dir())')"
+ninja -C build/cmake bgbot_cpp
+cp build/cmake/bgbot_cpp*.so build/
 ```
 
 On Apple Silicon: NEON intrinsics used instead of AVX2, no `-ffast-math`.
@@ -863,6 +864,11 @@ Use `CMakeLists_cpu.txt`. Flags: `-mavx2 -mfma -ffast-math -march=native`.
 - 4 thermometer inputs per point per player (24 points x 2 players x 4 = 192)
 - Plus bar and borne-off per player (4 more)
 
+Configure from the repo root: the top-level `CMakeLists.txt` includes
+`cpp/CMakeLists_cpu.txt` (`cpp/CMakeLists.txt` is the CUDA build, and CMake
+has no `-f` option to pick another list file). Needs `cmake`, `ninja`,
+`pybind11` and `numpy` for the Python that will import the module.
+
 **Extended (244 inputs)** — Racing/Attacking/Priming/Anchoring:
 - 122 features per player
 - [0-95]: Point encoding (same as Tesauro)
@@ -870,6 +876,44 @@ Use `CMakeLists_cpu.txt`. Flags: `-mavx2 -mfma -ffast-math -march=native`.
 - [97-99]: Borne-off (3 buckets)
 - [100-121]: 22 GNUbg-style features (escape, containment, timing, etc.)
 - Requires `init_escape_tables()` once before use
+
+**Accelerate (Apple Silicon only, on by default).** The batched candidate
+kernels — every `batch_evaluate_candidates_*` and the cubeful engine's
+`eval_groups_pair` — go through `NeuralNetwork::forward_group`, which on
+Apple arm64 runs each layer as one dense `cblas_sgemm` through Accelerate.
+Accelerate executes these on the CPU's matrix unit (SME on M4, AMX on M1-M3),
+which beats the sparse delta kernels even though ~77% of the inputs are zero.
+The hidden-layer sigmoid on this path is the exact Cephes one the x86 AVX2
+kernels and the CUDA trainer use, not the lookup table the other NEON kernels
+use: the table clamps to exactly 0/1 beyond ±8 (up to 3e-4 error per hidden
+unit), which moves equities by up to ~0.003 against x86 builds. So Apple
+Accelerate builds now match x86 builds more closely than before, but not
+bit-for-bit. `-DBGBOT_USE_ACCELERATE=OFF` restores the portable kernels
+(bit-identical to the pre-Accelerate engine).
+
+Measured 2026-11-17 on an M4 Pro (10P+4E cores), together with the encoder
+optimisation below (which is bit-identical on every platform). Wall time of
+`checker_play` on a fixed money-benchmark sample, against the engine before
+both changes:
+
+| Level, threads | Encoder only (`BGBOT_USE_ACCELERATE=OFF`) | Encoder + Accelerate |
+|---|---|---|
+| 2-ply, 1 thread  | 1.17x | 1.38x |
+| 3-ply, 1 thread  | 1.17x | 1.37x |
+| 3-ply, 10 threads | 1.13x | 1.37-1.41x |
+
+Money benchmark (17,535 decisions) with Accelerate: 2-ply PR 1.67 -> 1.68
+(cube 2.90 -> 2.92), 3-ply PR 0.60 -> 0.60, blunder counts unchanged. Max
+equity shift on the sample 0.004; 2 of 264 2-ply best moves changed (near-ties).
+
+**Encoder hot spots.** `hitting_shots`, `double_hitting_shots`,
+`compute_piploss`, `moment2` and `backbone` in `encoding.cpp` use bitmask
+formulations (distance masks per blot, a mirrored 8x8 roll matrix for the
+double-shot count, per-combination block masks for piploss). On 655k
+money-benchmark boards and candidates, `compute_extended_contact_inputs` went
+1.80 -> 1.17 us per board with every output bit-identical.
+`tests/test_encoding_golden.py` pins those features on 1,000 positions computed
+by the original implementations; keep it passing when touching them.
 
 ## Training Pipeline
 

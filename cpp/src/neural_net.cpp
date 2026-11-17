@@ -20,6 +20,14 @@
   #define BGBOT_USE_NEON 1
 #endif
 
+// Apple arm64 builds route batched evaluation through Accelerate's BLAS
+// (BGBOT_USE_ACCELERATE, set by CMakeLists_cpu.txt together with
+// ACCELERATE_NEW_LAPACK when the deployment target allows it; see
+// NeuralNetwork::forward_group).
+#if defined(BGBOT_USE_ACCELERATE)
+  #include <Accelerate/Accelerate.h>
+#endif
+
 namespace bgbot {
 
 // ======================== Utility ========================
@@ -117,6 +125,47 @@ static inline __m256 sigmoid256_ps(__m256 x) {
     __m256 neg_x = _mm256_sub_ps(zero, x);
     __m256 exp_neg_x = exp256_ps(neg_x);
     return _mm256_div_ps(one, _mm256_add_ps(one, exp_neg_x));
+}
+#endif
+
+// ======================== NEON Vectorized Sigmoid ========================
+// The same Cephes exp() as exp256_ps above, 4 lanes wide. Used by the
+// Accelerate group path, where the scalar LUT sigmoid over the hidden layer
+// cost several times more than the matrix multiply itself.
+#if defined(BGBOT_USE_ACCELERATE)
+static inline float32x4_t exp_neon_ps(float32x4_t x) {
+    x = vminq_f32(x, vdupq_n_f32(88.3762626647949f));
+    x = vmaxq_f32(x, vdupq_n_f32(-88.3762626647949f));
+
+    // exp(x) = 2^n * exp(f), n = floor(x/ln2 + 0.5), f = x - n*ln2 (two-step)
+    float32x4_t fx = vfmaq_f32(vdupq_n_f32(0.5f), x, vdupq_n_f32(1.44269504088896341f));
+    fx = vrndmq_f32(fx);
+    x = vfmsq_f32(x, fx, vdupq_n_f32(0.693359375f));
+    x = vfmsq_f32(x, fx, vdupq_n_f32(-2.12194440e-4f));
+    const float32x4_t z = vmulq_f32(x, x);
+
+    float32x4_t y = vdupq_n_f32(1.9875691500E-4f);
+    y = vfmaq_f32(vdupq_n_f32(1.3981999507E-3f), y, x);
+    y = vfmaq_f32(vdupq_n_f32(8.3334519073E-3f), y, x);
+    y = vfmaq_f32(vdupq_n_f32(4.1665795894E-2f), y, x);
+    y = vfmaq_f32(vdupq_n_f32(1.6666665459E-1f), y, x);
+    y = vfmaq_f32(vdupq_n_f32(5.0000001201E-1f), y, x);
+    y = vfmaq_f32(x, y, z);
+    y = vaddq_f32(y, vdupq_n_f32(1.0f));
+
+    int32x4_t n = vcvtq_s32_f32(fx);
+    n = vshlq_n_s32(vaddq_s32(n, vdupq_n_s32(0x7f)), 23);
+    return vmulq_f32(y, vreinterpretq_f32_s32(n));
+}
+
+static inline void sigmoid_inplace_neon(float* v, size_t n) {
+    const float32x4_t one = vdupq_n_f32(1.0f);
+    size_t i = 0;
+    for (; i + 3 < n; i += 4) {
+        const float32x4_t e = exp_neon_ps(vnegq_f32(vld1q_f32(v + i)));
+        vst1q_f32(v + i, vdivq_f32(one, vaddq_f32(one, e)));
+    }
+    for (; i < n; ++i) v[i] = 1.0f / (1.0f + std::exp(-v[i]));
 }
 #endif
 
@@ -960,6 +1009,101 @@ std::array<float, NN_OUTPUTS> NeuralNetwork::forward_from_base(
     return outputs;
 }
 
+// ======================== Group evaluation ========================
+
+#if defined(BGBOT_USE_ACCELERATE)
+
+// Dense path: H = sigmoid(X · W_hᵀ + b_h), O = sigmoid(H · W_oᵀ + b_o), each
+// layer one cblas_sgemm. Accelerate runs these on the CPU's matrix unit, which
+// beats the sparse column-sum kernels even though ~77% of the inputs are zero.
+void NeuralNetwork::forward_group(const float* inputs, int count,
+                                  std::array<float, NN_OUTPUTS>* outputs) const
+{
+    if (count <= 0) return;
+    const int nh = n_hidden_;
+    const int ni = n_inputs_;
+
+    ensure_transposed_weights();
+
+    thread_local std::vector<float> hidden;
+    thread_local std::vector<float> out;
+    hidden.resize(static_cast<size_t>(count) * nh);
+    out.resize(static_cast<size_t>(count) * NN_OUTPUTS);
+
+    // Hidden layer: seed every row with the biases, then accumulate X · W_hᵀ
+    // (hidden_weights_T_ is W_hᵀ, [ni x nh] row-major).
+    for (int b = 0; b < count; ++b) {
+        std::memcpy(&hidden[static_cast<size_t>(b) * nh], hidden_biases_.data(),
+                    nh * sizeof(float));
+    }
+    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+                count, nh, ni,
+                1.0f, inputs, ni,
+                hidden_weights_T_.data(), nh,
+                1.0f, hidden.data(), nh);
+    sigmoid_inplace_neon(hidden.data(), hidden.size());
+
+    // Output layer: output_weights_ is [NN_OUTPUTS x (nh+1)] row-major with the
+    // bias in the last column, so it is W_o with leading dimension nh+1.
+    const int hid_stride = nh + 1;
+    for (int b = 0; b < count; ++b) {
+        for (int o = 0; o < NN_OUTPUTS; ++o) {
+            out[b * NN_OUTPUTS + o] = output_weights_[o * hid_stride + nh];
+        }
+    }
+    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
+                count, NN_OUTPUTS, nh,
+                1.0f, hidden.data(), nh,
+                output_weights_.data(), hid_stride,
+                1.0f, out.data(), NN_OUTPUTS);
+    for (int b = 0; b < count; ++b) {
+        for (int o = 0; o < NN_OUTPUTS; ++o) {
+            outputs[b][o] = fast_sigmoid(out[b * NN_OUTPUTS + o]);
+        }
+    }
+}
+
+#else
+
+void NeuralNetwork::forward_group(const float* inputs, int count,
+                                  std::array<float, NN_OUTPUTS>* outputs) const
+{
+    if (count <= 0) return;
+    const int ni = n_inputs_;
+    thread_local std::vector<float> saved_base, saved_inputs;
+    if (static_cast<int>(saved_base.size()) < n_hidden_) saved_base.resize(n_hidden_);
+    if (static_cast<int>(saved_inputs.size()) < ni) saved_inputs.resize(ni);
+
+    outputs[0] = forward_save_base(inputs, saved_base.data(), saved_inputs.data());
+    for (int b = 1; b < count; ++b) {
+        outputs[b] = forward_from_base(inputs + static_cast<size_t>(b) * ni,
+                                       saved_base.data(), saved_inputs.data());
+    }
+}
+
+#endif
+
+void evaluate_board_group(const NeuralNetwork& nn, bool purerace,
+                          const std::vector<Board>& boards, const int* idx, int n,
+                          std::array<float, NN_OUTPUTS>* outputs)
+{
+    if (n <= 0) return;
+    const int ni = nn.n_inputs();
+    thread_local std::vector<float> encoded;
+    encoded.resize(static_cast<size_t>(n) * ni);
+    for (int j = 0; j < n; ++j) {
+        float* row = &encoded[static_cast<size_t>(j) * ni];
+        if (purerace) {
+            auto inp = compute_tesauro_inputs(boards[idx[j]]);
+            std::copy(inp.begin(), inp.end(), row);
+        } else {
+            auto inp = compute_extended_contact_inputs(boards[idx[j]]);
+            std::copy(inp.begin(), inp.end(), row);
+        }
+    }
+    nn.forward_group(encoded.data(), n, outputs);
+}
+
 // ======================== Transposed Weights ========================
 
 void NeuralNetwork::build_transposed_weights() const {
@@ -1647,8 +1791,6 @@ int GamePlanStrategy::batch_evaluate_candidates_equity(
 
     GamePlan gp = classify_game_plan(pre_move_board);
     const auto& nn = select_nn(gp);
-    const int ni = nn.n_inputs();
-    const int nh = nn.n_hidden();
 
     // Separate terminals from non-terminals
     // Use thread_local to avoid per-call allocation
@@ -1678,44 +1820,15 @@ int GamePlanStrategy::batch_evaluate_candidates_equity(
 
     const int nn_count = static_cast<int>(nn_indices.size());
 
-    // Use incremental (delta) evaluation: encode first candidate with
-    // forward_save_base, then use forward_from_base for the rest.
-    // This exploits the fact that candidate moves from the same position
-    // share most input features — only a few change per move.
-    thread_local std::vector<float> saved_base;   // pre-sigmoid hidden sums
-    thread_local std::vector<float> saved_inputs;  // first candidate's input vector
-    thread_local std::vector<float> cur_inputs;    // current candidate's input vector
+    // One group evaluation for all non-terminal candidates (delta evaluation
+    // off the first candidate, or Accelerate on Apple builds).
+    thread_local std::vector<std::array<float, NUM_OUTPUTS>> group_out;
+    group_out.resize(nn_count);
+    evaluate_board_group(nn, gp == GamePlan::PURERACE, candidates,
+                         nn_indices.data(), nn_count, group_out.data());
 
-    saved_base.resize(nh);
-    saved_inputs.resize(ni);
-    cur_inputs.resize(ni);
-
-    // Encode and evaluate first non-terminal candidate (full pass + save base)
-    if (gp == GamePlan::PURERACE) {
-        auto inp = compute_tesauro_inputs(candidates[nn_indices[0]]);
-        std::copy(inp.begin(), inp.end(), cur_inputs.begin());
-    } else {
-        auto inp = compute_extended_contact_inputs(candidates[nn_indices[0]]);
-        std::copy(inp.begin(), inp.end(), cur_inputs.begin());
-    }
-    auto out0 = nn.forward_save_base(cur_inputs.data(), saved_base.data(), saved_inputs.data());
-    double val0 = NeuralNetwork::compute_equity(out0);
-    equities[nn_indices[0]] = val0;
-    if (val0 > best_val) {
-        best_val = val0;
-        best_idx = nn_indices[0];
-    }
-
-    // Evaluate remaining candidates using delta from the base
-    for (int j = 1; j < nn_count; ++j) {
-        if (gp == GamePlan::PURERACE) {
-            auto inp = compute_tesauro_inputs(candidates[nn_indices[j]]);
-            std::copy(inp.begin(), inp.end(), cur_inputs.begin());
-        } else {
-            auto inp = compute_extended_contact_inputs(candidates[nn_indices[j]]);
-            std::copy(inp.begin(), inp.end(), cur_inputs.begin());
-        }
-        auto out = nn.forward_from_base(cur_inputs.data(), saved_base.data(), saved_inputs.data());
+    for (int j = 0; j < nn_count; ++j) {
+        const auto& out = group_out[j];
         double val = NeuralNetwork::compute_equity(out);
         equities[nn_indices[j]] = val;
         if (val > best_val) {
@@ -1750,8 +1863,6 @@ int GamePlanStrategy::batch_evaluate_candidates_equity_probs(
 
     GamePlan gp = classify_game_plan(pre_move_board);
     const auto& nn = select_nn(gp);
-    const int ni = nn.n_inputs();
-    const int nh = nn.n_hidden();
 
     thread_local std::vector<int> nn_indices;
 
@@ -1780,42 +1891,13 @@ int GamePlanStrategy::batch_evaluate_candidates_equity_probs(
 
     const int nn_count = static_cast<int>(nn_indices.size());
 
-    // Use incremental (delta) evaluation for speed.
-    thread_local std::vector<float> saved_base;
-    thread_local std::vector<float> saved_inputs;
-    thread_local std::vector<float> cur_inputs;
+    thread_local std::vector<std::array<float, NUM_OUTPUTS>> group_out;
+    group_out.resize(nn_count);
+    evaluate_board_group(nn, gp == GamePlan::PURERACE, candidates,
+                         nn_indices.data(), nn_count, group_out.data());
 
-    saved_base.resize(nh);
-    saved_inputs.resize(ni);
-    cur_inputs.resize(ni);
-
-    // Encode and evaluate first non-terminal candidate
-    if (gp == GamePlan::PURERACE) {
-        auto inp = compute_tesauro_inputs(candidates[nn_indices[0]]);
-        std::copy(inp.begin(), inp.end(), cur_inputs.begin());
-    } else {
-        auto inp = compute_extended_contact_inputs(candidates[nn_indices[0]]);
-        std::copy(inp.begin(), inp.end(), cur_inputs.begin());
-    }
-    auto out0 = nn.forward_save_base(cur_inputs.data(), saved_base.data(), saved_inputs.data());
-    probs_out[nn_indices[0]] = out0;
-    double val0 = NeuralNetwork::compute_equity(out0);
-    equities[nn_indices[0]] = val0;
-    if (val0 > best_val) {
-        best_val = val0;
-        best_idx = nn_indices[0];
-    }
-
-    // Evaluate remaining candidates using delta from the base
-    for (int j = 1; j < nn_count; ++j) {
-        if (gp == GamePlan::PURERACE) {
-            auto inp = compute_tesauro_inputs(candidates[nn_indices[j]]);
-            std::copy(inp.begin(), inp.end(), cur_inputs.data());
-        } else {
-            auto inp = compute_extended_contact_inputs(candidates[nn_indices[j]]);
-            std::copy(inp.begin(), inp.end(), cur_inputs.data());
-        }
-        auto out = nn.forward_from_base(cur_inputs.data(), saved_base.data(), saved_inputs.data());
+    for (int j = 0; j < nn_count; ++j) {
+        const auto& out = group_out[j];
         probs_out[nn_indices[j]] = out;
         double val = NeuralNetwork::compute_equity(out);
         equities[nn_indices[j]] = val;
@@ -1856,8 +1938,6 @@ int GamePlanStrategy::batch_evaluate_candidates_best_prob(
 
     GamePlan gp = classify_game_plan(pre_move_board);
     const auto& nn = select_nn(gp);
-    const int ni = nn.n_inputs();
-    const int nh = nn.n_hidden();
 
     thread_local std::vector<int> nn_indices;
     nn_indices.clear();
@@ -1893,40 +1973,13 @@ int GamePlanStrategy::batch_evaluate_candidates_best_prob(
 
     const int nn_count = static_cast<int>(nn_indices.size());
 
-    thread_local std::vector<float> saved_base;
-    thread_local std::vector<float> saved_inputs;
-    thread_local std::vector<float> cur_inputs;
-    saved_base.resize(nh);
-    saved_inputs.resize(ni);
-    cur_inputs.resize(ni);
+    thread_local std::vector<std::array<float, NUM_OUTPUTS>> group_out;
+    group_out.resize(nn_count);
+    evaluate_board_group(nn, gp == GamePlan::PURERACE, candidates,
+                         nn_indices.data(), nn_count, group_out.data());
 
-    if (gp == GamePlan::PURERACE) {
-        auto inp = compute_tesauro_inputs(candidates[nn_indices[0]]);
-        std::copy(inp.begin(), inp.end(), cur_inputs.begin());
-    } else {
-        auto inp = compute_extended_contact_inputs(candidates[nn_indices[0]]);
-        std::copy(inp.begin(), inp.end(), cur_inputs.begin());
-    }
-
-    auto out0 = nn.forward_save_base(cur_inputs.data(), saved_base.data(), saved_inputs.data());
-    double val0 = NeuralNetwork::compute_equity(out0);
-    if (equities) equities[nn_indices[0]] = val0;
-    if (val0 > best_val) {
-        best_val = val0;
-        best_idx = nn_indices[0];
-        if (best_probs_out) best_probs = out0;
-    }
-
-    for (int j = 1; j < nn_count; ++j) {
-        if (gp == GamePlan::PURERACE) {
-            auto inp = compute_tesauro_inputs(candidates[nn_indices[j]]);
-            std::copy(inp.begin(), inp.end(), cur_inputs.data());
-        } else {
-            auto inp = compute_extended_contact_inputs(candidates[nn_indices[j]]);
-            std::copy(inp.begin(), inp.end(), cur_inputs.data());
-        }
-
-        auto out = nn.forward_from_base(cur_inputs.data(), saved_base.data(), saved_inputs.data());
+    for (int j = 0; j < nn_count; ++j) {
+        const auto& out = group_out[j];
         double val = NeuralNetwork::compute_equity(out);
         if (equities) equities[nn_indices[j]] = val;
         if (val > best_val) {
@@ -2112,8 +2165,6 @@ int GamePlanPairStrategy::batch_evaluate_candidates_equity(
 
     int nn_idx = select_nn_idx(pre_move_board);
     const auto& nn = *nns_[nn_idx];
-    const int ni = nn.n_inputs();
-    const int nh = nn.n_hidden();
     bool is_pr = (nn_idx == 0);
 
     thread_local std::vector<int> nn_indices;
@@ -2135,33 +2186,13 @@ int GamePlanPairStrategy::batch_evaluate_candidates_equity(
     if (nn_indices.empty()) return best_idx;
 
     const int nn_count = static_cast<int>(nn_indices.size());
-    thread_local std::vector<float> saved_base, saved_inputs;
-    saved_base.resize(nh);
-    saved_inputs.resize(ni);
+    thread_local std::vector<std::array<float, NUM_OUTPUTS>> group_out;
+    group_out.resize(nn_count);
+    evaluate_board_group(nn, is_pr, candidates, nn_indices.data(), nn_count,
+                         group_out.data());
 
-    // First candidate: full forward + save base
-    std::array<float, NUM_OUTPUTS> out0;
-    if (is_pr) {
-        auto inp = compute_tesauro_inputs(candidates[nn_indices[0]]);
-        out0 = nn.forward_save_base(inp.data(), saved_base.data(), saved_inputs.data());
-    } else {
-        auto inp = compute_extended_contact_inputs(candidates[nn_indices[0]]);
-        out0 = nn.forward_save_base(inp.data(), saved_base.data(), saved_inputs.data());
-    }
-    double val0 = NeuralNetwork::compute_equity(out0);
-    equities[nn_indices[0]] = val0;
-    if (val0 > best_val) { best_val = val0; best_idx = nn_indices[0]; }
-
-    // Remaining: delta evaluation
-    std::array<float, NUM_OUTPUTS> out;
-    for (int j = 1; j < nn_count; ++j) {
-        if (is_pr) {
-            auto inp = compute_tesauro_inputs(candidates[nn_indices[j]]);
-            out = nn.forward_from_base(inp.data(), saved_base.data(), saved_inputs.data());
-        } else {
-            auto inp = compute_extended_contact_inputs(candidates[nn_indices[j]]);
-            out = nn.forward_from_base(inp.data(), saved_base.data(), saved_inputs.data());
-        }
+    for (int j = 0; j < nn_count; ++j) {
+        const auto& out = group_out[j];
         double val = NeuralNetwork::compute_equity(out);
         equities[nn_indices[j]] = val;
         if (val > best_val) { best_val = val; best_idx = nn_indices[j]; }
@@ -2192,8 +2223,6 @@ int GamePlanPairStrategy::batch_evaluate_candidates_equity_probs(
 
     int nn_idx = select_nn_idx(pre_move_board);
     const auto& nn = *nns_[nn_idx];
-    const int ni = nn.n_inputs();
-    const int nh = nn.n_hidden();
     bool is_pr = (nn_idx == 0);
 
     thread_local std::vector<int> nn_indices;
@@ -2216,33 +2245,13 @@ int GamePlanPairStrategy::batch_evaluate_candidates_equity_probs(
     if (nn_indices.empty()) return best_idx;
 
     const int nn_count = static_cast<int>(nn_indices.size());
-    thread_local std::vector<float> saved_base, saved_inputs;
-    saved_base.resize(nh);
-    saved_inputs.resize(ni);
+    thread_local std::vector<std::array<float, NUM_OUTPUTS>> group_out;
+    group_out.resize(nn_count);
+    evaluate_board_group(nn, is_pr, candidates, nn_indices.data(), nn_count,
+                         group_out.data());
 
-    std::array<float, NUM_OUTPUTS> out0;
-    if (is_pr) {
-        auto inp = compute_tesauro_inputs(candidates[nn_indices[0]]);
-        out0 = nn.forward_save_base(inp.data(), saved_base.data(), saved_inputs.data());
-    } else {
-        auto inp = compute_extended_contact_inputs(candidates[nn_indices[0]]);
-        out0 = nn.forward_save_base(inp.data(), saved_base.data(), saved_inputs.data());
-    }
-    probs_out[nn_indices[0]] = out0;
-    equities[nn_indices[0]] = NeuralNetwork::compute_equity(out0);
-    if (equities[nn_indices[0]] > best_val) {
-        best_val = equities[nn_indices[0]]; best_idx = nn_indices[0];
-    }
-
-    std::array<float, NUM_OUTPUTS> out;
-    for (int j = 1; j < nn_count; ++j) {
-        if (is_pr) {
-            auto inp = compute_tesauro_inputs(candidates[nn_indices[j]]);
-            out = nn.forward_from_base(inp.data(), saved_base.data(), saved_inputs.data());
-        } else {
-            auto inp = compute_extended_contact_inputs(candidates[nn_indices[j]]);
-            out = nn.forward_from_base(inp.data(), saved_base.data(), saved_inputs.data());
-        }
+    for (int j = 0; j < nn_count; ++j) {
+        const auto& out = group_out[j];
         probs_out[nn_indices[j]] = out;
         equities[nn_indices[j]] = NeuralNetwork::compute_equity(out);
         if (equities[nn_indices[j]] > best_val) {
@@ -2276,8 +2285,6 @@ int GamePlanPairStrategy::batch_evaluate_candidates_best_prob(
 
     int nn_idx = select_nn_idx(pre_move_board);
     const auto& nn = *nns_[nn_idx];
-    const int ni = nn.n_inputs();
-    const int nh = nn.n_hidden();
     bool is_pr = (nn_idx == 0);
 
     thread_local std::vector<int> nn_indices;
@@ -2307,34 +2314,13 @@ int GamePlanPairStrategy::batch_evaluate_candidates_best_prob(
     }
 
     const int nn_count = static_cast<int>(nn_indices.size());
-    thread_local std::vector<float> saved_base, saved_inputs;
-    saved_base.resize(nh);
-    saved_inputs.resize(ni);
+    thread_local std::vector<std::array<float, NUM_OUTPUTS>> group_out;
+    group_out.resize(nn_count);
+    evaluate_board_group(nn, is_pr, candidates, nn_indices.data(), nn_count,
+                         group_out.data());
 
-    std::array<float, NUM_OUTPUTS> out0;
-    if (is_pr) {
-        auto inp = compute_tesauro_inputs(candidates[nn_indices[0]]);
-        out0 = nn.forward_save_base(inp.data(), saved_base.data(), saved_inputs.data());
-    } else {
-        auto inp = compute_extended_contact_inputs(candidates[nn_indices[0]]);
-        out0 = nn.forward_save_base(inp.data(), saved_base.data(), saved_inputs.data());
-    }
-    double val0 = NeuralNetwork::compute_equity(out0);
-    if (equities) equities[nn_indices[0]] = val0;
-    if (val0 > best_val) {
-        best_val = val0; best_idx = nn_indices[0];
-        if (best_probs_out) best_probs = out0;
-    }
-
-    std::array<float, NUM_OUTPUTS> out;
-    for (int j = 1; j < nn_count; ++j) {
-        if (is_pr) {
-            auto inp = compute_tesauro_inputs(candidates[nn_indices[j]]);
-            out = nn.forward_from_base(inp.data(), saved_base.data(), saved_inputs.data());
-        } else {
-            auto inp = compute_extended_contact_inputs(candidates[nn_indices[j]]);
-            out = nn.forward_from_base(inp.data(), saved_base.data(), saved_inputs.data());
-        }
+    for (int j = 0; j < nn_count; ++j) {
+        const auto& out = group_out[j];
         double val = NeuralNetwork::compute_equity(out);
         if (equities) equities[nn_indices[j]] = val;
         if (val > best_val) {
@@ -2848,8 +2834,6 @@ int BackgameAwarePairStrategy::batch_evaluate_candidates_equity(
         return evaluate_candidates_equity(candidates, pre_move_board, equities);
     }
     const auto& nn = *nns_[nn_idx];
-    const int ni = nn.n_inputs();
-    const int nh = nn.n_hidden();
     bool is_pr = (nn_idx == 0);
 
     thread_local std::vector<int> nn_indices;
@@ -2871,31 +2855,13 @@ int BackgameAwarePairStrategy::batch_evaluate_candidates_equity(
     if (nn_indices.empty()) return best_idx;
 
     const int nn_count = static_cast<int>(nn_indices.size());
-    thread_local std::vector<float> saved_base, saved_inputs;
-    saved_base.resize(nh);
-    saved_inputs.resize(ni);
+    thread_local std::vector<std::array<float, NUM_OUTPUTS>> group_out;
+    group_out.resize(nn_count);
+    evaluate_board_group(nn, is_pr, candidates, nn_indices.data(), nn_count,
+                         group_out.data());
 
-    std::array<float, NUM_OUTPUTS> out0;
-    if (is_pr) {
-        auto inp = compute_tesauro_inputs(candidates[nn_indices[0]]);
-        out0 = nn.forward_save_base(inp.data(), saved_base.data(), saved_inputs.data());
-    } else {
-        auto inp = compute_extended_contact_inputs(candidates[nn_indices[0]]);
-        out0 = nn.forward_save_base(inp.data(), saved_base.data(), saved_inputs.data());
-    }
-    double val0 = NeuralNetwork::compute_equity(out0);
-    equities[nn_indices[0]] = val0;
-    if (val0 > best_val) { best_val = val0; best_idx = nn_indices[0]; }
-
-    std::array<float, NUM_OUTPUTS> out;
-    for (int j = 1; j < nn_count; ++j) {
-        if (is_pr) {
-            auto inp = compute_tesauro_inputs(candidates[nn_indices[j]]);
-            out = nn.forward_from_base(inp.data(), saved_base.data(), saved_inputs.data());
-        } else {
-            auto inp = compute_extended_contact_inputs(candidates[nn_indices[j]]);
-            out = nn.forward_from_base(inp.data(), saved_base.data(), saved_inputs.data());
-        }
+    for (int j = 0; j < nn_count; ++j) {
+        const auto& out = group_out[j];
         double val = NeuralNetwork::compute_equity(out);
         equities[nn_indices[j]] = val;
         if (val > best_val) { best_val = val; best_idx = nn_indices[j]; }
@@ -2943,8 +2909,6 @@ int BackgameAwarePairStrategy::batch_evaluate_candidates_equity_probs(
         return bi;
     }
     const auto& nn = *nns_[nn_idx];
-    const int ni = nn.n_inputs();
-    const int nh = nn.n_hidden();
     bool is_pr = (nn_idx == 0);
 
     thread_local std::vector<int> nn_indices;
@@ -2967,33 +2931,13 @@ int BackgameAwarePairStrategy::batch_evaluate_candidates_equity_probs(
     if (nn_indices.empty()) return best_idx;
 
     const int nn_count = static_cast<int>(nn_indices.size());
-    thread_local std::vector<float> saved_base, saved_inputs;
-    saved_base.resize(nh);
-    saved_inputs.resize(ni);
+    thread_local std::vector<std::array<float, NUM_OUTPUTS>> group_out;
+    group_out.resize(nn_count);
+    evaluate_board_group(nn, is_pr, candidates, nn_indices.data(), nn_count,
+                         group_out.data());
 
-    std::array<float, NUM_OUTPUTS> out0;
-    if (is_pr) {
-        auto inp = compute_tesauro_inputs(candidates[nn_indices[0]]);
-        out0 = nn.forward_save_base(inp.data(), saved_base.data(), saved_inputs.data());
-    } else {
-        auto inp = compute_extended_contact_inputs(candidates[nn_indices[0]]);
-        out0 = nn.forward_save_base(inp.data(), saved_base.data(), saved_inputs.data());
-    }
-    probs_out[nn_indices[0]] = out0;
-    equities[nn_indices[0]] = NeuralNetwork::compute_equity(out0);
-    if (equities[nn_indices[0]] > best_val) {
-        best_val = equities[nn_indices[0]]; best_idx = nn_indices[0];
-    }
-
-    std::array<float, NUM_OUTPUTS> out;
-    for (int j = 1; j < nn_count; ++j) {
-        if (is_pr) {
-            auto inp = compute_tesauro_inputs(candidates[nn_indices[j]]);
-            out = nn.forward_from_base(inp.data(), saved_base.data(), saved_inputs.data());
-        } else {
-            auto inp = compute_extended_contact_inputs(candidates[nn_indices[j]]);
-            out = nn.forward_from_base(inp.data(), saved_base.data(), saved_inputs.data());
-        }
+    for (int j = 0; j < nn_count; ++j) {
+        const auto& out = group_out[j];
         probs_out[nn_indices[j]] = out;
         equities[nn_indices[j]] = NeuralNetwork::compute_equity(out);
         if (equities[nn_indices[j]] > best_val) {
@@ -3049,8 +2993,6 @@ int BackgameAwarePairStrategy::batch_evaluate_candidates_best_prob(
         return bi;
     }
     const auto& nn = *nns_[nn_idx];
-    const int ni = nn.n_inputs();
-    const int nh = nn.n_hidden();
     bool is_pr = (nn_idx == 0);
 
     thread_local std::vector<int> nn_indices;
@@ -3080,34 +3022,13 @@ int BackgameAwarePairStrategy::batch_evaluate_candidates_best_prob(
     }
 
     const int nn_count = static_cast<int>(nn_indices.size());
-    thread_local std::vector<float> saved_base, saved_inputs;
-    saved_base.resize(nh);
-    saved_inputs.resize(ni);
+    thread_local std::vector<std::array<float, NUM_OUTPUTS>> group_out;
+    group_out.resize(nn_count);
+    evaluate_board_group(nn, is_pr, candidates, nn_indices.data(), nn_count,
+                         group_out.data());
 
-    std::array<float, NUM_OUTPUTS> out0;
-    if (is_pr) {
-        auto inp = compute_tesauro_inputs(candidates[nn_indices[0]]);
-        out0 = nn.forward_save_base(inp.data(), saved_base.data(), saved_inputs.data());
-    } else {
-        auto inp = compute_extended_contact_inputs(candidates[nn_indices[0]]);
-        out0 = nn.forward_save_base(inp.data(), saved_base.data(), saved_inputs.data());
-    }
-    double val0 = NeuralNetwork::compute_equity(out0);
-    if (equities) equities[nn_indices[0]] = val0;
-    if (val0 > best_val) {
-        best_val = val0; best_idx = nn_indices[0];
-        if (best_probs_out) best_probs = out0;
-    }
-
-    std::array<float, NUM_OUTPUTS> out;
-    for (int j = 1; j < nn_count; ++j) {
-        if (is_pr) {
-            auto inp = compute_tesauro_inputs(candidates[nn_indices[j]]);
-            out = nn.forward_from_base(inp.data(), saved_base.data(), saved_inputs.data());
-        } else {
-            auto inp = compute_extended_contact_inputs(candidates[nn_indices[j]]);
-            out = nn.forward_from_base(inp.data(), saved_base.data(), saved_inputs.data());
-        }
+    for (int j = 0; j < nn_count; ++j) {
+        const auto& out = group_out[j];
         double val = NeuralNetwork::compute_equity(out);
         if (equities) equities[nn_indices[j]] = val;
         if (val > best_val) {
