@@ -678,8 +678,8 @@ settings.set_gnubg_path("/opt/homebrew/bin/gnubg", persist=True)  # saved for la
 settings.set_gnubg_path(None, persist=True)                       # back to auto-detection
 ```
 
-The legacy scripts `score_benchmark_pr_gnubg.py` and
-`test_match_gnubg_comparison.py` still carry their own hardcoded Windows path.
+`scripts/score_benchmark_pr_gnubg.py` and `scripts/test_match_gnubg_comparison.py`
+resolve the binary the same way.
 
 ## Benchmark Scripts
 
