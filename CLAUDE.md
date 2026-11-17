@@ -17,8 +17,9 @@ GPU; that heritage is still in the code and in this file.
 - **Don't delete the inherited Windows/Linux/CUDA code unasked.** It keeps
   merges from upstream easy; removing it is the user's call.
 - **GPU training**: the CUDA SL trainer (`cuda_nn.cu`) is a stub on macOS
-  (`cuda_available()` is False), so the SL training scripts can't train here
-  yet. A Metal/MLX port is the planned replacement.
+  (`cuda_available()` is False). SL training runs on the Apple GPU through
+  MLX instead (`bgsage.sl_train`, `pip install mlx`); every training script
+  calls it.
 - **Inherited numbers**: training times and many benchmark timings below were
   measured on upstream's Windows box (RTX 4070S, 16 threads). Re-measure on
   the Mac before quoting them for this fork.
@@ -77,6 +78,7 @@ python/bgsage/               # Python package
   data.py                   # .bm file loading, training data parsing
   gnubg.py                  # GNUbg CLI wrapper for reference evaluation
   settings.py               # User settings (GNUbg binary path; see "GNUbg Path" below)
+  sl_train.py               # GPU SL trainer: CUDA, or Apple MLX (see "Training Pipeline")
   matchinfo.py              # Match play take points, dead cube take points, gammon prices
   text_export.py            # Galaxy/XG-compatible text export + move notation
   xg_compare.py             # Parse XG .xg files; compute per-game PR stats vs XG
@@ -876,7 +878,7 @@ has no `-f` option to pick another list file). Needs `cmake`, `ninja`,
 `build/venv` (gitignored) works:
 
 ```bash
-python3 -m venv build/venv && build/venv/bin/pip install numpy pybind11 cmake ninja pytest
+python3 -m venv build/venv && build/venv/bin/pip install numpy pybind11 cmake ninja pytest mlx
 export PATH="$PWD/build/venv/bin:$PATH"
 ```
 
@@ -978,14 +980,45 @@ Use `CMakeLists_cpu.txt`. Flags: `-mavx2 -mfma -ffast-math -march=native`.
 unnatural minima. TD gives realistic probability distributions that SL refines.
 
 1. **TD Self-Play (CPU)**: 25k-200k games @ alpha=0.1. Serial only (parallel TD deprecated).
-2. **Supervised Learning (GPU)**: Backprop against GNUbg rolled-out probabilities.
-   GPU via CUDA/cuBLAS, batch size 128. **Not available on Apple Silicon** — the
-   CUDA trainer is a stub on macOS (see "Platform Scope"); TD self-play runs fine.
+2. **Supervised Learning (GPU)**: Backprop against GNUbg rolled-out probabilities,
+   batch size 128 (4096 in the S11 scripts). Scripts call
+   `bgsage.sl_train.supervised_train` / `supervised_train_preencoded`: CUDA/cuBLAS
+   when `bgbot_cpp.cuda_available()`, otherwise **Apple MLX** on the Mac GPU
+   (`pip install mlx`). See "GPU SL trainer (`bgsage.sl_train`)" below.
 
 **Key training rules:**
 - All contact NNs train on ALL contact+crashed data, NOT game-plan subsets
 - Narrow subsets cause catastrophic regression
 - Game plan weight (`--gameplan-weight`) specializes each NN during SL
+
+### GPU SL trainer (`bgsage.sl_train`)
+
+`supervised_train(boards, targets, ...)` and
+`supervised_train_preencoded(inputs, targets, ...)` take exactly the keyword
+arguments and return the dict of `bgbot_cpp.cuda_supervised_train` /
+`cuda_supervised_train_preencoded`. All training scripts call them (and
+`sl_train.gpu_available()` in place of `cuda_available()`).
+`sl_train.backend()` is `"cuda"` when the CUDA build finds a GPU, else `"mlx"`
+when MLX has Metal, else `None`.
+
+The MLX path transcribes `cpp/src/cuda_nn.cu`: same sigmoid-MSE delta
+`(t-p)·p·(1-p)` (times the per-sample weight), backprop through the
+pre-update output weights, SGD at `alpha / batch_rows` (the partial last batch
+uses its own row count), one epoch = one shuffled pass, CPU benchmark scoring
+after every epoch with best-score weights saved as `.best`, and the same
+random init (`bgbot_cpp.NeuralNetwork(nh, ni, 0.1, seed)`). It is not
+bit-identical to CUDA: NumPy draws the shuffle, MLX's sigmoid doesn't clamp at
+±15, and GPU summation order differs. `tests/test_sl_train.py` holds the MLX
+weights to a float64 NumPy transcription of the update rules (2e-5).
+
+Measured 2026-11-17 on the M4 Pro (CPU busy with a rollout job): the snake-net
+recipe (`run_s11_containment_sl.py --family-data s11-bg-snake-rollout`, from
+`sl_s9_prim_race`, 20k ep @ α=3.1 + 60k ep @ α=1.0, batch 4096) reaches
+holdout ER **53.96** (CUDA on the RTX 4070S: 53.95). A 4,096-row step takes
+about 0.9 ms, close to the GPU's compute limit for a 244-400-5 net, which puts
+that schedule at ~7.5 minutes against 2.5 minutes on the RTX. (That figure is
+computed from the step time; the validation run itself took 11 minutes with an
+earlier loop that synced the GPU after every epoch, 1.55x slower, same weights.)
 
 ### Training a New Model from Scratch
 

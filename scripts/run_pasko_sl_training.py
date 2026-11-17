@@ -42,6 +42,7 @@ sys.path.insert(0, os.path.join(_PARENT_ROOT, 'build'))
 sys.path.insert(0, os.path.join(_BGSAGE_ROOT, 'build'))
 
 import bgbot_cpp
+from bgsage import sl_train
 import numpy as np
 
 DATA_DIR = os.path.join(_BGSAGE_ROOT, 'data')
@@ -150,7 +151,7 @@ def main():
             total_steps += chunk
             done += chunk
             # print_interval must be > 0 (0 crashes CUDA on Python 3.14).
-            bgbot_cpp.cuda_supervised_train_preencoded(
+            sl_train.supervised_train_preencoded(
                 inputs=train_inputs, targets=train_probs, weights_path=wpath,
                 n_hidden=N_HIDDEN, n_inputs=N_INPUTS, alpha=alpha, epochs=chunk,
                 batch_size=args.batch_size, seed=42 + total_steps,

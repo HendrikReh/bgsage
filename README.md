@@ -19,7 +19,7 @@ positions, dice, cube actions and scores for custom research. See
 
 It is a joint Python/C++ library that includes:
 * A neural network-based backgammon bot.
-* Neural network training framework using both self play and supervised learning, including training code, benchmark scoring, with customizable inputs. Upstream runs supervised learning on an NVIDIA GPU (via CUDA); that trainer isn't available on Apple Silicon, so in this fork only self-play (TD) training runs for now.
+* Neural network training framework using both self play and supervised learning, including training code, benchmark scoring, with customizable inputs. Supervised learning runs on the GPU: on Apple Silicon through Apple's MLX framework (`pip install mlx`), on NVIDIA GPUs through upstream's CUDA trainer.
 * The post-training weights for several different versions of the bot engine.
 * Multi-ply and rollout calculations that efficiently parallelize on the CPU. Full technical specifications of the algorithms are in MULTI-PLY.md (N-ply search and the cubeful evaluation engine) and ROLLOUT.md (truncated and full rollouts with variance reduction).
 * Test framework.
@@ -31,7 +31,7 @@ You need Xcode's command-line tools (`xcode-select --install`) and Python 3.10 o
 
 ```bash
 python3 -m venv build/venv
-build/venv/bin/pip install numpy pybind11 cmake ninja pytest
+build/venv/bin/pip install numpy pybind11 cmake ninja pytest mlx   # mlx: GPU training only
 export PATH="$PWD/build/venv/bin:$PATH"
 
 cmake -S . -B build/cmake -G Ninja -DCMAKE_BUILD_TYPE=Release \

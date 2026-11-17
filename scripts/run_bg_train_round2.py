@@ -21,6 +21,7 @@ import numpy as np
 sys.path.insert(0, "build")
 os.add_dll_directory(r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64")
 import bgbot_cpp
+from bgsage import sl_train
 
 N_HIDDEN = 400
 N_INPUTS = 244
@@ -90,7 +91,7 @@ def main():
         chunk = min(bench_interval, total_epochs - epochs_done)
         epochs_done += chunk
 
-        bgbot_cpp.cuda_supervised_train(
+        sl_train.supervised_train(
             boards=train_boards, targets=train_probs,
             weights_path=wpath, n_hidden=N_HIDDEN, n_inputs=N_INPUTS,
             alpha=alpha, epochs=chunk, batch_size=BATCH_SIZE,

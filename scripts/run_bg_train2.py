@@ -22,6 +22,7 @@ if os.path.isdir(cuda_path):
     os.add_dll_directory(cuda_path)
 
 import bgbot_cpp
+from bgsage import sl_train
 
 
 def benchmark_er(bench_boards, bench_eq, weights_path):
@@ -110,7 +111,7 @@ def run():
             total_epochs += chunk
             epochs_done += chunk
 
-            bgbot_cpp.cuda_supervised_train(
+            sl_train.supervised_train(
                 boards=train_boards, targets=train_probs,
                 weights_path=wpath, n_hidden=400, n_inputs=244,
                 alpha=alpha, epochs=chunk, batch_size=4096,

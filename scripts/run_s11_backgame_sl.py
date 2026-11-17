@@ -59,6 +59,7 @@ if sys.platform == "win32":
     os.add_dll_directory(str(_PROJECT_ROOT / "build"))
 
 import bgbot_cpp  # noqa: E402
+from bgsage import sl_train
 import numpy as np  # noqa: E402
 
 N_HIDDEN = 400
@@ -188,7 +189,7 @@ def train_category(category: str, args: argparse.Namespace) -> None:
             total_epochs += chunk
             done += chunk
             # print_interval must be > 0 (0 crashes CUDA on Python 3.14).
-            bgbot_cpp.cuda_supervised_train_preencoded(
+            sl_train.supervised_train_preencoded(
                 inputs=train_inputs, targets=train_probs, weights_path=wpath,
                 n_hidden=N_HIDDEN, n_inputs=N_INPUTS, alpha=alpha, epochs=chunk,
                 batch_size=BATCH, seed=42 + total_epochs,

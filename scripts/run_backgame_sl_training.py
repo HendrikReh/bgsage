@@ -12,6 +12,7 @@ cuda_path = r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64'
 if os.path.isdir(cuda_path):
     os.add_dll_directory(cuda_path)
 import bgbot_cpp
+from bgsage import sl_train
 import numpy as np
 
 N_HIDDEN = 400
@@ -104,7 +105,7 @@ def run():
             total_epochs += chunk
             epochs_done += chunk
             # print_interval must be > 0 (0 crashes with CUDA on Python 3.14)
-            bgbot_cpp.cuda_supervised_train_preencoded(
+            sl_train.supervised_train_preencoded(
                 inputs=train_inputs, targets=train_probs, weights_path=wpath,
                 n_hidden=N_HIDDEN, n_inputs=N_INPUTS, alpha=alpha, epochs=chunk,
                 batch_size=4096, seed=42+total_epochs,
