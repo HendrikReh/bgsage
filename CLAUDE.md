@@ -53,6 +53,7 @@ python/bgsage/               # Python package
   weights.py                # Production model registry, WeightConfig, model discovery
   data.py                   # .bm file loading, training data parsing
   gnubg.py                  # GNUbg CLI wrapper for reference evaluation
+  settings.py               # User settings (GNUbg binary path; see "GNUbg Path" below)
   matchinfo.py              # Match play take points, dead cube take points, gammon prices
   text_export.py            # Galaxy/XG-compatible text export + move notation
   xg_compare.py             # Parse XG .xg files; compute per-game PR stats vs XG
@@ -657,6 +658,29 @@ rollout.set_bearoff_db(&db);
 python scripts/generate_bearoff_db.py  # ~4 seconds, outputs data/bearoff_1sided.db
 ```
 
+## GNUbg Path
+
+`bgsage.gnubg` (`GnuBgAnalyzer`, `post_move_analytics*`) runs the GNUbg CLI.
+`bgsage.settings.gnubg_path()` picks the binary, first hit wins:
+
+1. `settings.set_gnubg_path(path)` in code (this process), or per instance
+   `GnuBgAnalyzer(gnubg_path=...)` / `post_move_analytics(..., gnubg_path=...)`
+2. the `BGSAGE_GNUBG` environment variable
+3. `"gnubg_path"` in the user settings file: `~/.config/bgsage/settings.json`
+   (`$XDG_CONFIG_HOME` respected), `%APPDATA%\bgsage\settings.json` on Windows,
+   or wherever `BGSAGE_SETTINGS` points
+4. auto-detection: `C:\Program Files (x86)\gnubg\gnubg-cli.exe`, then
+   `gnubg-cli` or `gnubg` on PATH
+
+```python
+from bgsage import settings
+settings.set_gnubg_path("/opt/homebrew/bin/gnubg", persist=True)  # saved for later sessions
+settings.set_gnubg_path(None, persist=True)                       # back to auto-detection
+```
+
+The legacy scripts `score_benchmark_pr_gnubg.py` and
+`test_match_gnubg_comparison.py` still carry their own hardcoded Windows path.
+
 ## Benchmark Scripts
 
 All benchmark scripts default to the production model and accept `--model <name>`
@@ -839,6 +863,11 @@ Need `#define NOMINMAX` before `#include <windows.h>` (std::min/max conflict).
 
 ### macOS (CPU-only)
 
+Configure from the repo root: the top-level `CMakeLists.txt` includes
+`cpp/CMakeLists_cpu.txt` (`cpp/CMakeLists.txt` is the CUDA build, and CMake
+has no `-f` option to pick another list file). Needs `cmake`, `ninja`,
+`pybind11` and `numpy` for the Python that will import the module.
+
 ```bash
 cmake -S . -B build/cmake -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -Dpybind11_DIR="$(python -c 'import pybind11; print(pybind11.get_cmake_dir())')"
@@ -847,35 +876,6 @@ cp build/cmake/bgbot_cpp*.so build/
 ```
 
 On Apple Silicon: NEON intrinsics used instead of AVX2, no `-ffast-math`.
-
-### Linux / Docker (CPU-only)
-
-Use `CMakeLists_cpu.txt`. Flags: `-mavx2 -mfma -ffast-math -march=native`.
-
-### Dependencies
-
-- C++17, pybind11
-- CUDA 13.1 toolkit (optional, for GPU training only)
-- Python >= 3.10
-
-## Input Encodings
-
-**Tesauro (196 inputs)** — PureRace only:
-- 4 thermometer inputs per point per player (24 points x 2 players x 4 = 192)
-- Plus bar and borne-off per player (4 more)
-
-Configure from the repo root: the top-level `CMakeLists.txt` includes
-`cpp/CMakeLists_cpu.txt` (`cpp/CMakeLists.txt` is the CUDA build, and CMake
-has no `-f` option to pick another list file). Needs `cmake`, `ninja`,
-`pybind11` and `numpy` for the Python that will import the module.
-
-**Extended (244 inputs)** — Racing/Attacking/Priming/Anchoring:
-- 122 features per player
-- [0-95]: Point encoding (same as Tesauro)
-- [96]: Bar / 2.0
-- [97-99]: Borne-off (3 buckets)
-- [100-121]: 22 GNUbg-style features (escape, containment, timing, etc.)
-- Requires `init_escape_tables()` once before use
 
 **Accelerate (Apple Silicon only, on by default).** The batched candidate
 kernels — every `batch_evaluate_candidates_*` and the cubeful engine's
@@ -914,6 +914,30 @@ money-benchmark boards and candidates, `compute_extended_contact_inputs` went
 1.80 -> 1.17 us per board with every output bit-identical.
 `tests/test_encoding_golden.py` pins those features on 1,000 positions computed
 by the original implementations; keep it passing when touching them.
+
+### Linux / Docker (CPU-only)
+
+Use `CMakeLists_cpu.txt`. Flags: `-mavx2 -mfma -ffast-math -march=native`.
+
+### Dependencies
+
+- C++17, pybind11
+- CUDA 13.1 toolkit (optional, for GPU training only)
+- Python >= 3.10
+
+## Input Encodings
+
+**Tesauro (196 inputs)** — PureRace only:
+- 4 thermometer inputs per point per player (24 points x 2 players x 4 = 192)
+- Plus bar and borne-off per player (4 more)
+
+**Extended (244 inputs)** — Racing/Attacking/Priming/Anchoring:
+- 122 features per player
+- [0-95]: Point encoding (same as Tesauro)
+- [96]: Bar / 2.0
+- [97-99]: Borne-off (3 buckets)
+- [100-121]: 22 GNUbg-style features (escape, containment, timing, etc.)
+- Requires `init_escape_tables()` once before use
 
 ## Training Pipeline
 
