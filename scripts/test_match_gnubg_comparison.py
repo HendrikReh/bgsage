@@ -135,11 +135,23 @@ def parse_cube_output(output):
 
     Handles any ordering of ND/DT/DP in cubeful equities section.
     Returns dict with equity_nd, equity_dt, equity_dp, action.
+
+    When the player on roll has no cube decision — the Crawford game, a dead
+    cube (e.g. double match point), or the 1-away leader post-Crawford —
+    GNUbg's `hint` prints no cube analysis at all. That case returns
+    {'no_cube_decision': True, 'reason': ...}. Output where the hint never ran
+    returns None.
     """
     result = {}
 
     if 'Cube analysis' not in output:
-        return None
+        if 'is now on roll' not in output:
+            return None
+        if 'cube is disabled during the Crawford game' in output:
+            reason = 'Crawford game'
+        else:
+            reason = 'cube dead or not available to the player on roll'
+        return {'no_cube_decision': True, 'reason': reason}
 
     section = output[output.index('Cube analysis'):]
     lines = section.split('\n')
@@ -323,6 +335,21 @@ def main():
         try:
             gnubg_output = run_gnubg(cmd)
             g = parse_cube_output(gnubg_output)
+
+            if g is not None and g.get('no_cube_decision'):
+                # GNUbg offers no cube action; bgsage must agree the player
+                # cannot double here and must not double.
+                can_dbl = bgbot_cpp.can_double_match(
+                    away1, away2, 1, bgbot_cpp.CubeOwner.CENTERED, is_craw)
+                print(f"  GNUbg:  no cube decision ({g['reason']})")
+                print(f"  bgsage: can_double={can_dbl}  -> {our_a}")
+                if not can_dbl and not cube.should_double:
+                    print(f"  -> AGREE: no cube action")
+                    agree += 1
+                else:
+                    print(f"  -> DISAGREE: bgsage treats the cube as available")
+                    disagree += 1
+                continue
 
             if g is None or 'equity_nd' not in g:
                 print(f"  [SKIP] Could not parse GNUbg output")
