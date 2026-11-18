@@ -975,6 +975,37 @@ money-benchmark boards and candidates, `compute_extended_contact_inputs` went
 `tests/test_encoding_golden.py` pins those features on 1,000 positions computed
 by the original implementations; keep it passing when touching them.
 
+**Analyzer call overhead (PR #3).** Two Python-side costs used to dominate the
+cheap levels. `cube_action` built a fresh base strategy on every call,
+reloading every weight file (24 for `stage11`, ~20 ms); `_CubelessBase._cube_strategy`
+now loads it once per analyzer and passes it to `cube_decision_*_unified` via
+`strategy=`. And 1-ply cubeful `checker_play` ran its conversion through a
+`ThreadPoolExecutor` (~0.9 ms of pool start-up for microseconds of work); it now
+runs serially (`SERIAL_CUBEFUL_1PLY`), N-ply keeps the pool. The shared cube
+strategy is safe to call from several threads: networks are immutable after
+construction, and the per-thread cubeful cache key covers every `CubeInfo`
+field, ply, deep prefilter and root pin, so cache hits across calls return
+fresh-evaluation values (8 Python threads x 1,440 calls at 1-3 ply,
+bit-identical to a fresh analyzer per call).
+
+Measured 2026-11-18 on the M4 Pro, `stage11`, one persistent analyzer, median
+ms per call over fixed random positions, `main` before (`c8ff5a6`) vs after
+(`623c458`), three interleaved rounds. Another job was loading the CPU (load
+average ~45), so absolute times run high; the ratios hold.
+
+| Call | before | after | speed-up |
+|---|---|---|---|
+| `cube_action` 1-ply | 19-25 | 0.015 | ~1,500x |
+| `cube_action` 2-ply | 22-29 | 1.9 | ~13x |
+| `cube_action` 3-ply | 36-40 | 16 | ~2.3x |
+| `checker_play` 1-ply | 1.07-1.15 | 0.13-0.14 | ~8x |
+| `checker_play` 1-ply, 1 thread | 0.96-1.06 | 0.13-0.14 | ~7.5x |
+| `checker_play` 2-ply | 11.0-14.3 | 13.9-15.3 | unchanged (noise) |
+
+The weight-load saving needs a long-lived analyzer: code that builds a new
+`BgBotAnalyzer` per call still pays it (the cube strategy loads lazily on the
+analyzer's first `cube_action`).
+
 ### Upstream builds (not supported in this fork)
 
 Kept for reference and upstream merges; nobody tests them here.
@@ -1065,6 +1096,40 @@ about 0.9 ms, close to the GPU's compute limit for a 244-400-5 net, which puts
 that schedule at ~7.5 minutes against 2.5 minutes on the RTX. (That figure is
 computed from the step time; the validation run itself took 11 minutes with an
 earlier loop that synced the GPU after every epoch, 1.55x slower, same weights.)
+
+### Cloud rollouts on Modal (`scripts/modal_rollout.py`)
+
+Rollout targets, not GPU time, are what training data costs (SL takes minutes
+on the Mac; TD is serial). `scripts/modal_rollout.py` rolls out a position
+file (26 ints per line, side that just moved positive — what the harvest
+scripts write) on Modal CPU containers and appends to the matching
+`<name>-rollout` file in the SL trainers' format, plus a `.meta.jsonl`
+sidecar (equity, SEs, seconds). It replaces the parent repo's
+`rollout_backgame_positions.py` for this fork. Defaults are the S11 piles'
+convention: `--model stage9`, 1,296 trials, no truncation, 3-ply checker play
+throughout (`ultra_late_threshold=9999`), VR, PubEval 20/15 prefilter,
+bearoff DB. Resumable (boards already in the output are skipped); `--limit N`
+caps a run and `--max-usd` stops it at an estimated compute cost; `--local`
+runs the same code in-process on the Mac.
+
+```bash
+build/venv/bin/pip install modal && build/venv/bin/modal setup   # once
+python scripts/modal_rollout.py data/<name>-data --limit 20        # small test
+python scripts/modal_rollout.py data/<name>-data --containers 100 --max-usd 300
+```
+
+The image builds the engine from `cpp/` with the inherited Linux x86-64 flags
+(AVX2/FMA, `-ffast-math`) — the one place this fork uses the Linux build. It
+picks marginally different moves from the Accelerate build, so values are not
+bit-identical, only statistically equal. Measured 2026-11-18 on
+`s11-bg-containment-rollout` rows: 40 boards rolled out locally reproduce the
+stored targets (equity z mean 0.16, std 0.77, max 2.4), and 20 of them on
+Modal match the local results within 1.7 SE. An 8-core container (16
+threads, $0.41/h at list price) runs at ~0.8x the M4 Pro: ~20 s and
+**~$0.002 per containment-type board** at 1,296 trials / 3-ply (Fargate was
+~$0.005), so snake-type boards (~6x longer) cost ~$0.013. The cost estimate
+counts rollout time only; Modal's dashboard has the real bill. Starter plans
+allow 100 concurrent containers.
 
 ### Training a New Model from Scratch
 
