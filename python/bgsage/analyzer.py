@@ -118,6 +118,37 @@ def _move_order_key(m: dict):
 # Capability observed by integrations that verify Python candidate pools.
 SERIAL_CUBEFUL_1PLY = True
 
+#: Janowski cube life for CONTACT positions in money-game cube analysis, by
+#: evaluation depth. The engine's default (cube_efficiency: 0.68) is right
+#: where the cube tree is deep enough (3-ply and up). The 1-ply and 2-ply
+#: trees end in a 1-ply Janowski leaf before the player's own next cube
+#: node, and with 0.68 there they under-value No Double for the side holding
+#: the initiative, so they over-double. Tuned on the odd seeds of the money
+#: benchmark's 2,842 cube decisions and checked on the even ones (cube PR
+#: 1-ply 3.06 -> 2.53, 2-ply 2.78 -> 1.27). Races keep their pip-based
+#: value. Not applied to match play: on the 5-point match benchmark the same
+#: values do not help (1-ply 2.35 -> 2.38, 2-ply 1.58 -> 1.82).
+MONEY_CONTACT_CUBE_LIFE: dict[int, float] = {1: 0.75, 2: 0.80}
+
+
+def _contact_cube_life(n_plies: int, away1: int = 0, away2: int = 0) -> float:
+    """``contact_x`` for a cube tree of depth ``n_plies``; -1 = engine default."""
+    if away1 > 0 or away2 > 0:
+        return -1.0
+    return MONEY_CONTACT_CUBE_LIFE.get(n_plies, -1.0)
+
+
+def _janowski_x(probs, board, n_plies: int | None, away1: int = 0, away2: int = 0) -> float:
+    """Cube life for a Janowski conversion of ``board`` in a depth-``n_plies``
+    analysis (None: not a cube tree, engine default)."""
+    race = bgbot_cpp.is_race(board)
+    if not race and n_plies is not None:
+        cx = _contact_cube_life(n_plies, away1, away2)
+        if cx >= 0.0:
+            return cx
+    pp, op = bgbot_cpp.pip_counts(board)
+    return bgbot_cpp.cube_efficiency(probs, race, pp, op)
+
 
 class _CubelessBase:
     """Shared infrastructure for cubeless analyzers."""
@@ -162,9 +193,7 @@ class _CubelessBase:
             cl_eq = r["equity"]
             probs = list(r["probs"])
             if owner is not None:
-                race = bgbot_cpp.is_race(bl)
-                pp, op = bgbot_cpp.pip_counts(bl)
-                x = bgbot_cpp.cube_efficiency(probs, race, pp, op)
+                x = _janowski_x(probs, bl, 1, away1, away2)
                 if max_cube_value and cube_value >= max_cube_value:
                     cf_eq = _dead_cube_equity(probs, cube_value, away1, away2, is_crawford)
                 elif is_match:
@@ -339,6 +368,7 @@ class _OnePlyAnalyzer(_CubelessBase):
             self._weights.hidden_sizes_list,
             away1=away1, away2=away2, is_crawford=is_crawford,
             jacoby=jacoby, beaver=beaver, **_cube_limit_kwargs(max_cube_value),
+            contact_x=_contact_cube_life(1, away1, away2),
             bearoff_db=self._bearoff_db, strategy=self._cube_strategy,
         )
         return self._format_cube_result(r, eval_level="1-ply")
@@ -438,6 +468,7 @@ class _MultiPlyAnalyzer(_CubelessBase):
             n_threads=self._parallel_threads,
             away1=away1, away2=away2, is_crawford=is_crawford,
             jacoby=jacoby, beaver=beaver, **_cube_limit_kwargs(max_cube_value),
+            contact_x=_contact_cube_life(self._n_plies, away1, away2),
             bearoff_db=self._bearoff_db,
             incl_2ply_details=incl_2ply_details, strategy=self._cube_strategy,
         )
@@ -819,9 +850,7 @@ class _CubefulAnalyzer:
         if max_cube_value and cube_value >= max_cube_value and self._cubeful_ply == 1:
             return _dead_cube_equity(probs, cube_value, away1, away2, is_crawford)
         if self._cubeful_ply == 1:
-            race = bgbot_cpp.is_race(post_move_board)
-            pp, op = bgbot_cpp.pip_counts(post_move_board)
-            x = bgbot_cpp.cube_efficiency(probs, race, pp, op)
+            x = _janowski_x(probs, post_move_board, 1, away1, away2)
             if is_match:
                 return bgbot_cpp.cl2cf(probs, cube_value, owner, x,
                                        away1, away2, is_crawford,
@@ -845,6 +874,7 @@ class _CubefulAnalyzer:
                     cube_value=cube_value,
                     away1=away2, away2=away1, is_crawford=is_crawford,
                     jacoby=jacoby, beaver=beaver, **_cube_limit_kwargs(max_cube_value),
+                    contact_x=_contact_cube_life(self._cubeful_ply, away1, away2),
                     bearoff_db=db,
                 )
             else:
@@ -854,6 +884,7 @@ class _CubefulAnalyzer:
                     n_threads=n_threads,
                     cube_value=cube_value,
                     jacoby=jacoby, beaver=beaver, **_cube_limit_kwargs(max_cube_value),
+                    contact_x=_contact_cube_life(self._cubeful_ply, away1, away2),
                     bearoff_db=db,
                 )
             return -opp_eq
@@ -1008,6 +1039,7 @@ class _CubefulAnalyzer:
                     cube_value=cube_value,
                     away1=away2, away2=away1, is_crawford=is_crawford,
                     jacoby=jacoby, beaver=beaver, **_cube_limit_kwargs(max_cube_value),
+                    contact_x=_contact_cube_life(cubeful_ply, away1, away2),
                     bearoff_db=db,
                     root_board=board,   # root routing: the decision's pre-move board
                 )
@@ -1624,9 +1656,10 @@ class BgBotAnalyzer:
             cf_eq = float(r["cubeful_equity"])
         else:
             # Cubeful equity via post-hoc Janowski on cubeless probs.
-            race = bgbot_cpp.is_race(board)
-            pp, op = bgbot_cpp.pip_counts(board)
-            x = bgbot_cpp.cube_efficiency(probs_list, race, pp, op)
+            # Only the plain 1-ply level is a depth-1 cube tree; N-ply and
+            # rollout probs converted here keep the engine default.
+            one_ply = eval_level == "1-ply"
+            x = _janowski_x(probs_list, board, 1 if one_ply else None, away1, away2)
             is_match = away1 > 0 or away2 > 0
             if is_match:
                 cf_eq = bgbot_cpp.cl2cf(probs_list, cube_value, owner, x,

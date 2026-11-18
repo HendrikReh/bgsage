@@ -1753,7 +1753,80 @@ with the GIL automatically acquired.
 
 Janowski interpolation for both money games and match play. Optional Jacoby rule
 for unlimited games (default on in Python API). Cube efficiency: 0.68 contact,
-pip-dependent for race (unchanged for match play).
+pip-dependent for race (unchanged for match play). The Python API raises the
+contact value for money analysis at 1-ply and 2-ply (next section).
+
+### Cube life by depth (money)
+
+`BgBotAnalyzer` and the `bgsage.batch` functions use a higher Janowski cube
+life for CONTACT positions in money analysis at 1-ply and 2-ply:
+`MONEY_CONTACT_CUBE_LIFE = {1: 0.75, 2: 0.80}` in `analyzer.py`. Races keep
+their pip-based value, match play and 3-ply and deeper keep 0.68, and
+rollout levels are untouched.
+
+**Why.** The 1-ply and 2-ply cube trees end in a 1-ply Janowski leaf before
+the player's own next cube node. With 0.68 there, the leaf under-values No
+Double for the side holding the initiative, so both levels over-double. See
+"Cube scoring: the opponent-owned-cube artifact" below for the diagnosis.
+
+**Where it applies.** The value goes to every cubeful conversion at that
+depth, so checker play and cube action stay consistent: the best move's
+cubeful equity is still minus the opponent's cube analysis.
+- `cube_action`, 1-ply and N-ply.
+- Checker play, in the 1-ply Janowski path and the N-ply cube-aware tree.
+- 1-ply `post_move_analytics`.
+- `batch_evaluate`, `batch_post_move_evaluate` and `batch_checker_play`, at
+  the matching levels.
+
+**Mechanism.** `CubeInfo.contact_x` (C++; -1 = `cube_efficiency()`) replaces
+the cube efficiency of contact positions only. This differs from
+`cube_x_override`, which also replaces races. `resolve_cube_x()` in
+`cube.cpp` is the one place that resolves it. The bindings take `contact_x`;
+`batch_checker_play` takes `contact_x_1ply` / `contact_x_nply`, and the batch
+bindings apply it to money positions only. C++ callers that don't pass it are
+bit-identical to before.
+
+**Tuning.** Tuned 2026-11-18 on the odd seeds of the money benchmark's 2,842
+cube decisions and checked on the even seeds. Cube PR, old -> new:
+
+| Level | odd seeds (tuning) | even seeds (held out) |
+|---|---|---|
+| 1-ply | 3.37 -> 2.19 | 3.06 -> 2.52 |
+| 2-ply | 3.06 -> 1.35 | 2.78 -> 1.26 |
+
+On the tuning half the optimum is flat: 0.74-0.76 at 1-ply and 0.79-0.81 at
+2-ply. At 3-ply, 0.68 is already best (0.52; 0.57 at 0.72).
+
+**Full money benchmark** (17,535 decisions), PR old -> new:
+
+| Level | total | checker | cube | blunders |
+|---|---|---|---|---|
+| 1-ply | 2.55 -> 2.43 | 2.42 -> 2.44 | 3.21 -> 2.36 | 153 -> 166 |
+| 2-ply | 1.65 -> 1.38 | 1.41 -> 1.40 | 2.92 -> 1.31 | 55 -> 58 |
+
+Checker play is unaffected within noise (paired: 1-ply +0.017 +- 0.011, 2-ply
+-0.010 +- 0.013).
+
+**Backgame folders**, cube PR at 1P / 2P, old -> new:
+
+| Folder | S9-play reference | S11-play twin |
+|---|---|---|
+| containment | 6.32 / 6.80 -> 4.09 / 2.74 | 9.03 / 11.10 -> 7.56 / 6.18 |
+| massive | 6.97 / 6.46 -> 3.42 / 2.32 | 8.49 / 7.97 -> 4.23 / 3.09 |
+
+Caveats:
+- At 1-ply the cube PR falls but cube blunders rise (29 -> 39 on the full
+  set).
+- Match play is excluded because the same values do not help on the 5-point
+  match benchmark: 1-ply 2.35 -> 2.38, 2-ply 1.58 -> 1.82. 0.75 at 2-ply gave
+  1.32 there, but without a held-out check.
+- Every reference here is a Sage rollout, which makes its own in-trial cube
+  decisions at 3-ply with 0.68. An independent XG check of the cube
+  decisions has not been run.
+
+Tests: `tests/test_contact_cube_life.py`. `tests/test_2ply_details.py` pins
+the table empty, because it compares an N-ply tree's interior with
+standalone shallower analyses.
 
 ### Jacoby Rule
 
@@ -3041,8 +3114,9 @@ cause, and a uniform cube life of 0.85 fixes 2-ply (massive 6.50 -> 1.68,
 money 2.91 -> 1.87) while regressing 1-ply and 3-ply on the money
 benchmark — so the real fix is a family- and ply-dependent cube life, the
 ML implied-cube-life index `cube_efficiency` already reserves a slot for.
-Until then, treat 2-ply cube decisions as 1-ply quality wherever a level
-is chosen for cube hints or PR grading. Side findings, not fixed: the
+The ply-dependent half of that fix landed on 2026-11-18: money analysis at
+1-ply and 2-ply now uses a higher contact cube life (see "Cube life by
+depth (money)" under "Doubling Cube"). Side findings, not fixed: the
 reference pipeline double-applies the beaver on opponent-owned records
 (harmless to PR); the S9-play snake reference's cube values are
 trial-player distorted (its 3-ply cube PR is worst, the twin's best); and

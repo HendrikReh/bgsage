@@ -51,9 +51,8 @@ float resolve_cube_x_local(
     const std::array<float, NUM_OUTPUTS>& probs,
     const CubeInfo& cube, const Board& board, bool race)
 {
-    if (cube.cube_x_override >= 0.0f) return cube.cube_x_override;
     auto [pp, op] = pip_counts(board);
-    return cube_efficiency(probs, race, pp, op);
+    return resolve_cube_x(probs, cube, race, pp, op);
 }
 
 void make_cube_pos_local(
@@ -143,6 +142,8 @@ uint64_t cube_fp_one(uint64_t h, const CubeInfo& c) {
     h = fp_mix(h, static_cast<uint32_t>(c.max_cube_value) + 29);
     h = fp_mix(h, static_cast<uint32_t>(
                       static_cast<int32_t>(c.cube_x_override * 4096.0f)) + 31);
+    h = fp_mix(h, static_cast<uint32_t>(
+                      static_cast<int32_t>(c.contact_x * 4096.0f)) + 37);
     return h;
 }
 
@@ -399,8 +400,9 @@ void leaf_from_post_probs(
             arCf[i] = cubeless_value(pre_roll_probs, aci[i]);
             continue;
         }
-        float x = (aci[i].cube_x_override >= 0.0f)
-                   ? aci[i].cube_x_override : default_x;
+        float x = (aci[i].cube_x_override >= 0.0f) ? aci[i].cube_x_override
+                   : (!race && aci[i].contact_x >= 0.0f) ? aci[i].contact_x
+                   : default_x;
         if (aci[i].is_money()) {
             arCf[i] = cl2cf_money(pre_roll_probs, aci[i].owner, x,
                                    aci[i].jacoby_active());

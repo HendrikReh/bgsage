@@ -27,6 +27,12 @@ struct CubeInfo {
     bool jacoby = false;                     // Jacoby rule (money games only)
     bool beaver = false;                     // Beaver rule (money games only)
     int max_cube_value = 0;                  // 0 = unlimited, >0 = cap (1 = cubeless)
+    // If >= 0, replaces the cube efficiency of CONTACT positions (races keep
+    // their pip-based value), unlike cube_x_override, which replaces both.
+    // The Python analyzer sets it per evaluation depth for money cube
+    // analysis (the 1-ply Janowski leaf otherwise over-doubles at 1-ply and
+    // 2-ply). Default -1 keeps every C++ caller on cube_efficiency().
+    float contact_x = -1.0f;
 
     bool is_money() const { return match.is_money(); }
 
@@ -56,6 +62,7 @@ inline CubeInfo flip_cube_perspective(const CubeInfo& cube) {
     opp.jacoby = cube.jacoby;
     opp.beaver = cube.beaver;
     opp.max_cube_value = cube.max_cube_value;
+    opp.contact_x = cube.contact_x;
     return opp;
 }
 
@@ -195,6 +202,15 @@ float cl2cf_money(const std::array<float, NUM_OUTPUTS>& probs,
 //   Race:             clamp(0.55 + 0.00125 * avg_pips, 0.6, 0.7) (probs ignored)
 float cube_efficiency(
     const std::array<float, NUM_OUTPUTS>& probs,
+    bool is_race_pos,
+    int player_pips,
+    int opponent_pips);
+
+// Cube efficiency for a position under `cube`: cube_x_override if set, else
+// cube_efficiency(), with cube.contact_x replacing it for contact positions.
+float resolve_cube_x(
+    const std::array<float, NUM_OUTPUTS>& probs,
+    const CubeInfo& cube,
     bool is_race_pos,
     int player_pips,
     int opponent_pips);
