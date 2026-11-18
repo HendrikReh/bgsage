@@ -701,6 +701,15 @@ float cube_efficiency(
     return std::clamp(x, 0.6f, 0.7f);
 }
 
+float contact_cube_x(const CubeInfo& cube, int player_pips, int opponent_pips)
+{
+    if (cube.contact_x_pip_slope == 0.0f) return cube.contact_x;
+    float avg_pips = static_cast<float>(player_pips + opponent_pips) * 0.5f;
+    float x = cube.contact_x
+              + cube.contact_x_pip_slope * (avg_pips - CONTACT_X_PIP_PIVOT);
+    return std::clamp(x, 0.5f, 1.0f);
+}
+
 float resolve_cube_x(
     const std::array<float, NUM_OUTPUTS>& probs,
     const CubeInfo& cube,
@@ -709,7 +718,8 @@ float resolve_cube_x(
     int opponent_pips)
 {
     if (cube.cube_x_override >= 0.0f) return cube.cube_x_override;
-    if (!is_race_pos && cube.contact_x >= 0.0f) return cube.contact_x;
+    if (!is_race_pos && cube.contact_x >= 0.0f)
+        return contact_cube_x(cube, player_pips, opponent_pips);
     return cube_efficiency(probs, is_race_pos, player_pips, opponent_pips);
 }
 
@@ -1317,6 +1327,7 @@ static void cubeful_recursive_multi(
             pre_roll_probs,
             (cci > 0 && aciCubePos[0].cube_value > 0) ? aciCubePos[0] : CubeInfo{},
             board, race);
+        auto [leaf_pp, leaf_op] = pip_counts(board);
 
         // Expand cci → 2*cci (fInvert=false: evaluate from current player's perspective)
         CubeInfo aci[MAX_CCI * 2];
@@ -1334,7 +1345,8 @@ static void cubeful_recursive_multi(
                 continue;
             }
             float x = (aci[i].cube_x_override >= 0.0f) ? aci[i].cube_x_override
-                       : (!race && aci[i].contact_x >= 0.0f) ? aci[i].contact_x
+                       : (!race && aci[i].contact_x >= 0.0f)
+                           ? contact_cube_x(aci[i], leaf_pp, leaf_op)
                        : default_x;
             if (aci[i].is_money()) {
                 arCf[i] = cl2cf_money(pre_roll_probs, aci[i].owner, x,

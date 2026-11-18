@@ -127,8 +127,19 @@ SERIAL_CUBEFUL_1PLY = True
 #: benchmark's 2,842 cube decisions and checked on the even ones (cube PR
 #: 1-ply 3.06 -> 2.53, 2-ply 2.78 -> 1.27). Races keep their pip-based
 #: value. Not applied to match play: on the 5-point match benchmark the same
-#: values do not help (1-ply 2.35 -> 2.38, 2-ply 1.58 -> 1.82).
-MONEY_CONTACT_CUBE_LIFE: dict[int, float] = {1: 0.75, 2: 0.80}
+#: values do not help (1-ply 2.35 -> 2.38, 2-ply 1.58 -> 1.82). At 1-ply the
+#: value is the one at 120 average pips; the slope below makes it rise with
+#: the pip count (it replaced a flat 0.75).
+MONEY_CONTACT_CUBE_LIFE: dict[int, float] = {1: 0.7375, 2: 0.80}
+
+#: Per-pip slope of the contact cube life above, by depth: the engine uses
+#: ``MONEY_CONTACT_CUBE_LIFE[n] + slope * (average pips - 120)`` (clamped to
+#: [0.5, 1.0]), so at 1-ply the cube life runs from about 0.66 at 75 pips to
+#: 0.79 at 150. Fitted at 1-ply to XG World Class's cube decisions on the
+#: money benchmark's cube positions, half the seeds at a time; scored on the
+#: other half, cube PR 2.00 -> 1.61 against XG and 2.36 -> 1.93 against the
+#: Sage reference, with fewer blunders. At 2-ply no slope beat the flat 0.80.
+MONEY_CONTACT_CUBE_LIFE_PIP_SLOPE: dict[int, float] = {1: 0.00175}
 
 
 def _contact_cube_life(n_plies: int, away1: int = 0, away2: int = 0) -> float:
@@ -138,6 +149,14 @@ def _contact_cube_life(n_plies: int, away1: int = 0, away2: int = 0) -> float:
     return MONEY_CONTACT_CUBE_LIFE.get(n_plies, -1.0)
 
 
+def _contact_cube_slope(n_plies: int, away1: int = 0, away2: int = 0) -> float:
+    """``contact_x_pip_slope`` for a cube tree of depth ``n_plies``; 0 = flat.
+    Only takes effect where ``_contact_cube_life`` sets ``contact_x``."""
+    if _contact_cube_life(n_plies, away1, away2) < 0.0:
+        return 0.0
+    return MONEY_CONTACT_CUBE_LIFE_PIP_SLOPE.get(n_plies, 0.0)
+
+
 def _janowski_x(probs, board, n_plies: int | None, away1: int = 0, away2: int = 0) -> float:
     """Cube life for a Janowski conversion of ``board`` in a depth-``n_plies``
     analysis (None: not a cube tree, engine default)."""
@@ -145,7 +164,9 @@ def _janowski_x(probs, board, n_plies: int | None, away1: int = 0, away2: int = 
     if not race and n_plies is not None:
         cx = _contact_cube_life(n_plies, away1, away2)
         if cx >= 0.0:
-            return cx
+            pp, op = bgbot_cpp.pip_counts(board)
+            return bgbot_cpp.contact_cube_x(
+                cx, _contact_cube_slope(n_plies, away1, away2), pp, op)
     pp, op = bgbot_cpp.pip_counts(board)
     return bgbot_cpp.cube_efficiency(probs, race, pp, op)
 
@@ -369,6 +390,7 @@ class _OnePlyAnalyzer(_CubelessBase):
             away1=away1, away2=away2, is_crawford=is_crawford,
             jacoby=jacoby, beaver=beaver, **_cube_limit_kwargs(max_cube_value),
             contact_x=_contact_cube_life(1, away1, away2),
+            contact_x_pip_slope=_contact_cube_slope(1, away1, away2),
             bearoff_db=self._bearoff_db, strategy=self._cube_strategy,
         )
         return self._format_cube_result(r, eval_level="1-ply")
@@ -469,6 +491,7 @@ class _MultiPlyAnalyzer(_CubelessBase):
             away1=away1, away2=away2, is_crawford=is_crawford,
             jacoby=jacoby, beaver=beaver, **_cube_limit_kwargs(max_cube_value),
             contact_x=_contact_cube_life(self._n_plies, away1, away2),
+            contact_x_pip_slope=_contact_cube_slope(self._n_plies, away1, away2),
             bearoff_db=self._bearoff_db,
             incl_2ply_details=incl_2ply_details, strategy=self._cube_strategy,
         )
@@ -875,6 +898,7 @@ class _CubefulAnalyzer:
                     away1=away2, away2=away1, is_crawford=is_crawford,
                     jacoby=jacoby, beaver=beaver, **_cube_limit_kwargs(max_cube_value),
                     contact_x=_contact_cube_life(self._cubeful_ply, away1, away2),
+                    contact_x_pip_slope=_contact_cube_slope(self._cubeful_ply, away1, away2),
                     bearoff_db=db,
                 )
             else:
@@ -885,6 +909,7 @@ class _CubefulAnalyzer:
                     cube_value=cube_value,
                     jacoby=jacoby, beaver=beaver, **_cube_limit_kwargs(max_cube_value),
                     contact_x=_contact_cube_life(self._cubeful_ply, away1, away2),
+                    contact_x_pip_slope=_contact_cube_slope(self._cubeful_ply, away1, away2),
                     bearoff_db=db,
                 )
             return -opp_eq
@@ -1040,6 +1065,7 @@ class _CubefulAnalyzer:
                     away1=away2, away2=away1, is_crawford=is_crawford,
                     jacoby=jacoby, beaver=beaver, **_cube_limit_kwargs(max_cube_value),
                     contact_x=_contact_cube_life(cubeful_ply, away1, away2),
+                    contact_x_pip_slope=_contact_cube_slope(cubeful_ply, away1, away2),
                     bearoff_db=db,
                     root_board=board,   # root routing: the decision's pre-move board
                 )

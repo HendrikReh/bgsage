@@ -2983,6 +2983,19 @@ PYBIND11_MODULE(bgbot_cpp, m) {
        py::arg("bearoff_db") = nullptr,
        py::arg("incl_2ply_details") = false);
 
+    m.def("contact_cube_x",
+          [](float contact_x, float contact_x_pip_slope,
+             int player_pips, int opponent_pips) {
+              CubeInfo ci;
+              ci.contact_x = contact_x;
+              ci.contact_x_pip_slope = contact_x_pip_slope;
+              return contact_cube_x(ci, player_pips, opponent_pips);
+          },
+          "Contact cube life for a CubeInfo with contact_x set: contact_x + "
+          "contact_x_pip_slope * (average pips - 120), clamped to [0.5, 1.0].",
+          py::arg("contact_x"), py::arg("contact_x_pip_slope"),
+          py::arg("player_pips"), py::arg("opponent_pips"));
+
     m.def("cube_efficiency",
           [](const std::vector<float>& probs_vec, bool is_race_pos,
              int player_pips, int opponent_pips) {
@@ -3457,7 +3470,8 @@ PYBIND11_MODULE(bgbot_cpp, m) {
             int n_threads,
             bool jacoby,
             bool beaver,
-            float contact_x) {
+            float contact_x,
+            float contact_x_pip_slope) {
         // Parse positions into C++ structs
         struct PosInput {
             Board board;
@@ -3512,7 +3526,7 @@ PYBIND11_MODULE(bgbot_cpp, m) {
                 // Cubeful equity via Janowski (unified money/match)
                 auto [_pp, _op] = pip_counts(inp.board);
                 CubeInfo ci{inp.cube_value, inp.owner, inp.match, -1.0f, jacoby, beaver,
-                            0, inp.match.is_money() ? contact_x : -1.0f};
+                            0, inp.match.is_money() ? contact_x : -1.0f, contact_x_pip_slope};
                 float x = resolve_cube_x(out.probs, ci, race, _pp, _op);
                 out.cubeful_equity = cl2cf(out.probs, ci, x);
 
@@ -3587,7 +3601,8 @@ PYBIND11_MODULE(bgbot_cpp, m) {
        py::arg("n_threads") = 0,
        py::arg("jacoby") = true,
        py::arg("beaver") = true,
-       py::arg("contact_x") = -1.0f);
+       py::arg("contact_x") = -1.0f,
+       py::arg("contact_x_pip_slope") = 0.0f);
 
     // Overload that takes a GamePlanStrategy (1-ply) directly
     m.def("batch_evaluate_positions", [](
@@ -3596,7 +3611,8 @@ PYBIND11_MODULE(bgbot_cpp, m) {
             int n_threads,
             bool jacoby,
             bool beaver,
-            float contact_x) {
+            float contact_x,
+            float contact_x_pip_slope) {
         struct PosInput {
             Board board;
             int cube_value;
@@ -3647,7 +3663,7 @@ PYBIND11_MODULE(bgbot_cpp, m) {
 
                 auto [_pp, _op] = pip_counts(inp.board);
                 CubeInfo ci{inp.cube_value, inp.owner, inp.match, -1.0f, jacoby, beaver,
-                            0, inp.match.is_money() ? contact_x : -1.0f};
+                            0, inp.match.is_money() ? contact_x : -1.0f, contact_x_pip_slope};
                 float x = resolve_cube_x(out.probs, ci, race, _pp, _op);
                 out.cubeful_equity = cl2cf(out.probs, ci, x);
 
@@ -3715,7 +3731,8 @@ PYBIND11_MODULE(bgbot_cpp, m) {
        py::arg("n_threads") = 0,
        py::arg("jacoby") = true,
        py::arg("beaver") = true,
-       py::arg("contact_x") = -1.0f);
+       py::arg("contact_x") = -1.0f,
+       py::arg("contact_x_pip_slope") = 0.0f);
 
     // Overload that takes a GamePlanPairStrategy (1-ply) directly
     m.def("batch_evaluate_positions", [](
@@ -3725,7 +3742,8 @@ PYBIND11_MODULE(bgbot_cpp, m) {
             int n_threads,
             bool jacoby,
             bool beaver,
-            float contact_x) {
+            float contact_x,
+            float contact_x_pip_slope) {
         struct PosInput {
             Board board;
             int cube_value;
@@ -3776,7 +3794,7 @@ PYBIND11_MODULE(bgbot_cpp, m) {
 
                 auto [_pp, _op] = pip_counts(inp.board);
                 CubeInfo ci{inp.cube_value, inp.owner, inp.match, -1.0f, jacoby, beaver,
-                            0, inp.match.is_money() ? contact_x : -1.0f};
+                            0, inp.match.is_money() ? contact_x : -1.0f, contact_x_pip_slope};
                 float x = resolve_cube_x(out.probs, ci, race, _pp, _op);
                 out.cubeful_equity = cl2cf(out.probs, ci, x);
 
@@ -3844,7 +3862,8 @@ PYBIND11_MODULE(bgbot_cpp, m) {
        py::arg("n_threads") = 0,
        py::arg("jacoby") = true,
        py::arg("beaver") = true,
-       py::arg("contact_x") = -1.0f);
+       py::arg("contact_x") = -1.0f,
+       py::arg("contact_x_pip_slope") = 0.0f);
 
     // ======================== Batch post-move position evaluation ========================
 
@@ -3858,7 +3877,8 @@ PYBIND11_MODULE(bgbot_cpp, m) {
             GamePlanStrategy& strategy,
             int n_threads,
             bool jacoby,
-            float contact_x) {
+            float contact_x,
+            float contact_x_pip_slope) {
         struct PosInput {
             Board board;
             CubeOwner owner;
@@ -3910,7 +3930,7 @@ PYBIND11_MODULE(bgbot_cpp, m) {
                 // Cubeful equity via Janowski (unified money/match)
                 auto [_pp, _op] = pip_counts(inp.board);
                 CubeInfo ci{inp.cube_value, inp.owner, inp.match, -1.0f, jacoby, false,
-                            0, inp.match.is_money() ? contact_x : -1.0f};
+                            0, inp.match.is_money() ? contact_x : -1.0f, contact_x_pip_slope};
                 float x = resolve_cube_x(out.probs, ci, race, _pp, _op);
                 out.cubeful_equity = cl2cf(out.probs, ci, x);
             };
@@ -3958,7 +3978,8 @@ PYBIND11_MODULE(bgbot_cpp, m) {
        py::arg("strategy"),
        py::arg("n_threads") = 0,
        py::arg("jacoby") = true,
-       py::arg("contact_x") = -1.0f);
+       py::arg("contact_x") = -1.0f,
+       py::arg("contact_x_pip_slope") = 0.0f);
 
     // Overload that takes a GamePlanPairStrategy (1-ply) directly
     m.def("batch_evaluate_post_move", [](
@@ -3967,7 +3988,8 @@ PYBIND11_MODULE(bgbot_cpp, m) {
                       // derive from Strategy, not GamePlanPairStrategy
             int n_threads,
             bool jacoby,
-            float contact_x) {
+            float contact_x,
+            float contact_x_pip_slope) {
         struct PosInput {
             Board board;
             CubeOwner owner;
@@ -4017,7 +4039,7 @@ PYBIND11_MODULE(bgbot_cpp, m) {
 
                 auto [_pp, _op] = pip_counts(inp.board);
                 CubeInfo ci{inp.cube_value, inp.owner, inp.match, -1.0f, jacoby, false,
-                            0, inp.match.is_money() ? contact_x : -1.0f};
+                            0, inp.match.is_money() ? contact_x : -1.0f, contact_x_pip_slope};
                 float x = resolve_cube_x(out.probs, ci, race, _pp, _op);
                 out.cubeful_equity = cl2cf(out.probs, ci, x);
             };
@@ -4064,7 +4086,8 @@ PYBIND11_MODULE(bgbot_cpp, m) {
        py::arg("strategy"),
        py::arg("n_threads") = 0,
        py::arg("jacoby") = true,
-       py::arg("contact_x") = -1.0f);
+       py::arg("contact_x") = -1.0f,
+       py::arg("contact_x_pip_slope") = 0.0f);
 
     // Overload for MultiPlyStrategy
     m.def("batch_evaluate_post_move", [](
@@ -4072,7 +4095,8 @@ PYBIND11_MODULE(bgbot_cpp, m) {
             std::shared_ptr<MultiPlyStrategy> strategy,
             int n_threads,
             bool jacoby,
-            float contact_x) {
+            float contact_x,
+            float contact_x_pip_slope) {
         struct PosInput {
             Board board;
             CubeOwner owner;
@@ -4122,7 +4146,7 @@ PYBIND11_MODULE(bgbot_cpp, m) {
 
                 auto [_pp, _op] = pip_counts(inp.board);
                 CubeInfo ci{inp.cube_value, inp.owner, inp.match, -1.0f, jacoby, false,
-                            0, inp.match.is_money() ? contact_x : -1.0f};
+                            0, inp.match.is_money() ? contact_x : -1.0f, contact_x_pip_slope};
                 float x = resolve_cube_x(out.probs, ci, race, _pp, _op);
                 out.cubeful_equity = cl2cf(out.probs, ci, x);
             };
@@ -4171,7 +4195,8 @@ PYBIND11_MODULE(bgbot_cpp, m) {
        py::arg("strategy"),
        py::arg("n_threads") = 0,
        py::arg("jacoby") = true,
-       py::arg("contact_x") = -1.0f);
+       py::arg("contact_x") = -1.0f,
+       py::arg("contact_x_pip_slope") = 0.0f);
 
     // ======================== Batch checker play ========================
 
@@ -4206,7 +4231,8 @@ PYBIND11_MODULE(bgbot_cpp, m) {
             int n_threads,
             bool jacoby,
             bool beaver,
-            float contact_x_1ply) {
+            float contact_x_1ply,
+            float contact_x_pip_slope_1ply) {
 
         struct CPInput {
             Board board;
@@ -4270,7 +4296,7 @@ PYBIND11_MODULE(bgbot_cpp, m) {
                 };
                 std::vector<Scored> scored(candidates.size());
                 CubeInfo ci{inp.cube_value, inp.owner, inp.match, -1.0f, jacoby, beaver,
-                             0, inp.match.is_money() ? contact_x_1ply : -1.0f};
+                             0, inp.match.is_money() ? contact_x_1ply : -1.0f, contact_x_pip_slope_1ply};
                 for (size_t j = 0; j < candidates.size(); ++j) {
                     auto post_probs = strategy_1ply.evaluate_probs(
                         candidates[j], inp.board);
@@ -4364,7 +4390,8 @@ PYBIND11_MODULE(bgbot_cpp, m) {
        py::arg("n_threads") = 0,
        py::arg("jacoby") = true,
        py::arg("beaver") = true,
-       py::arg("contact_x_1ply") = -1.0f);
+       py::arg("contact_x_1ply") = -1.0f,
+       py::arg("contact_x_pip_slope_1ply") = 0.0f);
 
     // 1-ply overload: GamePlanPairStrategy
     m.def("batch_checker_play", [](
@@ -4381,7 +4408,8 @@ PYBIND11_MODULE(bgbot_cpp, m) {
             int n_threads,
             bool jacoby,
             bool beaver,
-            float contact_x_1ply) {
+            float contact_x_1ply,
+            float contact_x_pip_slope_1ply) {
 
         struct CPInput {
             Board board;
@@ -4445,7 +4473,7 @@ PYBIND11_MODULE(bgbot_cpp, m) {
                 };
                 std::vector<Scored> scored(candidates.size());
                 CubeInfo ci{inp.cube_value, inp.owner, inp.match, -1.0f, jacoby, beaver,
-                             0, inp.match.is_money() ? contact_x_1ply : -1.0f};
+                             0, inp.match.is_money() ? contact_x_1ply : -1.0f, contact_x_pip_slope_1ply};
                 for (size_t j = 0; j < candidates.size(); ++j) {
                     auto post_probs = strategy_1ply.evaluate_probs(
                         candidates[j], inp.board);
@@ -4535,7 +4563,8 @@ PYBIND11_MODULE(bgbot_cpp, m) {
        py::arg("n_threads") = 0,
        py::arg("jacoby") = true,
        py::arg("beaver") = true,
-       py::arg("contact_x_1ply") = -1.0f);
+       py::arg("contact_x_1ply") = -1.0f,
+       py::arg("contact_x_pip_slope_1ply") = 0.0f);
 
     // N-ply overload: 1-ply filter + N-ply rescore of survivors
     m.def("batch_checker_play", [](
@@ -4548,7 +4577,9 @@ PYBIND11_MODULE(bgbot_cpp, m) {
             bool jacoby,
             bool beaver,
             float contact_x_1ply,
-            float contact_x_nply) {
+            float contact_x_pip_slope_1ply,
+            float contact_x_nply,
+            float contact_x_pip_slope_nply) {
 
         struct CPInput {
             Board board;
@@ -4607,7 +4638,7 @@ PYBIND11_MODULE(bgbot_cpp, m) {
             }
             if (match.is_money()) {
                 CubeInfo opp_ci{1, opp_owner, MatchInfo{}, -1.0f, jacoby, beaver,
-                                0, contact_x_nply};
+                                0, contact_x_nply, contact_x_pip_slope_nply};
                 float opp_eq = cubeful_equity_nply(
                     opp_pre_roll, opp_ci, strategy_1ply,
                     n_plies, filter, /*n_threads=*/1);
@@ -4646,7 +4677,7 @@ PYBIND11_MODULE(bgbot_cpp, m) {
                     float cubeful_equity;
                 };
                 CubeInfo ci{inp.cube_value, inp.owner, inp.match, -1.0f, jacoby, false,
-                             0, inp.match.is_money() ? contact_x_1ply : -1.0f};
+                             0, inp.match.is_money() ? contact_x_1ply : -1.0f, contact_x_pip_slope_1ply};
                 std::vector<Scored0> scored(candidates.size());
                 for (size_t j = 0; j < candidates.size(); ++j) {
                     auto post_probs = strategy_1ply.evaluate_probs(
@@ -4798,7 +4829,9 @@ PYBIND11_MODULE(bgbot_cpp, m) {
        py::arg("jacoby") = true,
        py::arg("beaver") = true,
        py::arg("contact_x_1ply") = -1.0f,
-       py::arg("contact_x_nply") = -1.0f);
+       py::arg("contact_x_pip_slope_1ply") = 0.0f,
+       py::arg("contact_x_nply") = -1.0f,
+       py::arg("contact_x_pip_slope_nply") = 0.0f);
 
     // N-ply overload: GamePlanPairStrategy for 1-ply filter + N-ply rescore
     m.def("batch_checker_play", [](
@@ -4817,7 +4850,9 @@ PYBIND11_MODULE(bgbot_cpp, m) {
             bool jacoby,
             bool beaver,
             float contact_x_1ply,
-            float contact_x_nply) {
+            float contact_x_pip_slope_1ply,
+            float contact_x_nply,
+            float contact_x_pip_slope_nply) {
 
         struct CPInput {
             Board board;
@@ -4872,7 +4907,7 @@ PYBIND11_MODULE(bgbot_cpp, m) {
             }
             if (match.is_money()) {
                 CubeInfo opp_ci{1, opp_owner, MatchInfo{}, -1.0f, jacoby, beaver,
-                                0, contact_x_nply};
+                                0, contact_x_nply, contact_x_pip_slope_nply};
                 float opp_eq = cubeful_equity_nply(
                     opp_pre_roll, opp_ci, strategy_1ply,
                     n_plies, filter, /*n_threads=*/1);
@@ -4909,7 +4944,7 @@ PYBIND11_MODULE(bgbot_cpp, m) {
                     float cubeful_equity;
                 };
                 CubeInfo ci{inp.cube_value, inp.owner, inp.match, -1.0f, jacoby, false,
-                             0, inp.match.is_money() ? contact_x_1ply : -1.0f};
+                             0, inp.match.is_money() ? contact_x_1ply : -1.0f, contact_x_pip_slope_1ply};
                 std::vector<Scored0> scored(candidates.size());
                 for (size_t j = 0; j < candidates.size(); ++j) {
                     auto post_probs = strategy_1ply.evaluate_probs(
@@ -5056,7 +5091,9 @@ PYBIND11_MODULE(bgbot_cpp, m) {
        py::arg("jacoby") = true,
        py::arg("beaver") = true,
        py::arg("contact_x_1ply") = -1.0f,
-       py::arg("contact_x_nply") = -1.0f);
+       py::arg("contact_x_pip_slope_1ply") = 0.0f,
+       py::arg("contact_x_nply") = -1.0f,
+       py::arg("contact_x_pip_slope_nply") = 0.0f);
 
     // ======================== Bearoff Database ========================
 
@@ -5656,7 +5693,8 @@ PYBIND11_MODULE(bgbot_cpp, m) {
                                      int away1, int away2, bool is_crawford,
                                      bool jacoby, bool beaver,
                                      const BearoffDB* bearoff_db, int max_cube_value,
-                                     float contact_x) {
+                                     float contact_x,
+            float contact_x_pip_slope) {
         Board board = list_to_board(board_vec);
         MoveFilter filter{filter_max_moves, filter_threshold};
 
@@ -5668,10 +5706,10 @@ PYBIND11_MODULE(bgbot_cpp, m) {
 
         py::gil_scoped_release release;
         if (away1 > 0 && away2 > 0) {
-            CubeInfo ci{cube_value, owner, {away1, away2, is_crawford}, -1.0f, jacoby, beaver, max_cube_value, contact_x};
+            CubeInfo ci{cube_value, owner, {away1, away2, is_crawford}, -1.0f, jacoby, beaver, max_cube_value, contact_x, contact_x_pip_slope};
             return cubeful_equity_nply(board, ci, *eval_strat, n_plies, filter, n_threads);
         }
-        CubeInfo ci{cube_value, owner, {0, 0, false}, -1.0f, jacoby, beaver, max_cube_value, contact_x};
+        CubeInfo ci{cube_value, owner, {0, 0, false}, -1.0f, jacoby, beaver, max_cube_value, contact_x, contact_x_pip_slope};
         return cubeful_equity_nply(board, ci, *eval_strat, n_plies, filter, n_threads);
     }, "Compute cubeful equity for a pre-roll position at N-ply depth (unified, any Strategy).",
        py::arg("board"), py::arg("owner"),
@@ -5684,7 +5722,8 @@ PYBIND11_MODULE(bgbot_cpp, m) {
        py::arg("away1") = 0, py::arg("away2") = 0, py::arg("is_crawford") = false,
        py::arg("jacoby") = true, py::arg("beaver") = true,
        py::arg("bearoff_db") = nullptr, py::arg("max_cube_value") = 0,
-       py::arg("contact_x") = -1.0f);
+       py::arg("contact_x") = -1.0f,
+       py::arg("contact_x_pip_slope") = 0.0f);
 
     // --- Unified cubeful_probs_nply (accepts any Strategy via shared_ptr) ---
     m.def("cubeful_probs_nply", [](const std::vector<int>& board_vec,
@@ -5745,7 +5784,8 @@ PYBIND11_MODULE(bgbot_cpp, m) {
              bool jacoby, bool beaver,
              const BearoffDB* bearoff_db,
              const std::vector<int>& root_board, int max_cube_value,
-             float contact_x) {
+             float contact_x,
+            float contact_x_pip_slope) {
         Board board = list_to_board(board_vec);
         MoveFilter filter{filter_max_moves, filter_threshold};
         Board root{};
@@ -5766,7 +5806,7 @@ PYBIND11_MODULE(bgbot_cpp, m) {
             CubeInfo ci{cube_value, owner,
                         {(away1 > 0 ? away1 : 0), (away2 > 0 ? away2 : 0),
                          is_crawford},
-                        -1.0f, jacoby, beaver, max_cube_value, contact_x};
+                        -1.0f, jacoby, beaver, max_cube_value, contact_x, contact_x_pip_slope};
             result = cubeful_probs_and_equity_nply(
                 board, ci, *eval_strat, n_plies, filter, n_threads, nullptr, root_ptr);
         }
@@ -5786,7 +5826,8 @@ PYBIND11_MODULE(bgbot_cpp, m) {
        py::arg("jacoby") = true, py::arg("beaver") = true,
        py::arg("bearoff_db") = nullptr,
        py::arg("root_board") = std::vector<int>{}, py::arg("max_cube_value") = 0,
-       py::arg("contact_x") = -1.0f);
+       py::arg("contact_x") = -1.0f,
+       py::arg("contact_x_pip_slope") = 0.0f);
 
     // --- Unified 1-ply cube decision ---
     m.def("evaluate_cube_decision_unified", [](const std::vector<int>& checkers,
@@ -5796,7 +5837,7 @@ PYBIND11_MODULE(bgbot_cpp, m) {
                                                 const std::vector<int>& hidden_sizes,
                                                 int away1, int away2, bool is_crawford,
                                                 float cube_x_override, bool jacoby,
-                                                bool beaver, int max_cube_value, float contact_x,
+                                                bool beaver, int max_cube_value, float contact_x, float contact_x_pip_slope,
                                                 const BearoffDB* bearoff_db,
                                                 std::shared_ptr<Strategy> strategy) {
         Board board = list_to_board(checkers);
@@ -5810,7 +5851,7 @@ PYBIND11_MODULE(bgbot_cpp, m) {
         bool race = is_race(board);
         auto post_move_probs = strat->evaluate_probs(flipped, race);
         auto pre_roll_probs = invert_probs(post_move_probs);
-        CubeInfo ci{cube_value, owner, {away1, away2, is_crawford}, cube_x_override, jacoby, beaver, max_cube_value, contact_x};
+        CubeInfo ci{cube_value, owner, {away1, away2, is_crawford}, cube_x_override, jacoby, beaver, max_cube_value, contact_x, contact_x_pip_slope};
         auto [pp, op] = pip_counts(board);
         float x = resolve_cube_x(pre_roll_probs, ci, race, pp, op);
         auto cd = cube_decision_1ply(pre_roll_probs, ci, x);
@@ -5839,6 +5880,7 @@ PYBIND11_MODULE(bgbot_cpp, m) {
        py::arg("cube_x_override") = -1.0f, py::arg("jacoby") = true,
        py::arg("beaver") = true, py::arg("max_cube_value") = 0,
        py::arg("contact_x") = -1.0f,
+       py::arg("contact_x_pip_slope") = 0.0f,
        py::arg("bearoff_db") = nullptr, py::arg("strategy") = nullptr);
 
     // --- Unified N-ply cube decision ---
@@ -5853,7 +5895,7 @@ PYBIND11_MODULE(bgbot_cpp, m) {
                                             int n_threads,
                                             int away1, int away2, bool is_crawford,
                                             float cube_x_override, bool jacoby,
-                                            bool beaver, int max_cube_value, float contact_x,
+                                            bool beaver, int max_cube_value, float contact_x, float contact_x_pip_slope,
                                             const BearoffDB* bearoff_db,
                                             bool incl_2ply_details,
                                             std::shared_ptr<Strategy> strategy) {
@@ -5868,7 +5910,7 @@ PYBIND11_MODULE(bgbot_cpp, m) {
         if (bearoff_db && bearoff_db->is_loaded()) {
             base_strat = std::make_shared<BearoffStrategy>(base, bearoff_db);
         }
-        CubeInfo ci{cube_value, owner, {away1, away2, is_crawford}, cube_x_override, jacoby, beaver, max_cube_value, contact_x};
+        CubeInfo ci{cube_value, owner, {away1, away2, is_crawford}, cube_x_override, jacoby, beaver, max_cube_value, contact_x, contact_x_pip_slope};
         MoveFilter filter{filter_max_moves, filter_threshold};
         CubeDecision cd;
         TwoPlyDetails details;
@@ -5927,6 +5969,7 @@ PYBIND11_MODULE(bgbot_cpp, m) {
        py::arg("cube_x_override") = -1.0f, py::arg("jacoby") = true,
        py::arg("beaver") = true, py::arg("max_cube_value") = 0,
        py::arg("contact_x") = -1.0f,
+       py::arg("contact_x_pip_slope") = 0.0f,
        py::arg("bearoff_db") = nullptr,
        py::arg("incl_2ply_details") = false, py::arg("strategy") = nullptr);
 }

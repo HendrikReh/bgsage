@@ -38,7 +38,7 @@ from dataclasses import dataclass
 
 import bgbot_cpp
 
-from .analyzer import _contact_cube_life, resolve_owner
+from .analyzer import _contact_cube_life, _contact_cube_slope, resolve_owner
 from .types import CheckerPlayResult, CubeActionResult, MoveAnalysis, PostMoveAnalysis, Probabilities
 from .weights import WeightConfig, WeightConfigPair, default_weights
 
@@ -137,6 +137,7 @@ def batch_evaluate(
             cpp_positions, strategy, n_threads,
             jacoby=effective_jacoby, beaver=effective_beaver,
             contact_x=_contact_cube_life(1),
+            contact_x_pip_slope=_contact_cube_slope(1),
         )
     elif eval_level in ("2ply", "3ply", "4ply"):
         n_plies = int(eval_level[0])
@@ -264,6 +265,7 @@ def batch_post_move_evaluate(
             cpp_positions, strategy, n_threads,
             jacoby=effective_jacoby,
             contact_x=_contact_cube_life(1),
+            contact_x_pip_slope=_contact_cube_slope(1),
         )
         level_label = "1-ply"
     elif eval_level in ("2ply", "3ply", "4ply"):
@@ -469,6 +471,7 @@ def batch_checker_play(
             filter_max_moves, filter_threshold, n_threads,
             jacoby=effective_jacoby,
             contact_x_1ply=_contact_cube_life(1),
+            contact_x_pip_slope_1ply=_contact_cube_slope(1),
         )
         level_label = "1-ply"
     elif eval_level in ("2ply", "3ply", "4ply"):
@@ -497,7 +500,9 @@ def batch_checker_play(
             filter_max_moves, filter_threshold, n_threads,
             jacoby=effective_jacoby,
             contact_x_1ply=_contact_cube_life(1),
+            contact_x_pip_slope_1ply=_contact_cube_slope(1),
             contact_x_nply=_contact_cube_life(n_plies),
+            contact_x_pip_slope_nply=_contact_cube_slope(n_plies),
         )
         level_label = f"{n_plies}-ply"
     else:
