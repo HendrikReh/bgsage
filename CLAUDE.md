@@ -1820,9 +1820,41 @@ Caveats:
 - Match play is excluded because the same values do not help on the 5-point
   match benchmark: 1-ply 2.35 -> 2.38, 2-ply 1.58 -> 1.82. 0.75 at 2-ply gave
   1.32 there, but without a held-out check.
-- Every reference here is a Sage rollout, which makes its own in-trial cube
-  decisions at 3-ply with 0.68. An independent XG check of the cube
-  decisions has not been run.
+- Every reference above is a Sage rollout, which makes its own in-trial
+  cube decisions at 3-ply with 0.68. The XG check below is the independent
+  one.
+
+**XG as referee** (2026-11-18). `scripts/export_money_cube_xg.py` writes
+the money benchmark's cube positions as one-decision `.xg` games:
+`generate` writes 11 shards of 200 to `data/money_cube_xg/`. Positions where
+the opponent owns the cube are skipped, because the mover has no decision
+there. XG Batch-Analyzes them ("World Class": 4-ply, XG Roller+ for close
+decisions). `score --xg-dir` reads XG's ND / DT / DP back into
+`xg_reference.jsonl`. `sage --xg-dir` scores Sage old and new against both
+references, with paired differences.
+
+All 2,196 positions (2,842 decisions) were analysed: 1,503 at 4-ply, 685 by
+XG Roller+ and 8 at 2-ply. XG's equities come out normalised (DP = 1.0,
+player-owned cubes included). XG's own cube PR against the Sage reference is
+0.44, so the two references are close. Cube PR old -> new, blunders in
+brackets:
+
+| Level | vs Sage reference | vs XG | paired new - old vs XG |
+|---|---|---|---|
+| 1-ply | 3.21 (29) -> 2.36 (39) | 2.74 (33) -> 2.00 (42) | -0.73 +- 0.19 |
+| 2-ply | 2.92 (18) -> 1.30 (19) | 2.30 (15) -> 1.02 (18) | -1.28 +- 0.15 |
+| 3-ply | 0.61 (4), unchanged | 0.39 (3), unchanged | 0 |
+
+On the held-out even seeds against XG (1,107 positions):
+
+| Level | Cube PR, old -> new (blunders) | Paired new - old |
+|---|---|---|
+| 1-ply | 2.50 (11) -> 2.01 (19) | -0.48 +- 0.30 |
+| 2-ply | 2.14 (4) -> 0.99 (8) | -1.15 +- 0.20 |
+
+So the 2-ply gain is confirmed independently. The 1-ply value helps on
+average, but it trades many small over-doubles for a few missed clear
+doubles: blunders rise under every reference.
 
 Tests: `tests/test_contact_cube_life.py`. `tests/test_2ply_details.py` pins
 the table empty, because it compares an N-ply tree's interior with

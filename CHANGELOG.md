@@ -31,6 +31,9 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
   - Races, match play, 3-ply and deeper, and rollouts are untouched. C++
     callers keep the old values unless they pass the new
     `CubeInfo.contact_x`.
+  - Checked against XG World Class on all 2,196 benchmark cube positions
+    (`scripts/export_money_cube_xg.py`): against XG the cube PR falls from
+    2.74 to 2.00 at 1-ply and from 2.30 to 1.02 at 2-ply.
   - See "Cube life by depth (money)" in `CLAUDE.md`.
 
 ### Fixed

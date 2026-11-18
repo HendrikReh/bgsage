@@ -78,6 +78,7 @@ backgame_ref_positions/benchmark/*candidates rollout.jsonl
 backgame_ref_positions/benchmark/*.pre-merge
 # XG analysis shards of Benchmark PR decisions (scripts/export_benchmark_pr_xg.py)
 data/benchmark_pr_xg/
+data/money_cube_xg/
 # Modal rollout piles of the pure-race and S9 containment experiments (up to
 # ~110 MB per sidecar, over GitHub's file limit; regenerable with modal_rollout.py)
 data/purerace-sage-*
