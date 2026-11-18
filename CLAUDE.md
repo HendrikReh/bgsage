@@ -1836,7 +1836,11 @@ unavailable (2-region). Unified dispatcher: `cl2cf()` → money or match.
 maximization. Final results converted to equity via `mwc2eq()`.
 
 **Crawford rule:** No doubling allowed. **Post-Crawford:** Leader at 1-away can't
-double; trailer should double immediately.
+double; trailer should double immediately. `cl2cf_match()` therefore values a cube
+the trailer may still turn (centered or trailer-owned, trailer's away > cv) as
+doubled once instead of through Janowski: `max(play on at cv, min(take at 2cv, pass))`
+from the trailer's side, mirrored for the leader. No Double then equals Double/Take
+whenever the leader takes, matching GNUbg and rollouts.
 
 **Equities are always normalized:** DP = +1.0 in equity space for both money and match
 (by definition of the `mwc2eq` linear normalization). ND and DT vary by score.

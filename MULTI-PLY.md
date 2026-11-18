@@ -1233,6 +1233,13 @@ The recursion operates entirely in MWC space for match play:
 - **Post-Crawford** (one player at 1-away, not Crawford): Leader at 1-away cannot
   double (meaningless — they'd already win with a single win). Trailer should always
   double (automatic double logic).
+- **Post-Crawford leaf values**: `cl2cf_match()` skips Janowski while the trailer can
+  still turn the cube (centered or trailer-owned, trailer's away > cv). The trailer
+  doubles at the next opportunity and can only win after it, so the position is worth
+  `max(cubeless at cv, min(cubeless at 2cv, cash cv))` to the trailer and the mirror
+  `min(cubeless at cv, max(cubeless at 2cv, pass cv))` to the leader. The dead-cube
+  anchor at cv used to score a 3-away trailer's gammon as 2 points instead of the
+  match, which put 2-ply No Double up to 0.18 below Double/Take.
 
 ## 13. Special Rules: Jacoby and Beaver
 
