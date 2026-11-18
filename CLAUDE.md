@@ -26,9 +26,9 @@ GPU; that heritage is still in the code and in this file.
 - **XG workflows**: eXtreme Gammon runs on the Mac under CrossOver, and its
   Batch Analyze reads both the `.txt` transcripts and the `.xg` files this
   repo writes, so the Python side of the XG tooling works here (see "XG as
-  referee for the Benchmark PR sample"). The GUI drivers (`xg_batch_win.py`,
-  `xg_batch_analyze.py`, `play_sage_vs_xg.py`) are Windows-only and untested
-  under CrossOver; run Batch Analyze by hand.
+  referee for the Benchmark PR sample", and `scripts/xg_h2h.py` for
+  head-to-head games). The GUI driver `xg_batch_win.py` is Windows-only and
+  untested under CrossOver; run Batch Analyze by hand.
 
 ## Repo Boundary Rule
 
@@ -908,31 +908,44 @@ historically considered the strongest backgammon engine. There are two
 natural approaches:
 
 1. **Head-to-head play** — Sage and XG play games against each other;
-   tally points. XG has no API, so `scripts/play_sage_vs_xg.py` gets XG's
-   moves out of its own analysis: Sage plays both sides of a money game,
-   the transcript is batch-analysed in XG, the first opponent decision that
-   differs from XG's #1 is replaced by XG's move and the game replayed from
-   there with fresh dice, until every opponent move is XG's (XG's "too good
-   to double", `flag_double == -1`, counts as no double).
-   `scripts/run_sage_vs_xg_games.py <n_games> [--level 3P]` plays a series
-   (seeds continue from `logs/sage_vs_xg.txt`, one `seed, level: ±score`
-   line per converged game) and prints the mean points per game with its
-   standard error. XG must be running on the Windows desktop: each
-   iteration drives its Batch Analyze dialog through
-   `scripts/xg_batch_analyze.py` — an Anthropic Computer Use agent
-   (`ANTHROPIC_API_KEY` in the environment or `bgsage/.env`; `pyautogui`
-   takes the mouse and keyboard for about a minute per iteration). Its
-   `run_computer_use(prompt)` is the reusable driver. For a FIXED dialog flow
-   prefer `scripts/xg_batch_win.py` — pywinauto (Win32 backend) driving the
-   Batch Analyze form's real controls (`TBatchDlg`: Choose / Start buttons,
-   the check boxes, the per-player "Analyze Level" combo, which lists XG's
-   analysis PROFILES such as `Sage2P` / `Sage3P` / `Custom Setting 4Ply` /
-   `Custom Setting ++`, and the Open dialog's list view for a select-all;
-   the menu bar is a Delphi action bar, opened by clicking "Analyze" ~353 px
-   from the window's left edge). No vision model, no API cost, deterministic
-   — measured 2026-09-06: the Computer Use agent could not finish the same
-   flow on the 7,680-px-wide desktop. `xg_folder_batch.py` uses it to
-   Batch-Analyze the folder-benchmark shards a level at a time.
+   tally points. XG has no API, so `scripts/xg_h2h.py` gets XG's moves out
+   of its own Batch Analyze, replaying every game to a fixed point:
+   - Sage plays its seat and predicts XG's.
+   - Each round writes the XG decisions still unanswered as one-decision
+     `.xg` games; you Batch-Analyze the round's folder once.
+   - The next `round` reads XG's #1 moves and cube recommendations back
+     (double iff `FlagDouble > 0`, take iff DT <= DP), replays every game
+     from the start, and re-predicts the tail after any disagreement.
+   - A game is finished when every XG decision in it is XG's own answer.
+   Dice are drawn per (game pair, turn), so a changed move never changes a
+   later roll, and a finished game is the game live play would have
+   produced (`tests/test_xg_h2h.py` checks this with a Sage level standing
+   in for XG). The opening is standard (no doubles, higher die moves
+   first), each dice sequence is played twice with the seats swapped, and
+   no game is ever skipped. The rules are money, Jacoby on, Beaver off.
+   `report --luck` subtracts each roll's luck, from Sage's 2-ply analytics,
+   times the cube; every roll's luck averages zero whatever evaluator
+   measures it, so the adjusted mean stays unbiased. In a stand-in test
+   (Sage 1-ply vs 2-ply, 8 games) that cut the per-game standard error from
+   0.89 to 0.11 points.
+
+   ```bash
+   python scripts/xg_h2h.py init --dir data/xg_h2h/pilot --pairs 50 --sage-level 3ply
+   python scripts/xg_h2h.py round --dir data/xg_h2h/pilot   # then Batch Analyze round_NNN in XG
+   python scripts/xg_h2h.py report --dir data/xg_h2h/pilot --luck
+   ```
+
+   Keep one XG level for the whole run; `round` prints the levels it
+   harvested and warns if XG ever answers a decision two ways. Upstream's
+   replay runners (`play_sage_vs_xg.py`, `run_sage_vs_xg_games.py`) are
+   retired stubs: they allowed non-standard openings, accepted incomplete
+   XG decisions and skipped failed games. On Windows, `scripts/xg_batch_win.py`
+   drives XG's Batch Analyze dialog with pywinauto (Win32 backend:
+   `TBatchDlg`'s Choose / Start buttons, check boxes and per-player
+   "Analyze Level" profile combo; the Delphi action-bar menu opens by
+   clicking "Analyze" ~353 px from the window's left edge), and
+   `xg_folder_batch.py` uses it for the folder-benchmark shards; neither is
+   tested under CrossOver.
 
 2. **Sage plays itself; XG scores it** — Sage plays both sides of many
    games, each game is exported as text, and XG's *Batch Analyze* feature

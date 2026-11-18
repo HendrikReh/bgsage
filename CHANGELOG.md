@@ -16,6 +16,26 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
 ## [Unreleased]
 
+### Added
+
+- **Head-to-head games against XG** (`scripts/xg_h2h.py`). XG has no API,
+  so each game is replayed to a fixed point instead:
+  - Sage plays its seat and predicts XG's.
+  - Each round writes XG's unanswered decisions as one-decision `.xg`
+    games for one Batch Analyze.
+  - The next round reads XG's picks back and re-plays everything after a
+    disagreement.
+  - A game is finished when every XG decision in it is XG's own.
+
+  Dice are fixed per (game pair, turn), so a finished game is exactly what
+  live play would have produced; `tests/test_xg_h2h.py` checks this with a
+  Sage level standing in for XG. The opening is standard, each dice
+  sequence is played twice with the seats swapped, and no game is ever
+  skipped. `report --luck` gives luck-adjusted results; in the stand-in
+  test that cut the per-game standard error from 0.89 to 0.11 points. The
+  retired upstream replay runners stay retired; `CLAUDE.md` no longer
+  describes them as working.
+
 ### Changed
 
 - **Money cube analysis at 1-ply and 2-ply uses a higher contact cube life**
