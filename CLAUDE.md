@@ -715,7 +715,7 @@ to override. Scripts live in `scripts/`.
 |--------|-----------------|----------|
 | `run_full_benchmark.py` | Full suite: per-plan ER + contact/crashed/race ER + vs PubEval ppg + self-play distribution. Supports 1-ply through N-ply. | `--model`, `--ply N`, `--scenarios N`, `--threads N`, `--games N` |
 | `run_rollout_benchmark.py` | Top-N worst 1-ply errors compared at 2-ply, 3-ply, 4-ply, rollout | `--model`, `--top N`, `--threads N` |
-| `score_benchmark_pr.py` | Benchmark PR (equity error vs rollout reference, 103k decisions). Any registered model type (5-NN, pair, backgame) via `bgbot_cpp.score_benchmark_pr_strategy`. | `--model`, `--plies N`, `--all-models`, `--all-plies`, `--decision-step N` |
+| `score_benchmark_pr.py` | Benchmark PR (equity error vs rollout reference, 103k decisions). Any registered model type (5-NN, pair, backgame) via `bgbot_cpp.score_benchmark_pr_strategy`. | `--model`, `--plies N`, `--all-models`, `--all-plies`, `--decision-step N`, `--no-bearoff` |
 | `score_benchmark_pr_gnubg.py` | GNUbg's Benchmark PR (parallel GNUbg CLI subprocesses) | `--plies N`, `--workers N`, `--decision-step N` |
 | `test_evaluate_probs.py` | Single position eval at 1-4 ply + GNUbg + rollouts | `--model`, `--checkers`, `--ply N` |
 | `test_cube_decision.py` | Cube decisions vs 3 reference positions at 1-4 ply + rollout | `--model` |
@@ -771,26 +771,47 @@ shared between many games: Stage 5 2-ply scores 3.37 on the sample but 5.27
 on those 4,233 extras.
 
 Measured 2026-11-18 (5,140 scored decisions; the 1,804 with a single legal
-move are skipped):
+move are skipped). `score_benchmark_pr.py` plays bearoff positions from the
+bearoff database, as the engine and GNUbg do; `--no-bearoff` scores the raw
+networks, which puts every model's pure race at 0.66-0.82:
 
 | Strategy | Overall | PureRace | Racing | Attacking | Priming | Anchoring |
 |---|---|---|---|---|---|---|
 | GNUbg 1-ply | 4.31 | 0.39 | 4.85 | 5.35 | 5.76 | 5.10 |
 | GNUbg 2-ply | 3.48 | 0.37 | 3.89 | 3.85 | 4.59 | 4.62 |
-| stage5 1-ply | 4.20 | 0.70 | 4.57 | 4.93 | 5.19 | 5.39 |
-| stage5 2-ply | 3.37 | 0.62 | 3.06 | 3.82 | 4.72 | 4.58 |
-| stage9 2-ply | 3.29 | 0.82 | 3.16 | 3.80 | 4.50 | 4.12 |
-| stage11 1-ply | 4.15 | 0.80 | 4.30 | 5.02 | 5.51 | 5.03 |
-| stage11 2-ply | 3.22 | 0.82 | 3.03 | 3.78 | 4.42 | 4.00 |
+| stage5 1-ply | 4.17 | 0.54 | 4.57 | 4.93 | 5.19 | 5.39 |
+| stage5 2-ply | 3.34 | 0.44 | 3.06 | 3.82 | 4.72 | 4.58 |
+| stage9 2-ply | 3.24 | 0.57 | 3.16 | 3.80 | 4.50 | 4.12 |
+| stage11 1-ply | 4.11 | 0.55 | 4.30 | 5.02 | 5.51 | 5.03 |
+| stage11 2-ply | 3.17 | 0.57 | 3.03 | 3.78 | 4.42 | 4.00 |
 
 Read it with three caveats. The reference favours Stage 5: it is Stage 5's
 rollout, and only the moves Stage 5's 2-ply filter kept were rolled out, so a
 pick outside that set is charged the worst rolled-out move (GNUbg 1-ply lands
 outside it 159 times, stage11 about 80). No significance test was run, so gaps
-of a few hundredths (Stages 8-11 span 3.22-3.29 at 2-ply) may be noise. And
+of a few hundredths (Stages 8-11 span 3.17-3.24 at 2-ply) may be noise. And
 the numbers are not comparable with the full-set PRs quoted elsewhere in this
-file. The one clear gap is the pure race, where every model since Stage 6
-shares a pure-race net at ~0.8 against GNUbg's 0.37.
+file.
+
+**The pure-race gap.** The one clear gap to GNUbg is the pure race (979
+decisions). Split by whether the pre-move position is in the bearoff database
+(both sides home), stage11 PR at 1-ply / 2-ply:
+
+| Race decisions | n | raw net | with bearoff DB | GNUbg |
+|---|---|---|---|---|
+| bearoff (both sides home) | 371 | 0.75 / 0.76 | 0.09 / 0.09 | 0.11 / 0.11 |
+| outside the database | 608 | 0.84 / 0.86 | 0.83 / 0.86 | 0.57 / 0.52 |
+
+So the database settles the home-board bearoffs, and what remains is the
+pure-race net in races with checkers still outside home. Every model from
+Stage 6 to Stage 11 uses the same file there (`sl_s9_purerace` is
+byte-identical to S6's 100h net), and with it 2-ply is no better than 1-ply
+(0.98 vs 0.89 on the 520 races with no candidate in the database). Swapping
+Stage 5's 200h pure-race net into stage11 gives 0.81 / 0.64 outside the
+database and 0.54 / 0.44 over all races, but this reference is Stage 5's own
+rollout, played with that very net, so part of the gain may be bias.
+GNUbg's race benchmark (`race.bm`), the independent check, is not on this
+machine.
 
 `score_benchmark_pr.py` builds its N-ply strategy with `create_multipy`, which
 adds the PubEval opponent prefilter BgBotAnalyzer uses; the older 5-NN-only

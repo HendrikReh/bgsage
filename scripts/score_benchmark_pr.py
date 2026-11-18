@@ -38,7 +38,7 @@ sys.path.insert(0, build_dir)
 sys.path.insert(0, os.path.join(project_dir, 'python'))
 
 import bgbot_cpp
-from bgsage.weights import MODELS, WeightConfig
+from bgsage.weights import MODELS, WeightConfig, bearoff_db_path
 
 DATA_DIR = os.path.join(project_dir, 'data')
 BENCHMARK_DIR = os.path.join(DATA_DIR, 'benchmark_pr')
@@ -158,6 +158,9 @@ def main():
     parser.add_argument('--decision-step', type=int, default=1,
                         help='Score every Nth decision only: the sample '
                              'generate_benchmark_pr.py --decision-step N rolled out')
+    parser.add_argument('--no-bearoff', action='store_true',
+                        help='Score the raw networks: do not use the bearoff '
+                             'database (the engine and GNUbg both use one)')
     parser.add_argument('--threads', type=int, default=0,
                         help='Number of threads (0 = auto)')
     args = parser.parse_args()
@@ -181,6 +184,22 @@ def main():
     else:
         plies_list = [args.plies]
 
+    # The engine plays bearoff positions from the bearoff database
+    # (BgBotAnalyzer loads it by default), and so does GNUbg; scoring the raw
+    # networks there overstates the race error several times over.
+    bearoff_db = None
+    if not args.no_bearoff:
+        path = bearoff_db_path()
+        bearoff_db = bgbot_cpp.BearoffDB()
+        if path is None or not bearoff_db.load(path):
+            print("ERROR: bearoff database not found; generate it with "
+                  "scripts/generate_bearoff_db.py or pass --no-bearoff.")
+            sys.exit(1)
+        print(f"  Bearoff database: {path}")
+    else:
+        print("  Bearoff database: off (raw networks)")
+    print()
+
     results = {}
 
     for model_name in model_names:
@@ -195,6 +214,8 @@ def main():
         # (5-NN, pair, backgame-aware), the same way BgBotAnalyzer does.
         base = bgbot_cpp.create_strategy(
             w.strategy_type, w.weight_paths_list, w.hidden_sizes_list)
+        if bearoff_db is not None:
+            base = bgbot_cpp.BearoffStrategy(base, bearoff_db)
 
         for plies in plies_list:
             label = f"{model_name} ({plies}-ply)"
@@ -209,6 +230,8 @@ def main():
                     n_plies=plies,
                     filter_max_moves=FILTER_MAX_MOVES,
                     filter_threshold=FILTER_THRESHOLD)
+                if bearoff_db is not None:
+                    bgbot_cpp.multipy_set_bearoff_db(strat, bearoff_db)
                 raw = bgbot_cpp.score_benchmark_pr_strategy(
                     decisions, strat, base,
                     filter_max_moves=FILTER_MAX_MOVES,
