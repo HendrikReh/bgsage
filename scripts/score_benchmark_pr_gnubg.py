@@ -11,9 +11,9 @@ Decisions are scored in parallel using ThreadPoolExecutor. Each worker
 processes a batch of decisions, spawning one GNUbg subprocess per decision.
 
 Usage:
-  python python/score_benchmark_pr_gnubg.py                  # GNUbg 1-ply
-  python python/score_benchmark_pr_gnubg.py --plies 2        # GNUbg 2-ply
-  python python/score_benchmark_pr_gnubg.py --plies 1 --plies 2  # Both
+  python scripts/score_benchmark_pr_gnubg.py                  # GNUbg 1-ply
+  python scripts/score_benchmark_pr_gnubg.py --plies 2        # GNUbg 2-ply
+  python scripts/score_benchmark_pr_gnubg.py --plies 1 --plies 2  # Both
 """
 
 import os
@@ -27,7 +27,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Setup import paths
 script_dir = os.path.dirname(os.path.abspath(__file__))
-project_dir = os.path.dirname(os.path.dirname(script_dir))
+project_dir = os.path.dirname(script_dir)  # the bgsage repo root
 build_dir = os.path.join(project_dir, 'build')
 
 if sys.platform == 'win32':
@@ -38,13 +38,15 @@ if sys.platform == 'win32':
         os.add_dll_directory(build_dir)
 
 sys.path.insert(0, build_dir)
-sys.path.insert(0, os.path.join(project_dir, 'bgsage', 'python'))
+sys.path.insert(0, os.path.join(project_dir, 'python'))
 
 import bgbot_cpp
+from bgsage.settings import gnubg_path
 
 DATA_DIR = os.path.join(project_dir, 'data')
 BENCHMARK_DIR = os.path.join(DATA_DIR, 'benchmark_pr')
-GNUBG_CLI = r'C:\Program Files (x86)\gnubg\gnubg-cli.exe'
+# BGSAGE_GNUBG, the user settings file, or auto-detection (CLAUDE.md "GNUbg Path")
+GNUBG_CLI = gnubg_path()
 
 GAME_PLANS = ['purerace', 'racing', 'attacking', 'priming', 'anchoring']
 

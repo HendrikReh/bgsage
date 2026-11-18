@@ -2,6 +2,29 @@
 
 Neural-network backgammon engine with C++ core and Python interface. Licensed under MPL-2.0.
 
+## Platform Scope (this fork)
+
+**This fork (HendrikReh/bgsage) targets macOS on Apple Silicon (arm64) only.**
+The development machine is an M4 Pro Mac mini (10P+4E cores, 20-core GPU,
+64 GB). Upstream (markbgsage/bgsage) was developed on Windows with an NVIDIA
+GPU; that heritage is still in the code and in this file.
+
+- **Optimise for Apple Silicon freely**: NEON, Accelerate (SME/AMX), Metal or
+  MLX. A portable fallback is not a requirement for new code.
+- **Windows, Linux, x86 and CUDA are not supported here.** Don't spend effort
+  testing or keeping the MSVC, Linux/Docker, AVX2 or CUDA paths working, and
+  don't block on their CI jobs.
+- **Don't delete the inherited Windows/Linux/CUDA code unasked.** It keeps
+  merges from upstream easy; removing it is the user's call.
+- **GPU training**: the CUDA SL trainer (`cuda_nn.cu`) is a stub on macOS
+  (`cuda_available()` is False), so the SL training scripts can't train here
+  yet. A Metal/MLX port is the planned replacement.
+- **Inherited numbers**: training times and many benchmark timings below were
+  measured on upstream's Windows box (RTX 4070S, 16 threads). Re-measure on
+  the Mac before quoting them for this fork.
+- **XG workflows** (Batch Analyze, `xg_batch_*.py`, `play_sage_vs_xg.py`)
+  need eXtreme Gammon on a Windows desktop and are outside this fork's scope.
+
 ## Repo Boundary Rule
 
 **This is a standalone library repo (`bgsage/`). When the working directory is
@@ -13,8 +36,8 @@ new C++ in `cpp/`.
 
 The same applies to *runtime* paths: every directory the code references —
 compiled extension, weights, data, output dirs — must resolve inside `bgsage/`.
-Scripts must not reach into a parent directory for `bgbot_cpp.pyd`, model
-weights, or output logs. The compiled `bgbot_cpp.pyd` belongs in `bgsage/build/`,
+Scripts must not reach into a parent directory for the compiled extension, model
+weights, or output logs. The compiled `bgbot_cpp*.so` belongs in `bgsage/build/`,
 default output directories resolve under `bgsage/logs/`, and scripts should set
 `_PROJECT_ROOT = _SCRIPT_DIR.parent` (the bgsage repo root) — never
 `.parent.parent` (which points at the host project). Several existing scripts
@@ -34,8 +57,8 @@ path" and is the primary working directory for the session.
   yourself using the main repo path (e.g. `<repo-root>/` instead of
   `<repo-root>/.claude/worktrees/<name>/`), STOP and fix it.
 - New files created in the main repo path will NOT be on the worktree branch.
-- The MSVC build directory (`build_msvc/`) is shared across worktrees. After
-  building, copy the `.pyd` to the worktree's `build/` directory.
+- Build in the worktree's own `build/` (see "Building"); a build in the main
+  repo's `build/` is not what the worktree's scripts and tests load.
 
 ## Project Structure
 
@@ -44,8 +67,8 @@ cpp/                         # C++ core (all performance-critical code)
   include/bgbot/            # Public headers
   src/                      # Implementation (.cpp/.cu)
   pybind/bindings.cpp       # pybind11 Python bindings
-  CMakeLists.txt            # Full build (CUDA + CPU)
-  CMakeLists_cpu.txt        # CPU-only build (Docker / macOS)
+  CMakeLists.txt            # Upstream full build (CUDA + CPU); not used in this fork
+  CMakeLists_cpu.txt        # CPU build, the one used on Apple Silicon (included by ../CMakeLists.txt)
 python/bgsage/               # Python package
   analyzer.py               # Public API: checker + cube analysis
   types.py                  # Dataclasses (Probabilities, MoveAnalysis, etc.)
@@ -53,6 +76,7 @@ python/bgsage/               # Python package
   weights.py                # Production model registry, WeightConfig, model discovery
   data.py                   # .bm file loading, training data parsing
   gnubg.py                  # GNUbg CLI wrapper for reference evaluation
+  settings.py               # User settings (GNUbg binary path; see "GNUbg Path" below)
   matchinfo.py              # Match play take points, dead cube take points, gammon prices
   text_export.py            # Galaxy/XG-compatible text export + move notation
   xg_compare.py             # Parse XG .xg files; compute per-game PR stats vs XG
@@ -120,7 +144,7 @@ by one tempo. Being on roll is an advantage.
 | `cube.h/cpp` | Doubling cube (Janowski method) |
 | `pubeval.h/cpp` | PubEval linear evaluator (reference opponent) |
 | `bearoff.h/cpp` | One-sided bearoff database + BearoffStrategy wrapper |
-| `cuda_nn.h/cu` | GPU training (CUDA/cuBLAS) |
+| `cuda_nn.h/cu` | GPU training (CUDA/cuBLAS) — upstream only; a stub on macOS |
 
 ## Production Model
 
@@ -657,6 +681,29 @@ rollout.set_bearoff_db(&db);
 python scripts/generate_bearoff_db.py  # ~4 seconds, outputs data/bearoff_1sided.db
 ```
 
+## GNUbg Path
+
+`bgsage.gnubg` (`GnuBgAnalyzer`, `post_move_analytics*`) runs the GNUbg CLI.
+`bgsage.settings.gnubg_path()` picks the binary, first hit wins:
+
+1. `settings.set_gnubg_path(path)` in code (this process), or per instance
+   `GnuBgAnalyzer(gnubg_path=...)` / `post_move_analytics(..., gnubg_path=...)`
+2. the `BGSAGE_GNUBG` environment variable
+3. `"gnubg_path"` in the user settings file: `~/.config/bgsage/settings.json`
+   (`$XDG_CONFIG_HOME` respected), `%APPDATA%\bgsage\settings.json` on Windows,
+   or wherever `BGSAGE_SETTINGS` points
+4. auto-detection: `C:\Program Files (x86)\gnubg\gnubg-cli.exe`, then
+   `gnubg-cli` or `gnubg` on PATH
+
+```python
+from bgsage import settings
+settings.set_gnubg_path("/opt/homebrew/bin/gnubg", persist=True)  # saved for later sessions
+settings.set_gnubg_path(None, persist=True)                       # back to auto-detection
+```
+
+`scripts/score_benchmark_pr_gnubg.py` and `scripts/test_match_gnubg_comparison.py`
+resolve the binary the same way.
+
 ## Benchmark Scripts
 
 All benchmark scripts default to the production model and accept `--model <name>`
@@ -820,7 +867,71 @@ The .xg file MUST contain exactly one game; `ValueError` otherwise.
 
 ## Building
 
-### Windows (MSVC — required for Python 3.14)
+### macOS on Apple Silicon (the supported build)
+
+Configure from the repo root: the top-level `CMakeLists.txt` includes
+`cpp/CMakeLists_cpu.txt` (`cpp/CMakeLists.txt` is the CUDA build, and CMake
+has no `-f` option to pick another list file). Needs `cmake`, `ninja`,
+`pybind11` and `numpy` for the Python that will import the module; a venv in
+`build/venv` (gitignored) works:
+
+```bash
+python3 -m venv build/venv && build/venv/bin/pip install numpy pybind11 cmake ninja pytest
+export PATH="$PWD/build/venv/bin:$PATH"
+```
+
+```bash
+cmake -S . -B build/cmake -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -Dpybind11_DIR="$(python -c 'import pybind11; print(pybind11.get_cmake_dir())')"
+ninja -C build/cmake bgbot_cpp
+cp build/cmake/bgbot_cpp*.so build/
+```
+
+NEON intrinsics are used instead of AVX2, and no `-ffast-math`.
+
+**Accelerate (Apple Silicon only, on by default).** The batched candidate
+kernels — every `batch_evaluate_candidates_*` and the cubeful engine's
+`eval_groups_pair` — go through `NeuralNetwork::forward_group`, which on
+Apple arm64 runs each layer as one dense `cblas_sgemm` through Accelerate.
+Accelerate executes these on the CPU's matrix unit (SME on M4, AMX on M1-M3),
+which beats the sparse delta kernels even though ~77% of the inputs are zero.
+The hidden-layer sigmoid on this path is the exact Cephes one the x86 AVX2
+kernels and the CUDA trainer use, not the lookup table the other NEON kernels
+use: the table clamps to exactly 0/1 beyond ±8 (up to 3e-4 error per hidden
+unit), which moves equities by up to ~0.003 against x86 builds. So Apple
+Accelerate builds now match x86 builds more closely than before, but not
+bit-for-bit. `-DBGBOT_USE_ACCELERATE=OFF` restores the portable kernels
+(bit-identical to the pre-Accelerate engine).
+
+Measured 2026-11-17 on an M4 Pro (10P+4E cores), together with the encoder
+optimisation below (which is bit-identical on every platform). Wall time of
+`checker_play` on a fixed money-benchmark sample, against the engine before
+both changes:
+
+| Level, threads | Encoder only (`BGBOT_USE_ACCELERATE=OFF`) | Encoder + Accelerate |
+|---|---|---|
+| 2-ply, 1 thread  | 1.17x | 1.38x |
+| 3-ply, 1 thread  | 1.17x | 1.37x |
+| 3-ply, 10 threads | 1.13x | 1.37-1.41x |
+
+Money benchmark (17,535 decisions) with Accelerate: 2-ply PR 1.67 -> 1.68
+(cube 2.90 -> 2.92), 3-ply PR 0.60 -> 0.60, blunder counts unchanged. Max
+equity shift on the sample 0.004; 2 of 264 2-ply best moves changed (near-ties).
+
+**Encoder hot spots.** `hitting_shots`, `double_hitting_shots`,
+`compute_piploss`, `moment2` and `backbone` in `encoding.cpp` use bitmask
+formulations (distance masks per blot, a mirrored 8x8 roll matrix for the
+double-shot count, per-combination block masks for piploss). On 655k
+money-benchmark boards and candidates, `compute_extended_contact_inputs` went
+1.80 -> 1.17 us per board with every output bit-identical.
+`tests/test_encoding_golden.py` pins those features on 1,000 positions computed
+by the original implementations; keep it passing when touching them.
+
+### Upstream builds (not supported in this fork)
+
+Kept for reference and upstream merges; nobody tests them here.
+
+#### Windows (MSVC — required for Python 3.14)
 
 **Python 3.14 is compiled with MSVC.** MinGW-compiled pybind11 modules crash due
 to incompatible C runtime. Always use MSVC.
@@ -837,24 +948,14 @@ ninja bgbot_cpp
 
 Need `#define NOMINMAX` before `#include <windows.h>` (std::min/max conflict).
 
-### macOS (CPU-only)
-
-```bash
-mkdir build && cd build
-cmake ../cpp -DCMAKE_BUILD_TYPE=Release -f ../cpp/CMakeLists_cpu.txt
-make -j
-```
-
-On Apple Silicon: NEON intrinsics used instead of AVX2, no `-ffast-math`.
-
-### Linux / Docker (CPU-only)
+#### Linux / Docker (CPU-only)
 
 Use `CMakeLists_cpu.txt`. Flags: `-mavx2 -mfma -ffast-math -march=native`.
 
 ### Dependencies
 
 - C++17, pybind11
-- CUDA 13.1 toolkit (optional, for GPU training only)
+- CUDA 13.1 toolkit (upstream GPU training only; not available on macOS)
 - Python >= 3.10
 
 ## Input Encodings
@@ -878,7 +979,8 @@ unnatural minima. TD gives realistic probability distributions that SL refines.
 
 1. **TD Self-Play (CPU)**: 25k-200k games @ alpha=0.1. Serial only (parallel TD deprecated).
 2. **Supervised Learning (GPU)**: Backprop against GNUbg rolled-out probabilities.
-   GPU via CUDA/cuBLAS, batch size 128.
+   GPU via CUDA/cuBLAS, batch size 128. **Not available on Apple Silicon** — the
+   CUDA trainer is a stub on macOS (see "Platform Scope"); TD self-play runs fine.
 
 **Key training rules:**
 - All contact NNs train on ALL contact+crashed data, NOT game-plan subsets
@@ -904,13 +1006,15 @@ MODELS["stage5small"] = {
 }
 ```
 
-**Step 3: Launch training as a detached process** (Windows).
+**Step 3: Launch training as a detached process.**
 Training is long-running and must survive past Claude Code's ~1h timeout.
 Run from the bgsage repo root:
 ```bash
-# IMPORTANT: Use python -u for unbuffered output. python must be on PATH.
-powershell -Command "Start-Process -FilePath python -ArgumentList '-u','scripts\run_stage5small_training.py' -WindowStyle Hidden -RedirectStandardOutput 'logs\training.log' -RedirectStandardError 'logs\training_err.log'"
+# IMPORTANT: Use python -u for unbuffered output.
+nohup build/venv/bin/python -u scripts/run_stage5small_training.py \
+  > logs/training.log 2> logs/training_err.log &
 ```
+(Upstream launched it on Windows with PowerShell `Start-Process ... -WindowStyle Hidden`.)
 
 **Output buffering note:** Even with `-u`, C++ stdout from `bgbot_cpp` functions
 (TD training, SL training) is internally buffered until the C++ function returns.
@@ -927,16 +1031,16 @@ to ~20 prints per phase, e.g., every 10 epochs for a 200-epoch phase).
 **Step 4: Monitor training progress:**
 ```bash
 # Check if process is alive
-powershell -Command "Get-Process python* | Select-Object Id, CPU, StartTime"
+pgrep -fl run_stage5small_training
 
 # Check weight file timestamps (updated every benchmark_interval)
-stat -c '%Y' models/td_s5s_racing.weights && date +%s
+stat -f '%m' models/td_s5s_racing.weights && date +%s
 
 # Check history CSV
 cat models/td_s5s.history.csv
 
 # Check log output (may be delayed due to C++ internal buffering)
-powershell -Command "Get-Content 'logs\training.log' -Tail 20"
+tail -20 logs/training.log
 ```
 
 **Step 5: After training completes**, run benchmarks:
@@ -944,7 +1048,7 @@ powershell -Command "Get-Content 'logs\training.log' -Tail 20"
 python scripts/run_stage5small_benchmarks.py
 ```
 
-**Estimated timing** (Stage 5 Small — 100h/200h hidden, Windows RTX 4070S):
+**Estimated timing** (Stage 5 Small — 100h/200h hidden, measured upstream on Windows + RTX 4070S; not re-measured on the Mac):
 - TD Phase 1 (200k games @ α=0.1): ~3.9 hours
 - TD Phase 2 (1M games @ α=0.02): ~19 hours
 - SL (5 NNs, ~2500 epochs each): ~2-4 hours (GPU)
@@ -1097,7 +1201,8 @@ the chain, evaluating survivors at each step's ply level through the cubeful
 evaluation engine's dead-cube path (`cubeless_tree_probs`; the old recursion
 only in hybrid / full-depth-opponent modes).
 
-**Optimizations**: AVX2 FMA intrinsics, fast sigmoid LUT, open-addressing position
+**Optimizations**: Accelerate/SME group evaluation and NEON on Apple Silicon (AVX2 FMA
+intrinsics in the upstream x86 build), fast sigmoid LUT, open-addressing position
 cache, incremental delta evaluation, transposed weight matrix.
 
 ## Rollout
@@ -1734,7 +1839,7 @@ model (like S7 or S8), so future training runs can follow the same process.
 
 ### Prerequisites
 
-- CUDA GPU available (for SL training)
+- CUDA GPU available (for SL training) — upstream only; not available on Apple Silicon
 - C++ build with pair strategy support (`td_train_gameplan_pair`, `cuda_supervised_train`,
   `score_benchmarks_pair`, `create_multipy_pair`, `create_rollout_pair`)
 - Training data in `data/`: `contact-train-data`, `crashed-train-data`, `purerace-train-data`
@@ -1764,11 +1869,14 @@ Copy `scripts/run_s8_training.py` and update these constants:
 
 ### Step 3: Launch Training
 
-Training is long-running (~30-50 hours depending on hidden size). Launch as a
-detached Windows process. Run from the bgsage repo root (python must be on PATH):
+Training is long-running (~30-50 hours depending on hidden size, measured
+upstream on Windows + RTX 4070S). Launch it as a detached process from the
+bgsage repo root. Its SL phases need the CUDA trainer, which this fork doesn't
+have on Apple Silicon yet (see "Platform Scope"):
 
 ```bash
-powershell -Command "Start-Process -FilePath python -ArgumentList '-u','scripts\run_s9_training.py' -WindowStyle Hidden -RedirectStandardOutput 'logs\s9_training.log' -RedirectStandardError 'logs\s9_training_err.log'"
+nohup build/venv/bin/python -u scripts/run_s9_training.py \
+  > logs/s9_training.log 2> logs/s9_training_err.log &
 ```
 
 ### Step 4: Monitor Progress
@@ -1776,9 +1884,9 @@ powershell -Command "Start-Process -FilePath python -ArgumentList '-u','scripts\
 Set up a cron job to show the user a training summary every 10 minutes. Use
 `CronCreate` with `*/10 * * * *` and a prompt that runs these checks:
 
-1. **Process alive?** `powershell -Command "Get-Process python* | Select-Object Id, CPU, WorkingSet64, StartTime | Format-Table -AutoSize"`
-2. **Training log tail:** `powershell -Command "Get-Content 'logs\s9_training.log' -Tail 30"`
-3. **Errors:** `powershell -Command "Get-Content 'logs\s9_training_err.log' -Tail 10"`
+1. **Process alive?** `ps -o pid,%cpu,rss,lstart,command -p $(pgrep -f run_s9_training)`
+2. **Training log tail:** `tail -30 logs/s9_training.log`
+3. **Errors:** `tail -10 logs/s9_training_err.log`
 4. **Weight files:** `ls -lt models/td_s9* models/sl_s9* models/s9_gpw_scan/ 2>/dev/null | head -20`
 
 The cron prompt should instruct Claude to summarize: what phase it's in (TD Phase 1,
@@ -1790,7 +1898,7 @@ summary without needing to manually check logs.
 
 You can also check manually:
 ```bash
-powershell -Command "Get-Content 'logs\s9_training.log' -Tail 30"
+tail -30 logs/s9_training.log
 ```
 
 Check weight file timestamps to verify training is progressing:

@@ -4,6 +4,12 @@ Open Sage is a "backgammon bot engine" - that is, a library that you can ask que
 move in this situation, with all the analytics to back it up", or "is this a double, and if so, is it a take or a pass 
 (including analytics)?".
 
+> **This is an Apple Silicon fork.** This fork ([HendrikReh/bgsage](https://github.com/HendrikReh/bgsage)) of
+> [markbgsage/bgsage](https://github.com/markbgsage/bgsage) targets **macOS on Apple Silicon (arm64) only**, and is
+> optimised for it. Batched neural-network evaluation runs through Apple's Accelerate framework on the CPU's matrix unit
+> (SME on M4, AMX on M1-M3). Windows, Linux, x86 and NVIDIA/CUDA code inherited from upstream is still in the tree, but it is
+> not tested or supported here.
+
 ## What it Contains
 
 Complete, seeded game and match simulation is available through
@@ -13,11 +19,32 @@ positions, dice, cube actions and scores for custom research. See
 
 It is a joint Python/C++ library that includes:
 * A neural network-based backgammon bot.
-* Neural network training framework using both self play and supervised learning, including training code, benchmark scoring, with customizable inputs. Uses your NVIDIA GPU (via CUDA) if you have one.
+* Neural network training framework using both self play and supervised learning, including training code, benchmark scoring, with customizable inputs. Upstream runs supervised learning on an NVIDIA GPU (via CUDA); that trainer isn't available on Apple Silicon, so in this fork only self-play (TD) training runs for now.
 * The post-training weights for several different versions of the bot engine.
 * Multi-ply and rollout calculations that efficiently parallelize on the CPU. Full technical specifications of the algorithms are in MULTI-PLY.md (N-ply search and the cubeful evaluation engine) and ROLLOUT.md (truncated and full rollouts with variance reduction).
 * Test framework.
 * VIBING.md: information on how to use Claude Code-style tools to interact with and change it, and how to submit changes back to us (the maintainers). Most of this code was written by Anthropic's Claude Code and OpenAI's Codex.
+
+## Building on Apple Silicon
+
+You need Xcode's command-line tools (`xcode-select --install`) and Python 3.10 or newer. From the repo root:
+
+```bash
+python3 -m venv build/venv
+build/venv/bin/pip install numpy pybind11 cmake ninja pytest
+export PATH="$PWD/build/venv/bin:$PATH"
+
+cmake -S . -B build/cmake -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -Dpybind11_DIR="$(python -c 'import pybind11; print(pybind11.get_cmake_dir())')"
+ninja -C build/cmake bgbot_cpp
+cp build/cmake/bgbot_cpp*.so build/
+
+PYTHONPATH="$PWD/build:$PWD/python" python -m pytest -q tests
+```
+
+Accelerate is on by default; `-DBGBOT_USE_ACCELERATE=OFF` builds the portable kernels instead. For the
+measured speedups, and for comparing against GNUbg (set its location with `BGSAGE_GNUBG` or
+`bgsage.settings.set_gnubg_path`), see CLAUDE.md.
 
 ## What Evaluation Levels Does It Support?
 
@@ -44,7 +71,8 @@ It offers both Python and C++ interfaces for:
 
 We tested money games and match play against eXtreme Gammon (XG), another popular backgammon analysis application. In particular, we tested Open Sage's 3T evaluations (truncated rollouts) to XG Roller ++ (an equivalent truncated rollout). The two bots were very close, with some weak evidence that Sage 3T is a bit stronger.
 
-Details of the tests, and instructions on how to replicate them, are in XG_COMPARISON.md
+Details of the tests, and instructions on how to replicate them, are in XG_COMPARISON.md. These tests were run upstream;
+replicating them needs XG, which runs on Windows, so it is outside this fork's scope.
 
 ## License
 

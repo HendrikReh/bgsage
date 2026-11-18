@@ -42,6 +42,7 @@ from .types import (
     Probabilities,
 )
 from .gnubg import GnuBgAnalyzer
+from . import settings
 from .luck import luck_from_equities, roll_luck
 from .types import LuckResult, RollEquity
 from .weights import MODELS, PRODUCTION_MODEL, WeightConfig, WeightConfigPair, default_weights

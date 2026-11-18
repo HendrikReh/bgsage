@@ -14,7 +14,10 @@ underlying cubeless probabilities will differ. We expect:
   - Exact action agreement only when the position is clearly not borderline
 
 Usage:
-    python bgsage/scripts/test_match_gnubg_comparison.py [--build-dir build] [--model stage5]
+    python scripts/test_match_gnubg_comparison.py [--build-dir build] [--model stage5]
+
+The GNUbg binary comes from bgsage.settings.gnubg_path() (BGSAGE_GNUBG, the
+user settings file, or auto-detection; see CLAUDE.md "GNUbg Path").
 """
 
 import sys
@@ -31,36 +34,34 @@ for i, arg in enumerate(sys.argv):
         build_dir_arg = sys.argv[i + 1]
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
-bgsage_dir = os.path.dirname(script_dir)
-project_dir = os.path.dirname(bgsage_dir)
+project_dir = os.path.dirname(script_dir)  # the bgsage repo root
 
 build_dir = os.path.join(project_dir, build_dir_arg)
 build_dir_std = os.path.join(project_dir, 'build')
-sys.path.insert(0, os.path.join(bgsage_dir, 'python'))
+sys.path.insert(0, os.path.join(project_dir, 'python'))
 sys.path.insert(0, build_dir)
 sys.path.insert(0, build_dir_std)
 
-cuda_x64 = r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64'
-if os.path.isdir(cuda_x64):
-    os.add_dll_directory(cuda_x64)
-if os.path.isdir(build_dir):
-    os.add_dll_directory(build_dir)
-if os.path.isdir(build_dir_std):
-    os.add_dll_directory(build_dir_std)
-
-
-GNUBG_CLI = r'C:\Program Files (x86)\gnubg\gnubg-cli.exe'
+if sys.platform == 'win32':
+    cuda_x64 = r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64'
+    if os.path.isdir(cuda_x64):
+        os.add_dll_directory(cuda_x64)
+    if os.path.isdir(build_dir):
+        os.add_dll_directory(build_dir)
+    if os.path.isdir(build_dir_std):
+        os.add_dll_directory(build_dir_std)
 
 
 def run_gnubg(cmd, timeout=60):
-    """Run gnubg-cli with the given command and return stdout."""
+    """Run the GNUbg CLI (bgsage.settings.gnubg_path()) and return stdout."""
+    from bgsage.settings import gnubg_path
     with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
         f.write(cmd)
         cmd_file = f.name
 
     try:
         result = subprocess.run(
-            [GNUBG_CLI, '-q', '-t', '--no-rc', '-c', cmd_file],
+            [gnubg_path(), '-q', '-t', '--no-rc', '-c', cmd_file],
             capture_output=True, text=True, timeout=timeout
         )
         return result.stdout
@@ -134,11 +135,23 @@ def parse_cube_output(output):
 
     Handles any ordering of ND/DT/DP in cubeful equities section.
     Returns dict with equity_nd, equity_dt, equity_dp, action.
+
+    When the player on roll has no cube decision — the Crawford game, a dead
+    cube (e.g. double match point), or the 1-away leader post-Crawford —
+    GNUbg's `hint` prints no cube analysis at all. That case returns
+    {'no_cube_decision': True, 'reason': ...}. Output where the hint never ran
+    returns None.
     """
     result = {}
 
     if 'Cube analysis' not in output:
-        return None
+        if 'is now on roll' not in output:
+            return None
+        if 'cube is disabled during the Crawford game' in output:
+            reason = 'Crawford game'
+        else:
+            reason = 'cube dead or not available to the player on roll'
+        return {'no_cube_decision': True, 'reason': reason}
 
     section = output[output.index('Cube analysis'):]
     lines = section.split('\n')
@@ -228,15 +241,19 @@ def main():
     args = parser.parse_args()
 
     import bgbot_cpp
-    from bgsage import STARTING_BOARD
+    from bgsage import BgBotAnalyzer, STARTING_BOARD
 
     w = WeightConfig.from_args(args)
     w.validate()
 
-    CubeOwner = bgbot_cpp.CubeOwner
+    # Model-independent 1-ply cube analysis (works for 5-NN, pair and the
+    # backgame-aware production layouts alike).
+    analyzer = BgBotAnalyzer(weights=w, eval_level="1ply")
 
-    if not os.path.isfile(GNUBG_CLI):
-        print(f"GNUbg CLI not found at {GNUBG_CLI}, skipping comparison")
+    from bgsage.settings import gnubg_path
+    if not os.path.isfile(gnubg_path()):
+        print(f"GNUbg CLI not found at {gnubg_path()}, skipping comparison "
+              f"(configure it with BGSAGE_GNUBG or bgsage.settings.set_gnubg_path)")
         return 0
 
     print("=" * 70)
@@ -302,19 +319,37 @@ def main():
             away1 = match_len - sc1
             away2 = match_len - sc2
 
-        our = bgbot_cpp.evaluate_cube_decision(
-            pos, 1, CubeOwner.CENTERED, *w.weight_args,
+        cube = analyzer.cube_action(
+            pos, cube_value=1, cube_owner="centered",
             away1=away1, away2=away2, is_crawford=is_craw,
         )
+        our = {"equity_nd": cube.equity_nd, "equity_dt": cube.equity_dt,
+               "equity_dp": cube.equity_dp}
 
-        our_a = our_action_str(our["should_double"], our["should_take"])
-        our_probs = list(our["probs"])
+        our_a = our_action_str(cube.should_double, cube.should_take)
+        p = cube.probs
+        our_probs = [p.win, p.gammon_win, p.backgammon_win, p.gammon_loss, p.backgammon_loss]
 
         # GNUbg evaluation
         cmd = build_gnubg_command(pos, match_len, sc1, sc2, is_craw)
         try:
             gnubg_output = run_gnubg(cmd)
             g = parse_cube_output(gnubg_output)
+
+            if g is not None and g.get('no_cube_decision'):
+                # GNUbg offers no cube action; bgsage must agree the player
+                # cannot double here and must not double.
+                can_dbl = bgbot_cpp.can_double_match(
+                    away1, away2, 1, bgbot_cpp.CubeOwner.CENTERED, is_craw)
+                print(f"  GNUbg:  no cube decision ({g['reason']})")
+                print(f"  bgsage: can_double={can_dbl}  -> {our_a}")
+                if not can_dbl and not cube.should_double:
+                    print(f"  -> AGREE: no cube action")
+                    agree += 1
+                else:
+                    print(f"  -> DISAGREE: bgsage treats the cube as available")
+                    disagree += 1
+                continue
 
             if g is None or 'equity_nd' not in g:
                 print(f"  [SKIP] Could not parse GNUbg output")

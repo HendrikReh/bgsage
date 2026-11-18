@@ -63,6 +63,28 @@ target_compile_options(bgbot_lib PRIVATE ${BGBOT_OPT_FLAGS})
 find_package(Threads REQUIRED)
 target_link_libraries(bgbot_lib PUBLIC Threads::Threads)
 
+# Apple Silicon: batched NN evaluation through Accelerate's BLAS, which runs on
+# the CPU's matrix unit (SME on M4, AMX on M1-M3) — see
+# NeuralNetwork::forward_group. Off elsewhere (x86_64 Macs keep the AVX2
+# kernels). -DBGBOT_USE_ACCELERATE=OFF restores the portable delta kernels.
+if(APPLE AND BGBOT_TARGET_ARCH MATCHES "^(arm64|aarch64)$")
+    option(BGBOT_USE_ACCELERATE "Batched NN evaluation via Apple Accelerate" ON)
+    if(BGBOT_USE_ACCELERATE)
+        find_library(BGBOT_ACCELERATE_FRAMEWORK Accelerate REQUIRED)
+        target_link_libraries(bgbot_lib PUBLIC ${BGBOT_ACCELERATE_FRAMEWORK})
+        target_compile_definitions(bgbot_lib PRIVATE BGBOT_USE_ACCELERATE=1)
+        # The new CBLAS interface needs macOS 13.3+ at runtime; with an older
+        # deployment target keep the classic one (it emits deprecation warnings).
+        if(NOT CMAKE_OSX_DEPLOYMENT_TARGET OR
+           CMAKE_OSX_DEPLOYMENT_TARGET VERSION_GREATER_EQUAL "13.3")
+            target_compile_definitions(bgbot_lib PRIVATE ACCELERATE_NEW_LAPACK)
+        else()
+            target_compile_options(bgbot_lib PRIVATE -Wno-deprecated-declarations)
+        endif()
+        message(STATUS "bgbot: Accelerate batched NN evaluation ON")
+    endif()
+endif()
+
 # CUDA stub (provides cuda_available() = false, no-op cuda_supervised_train)
 add_library(bgbot_cuda_stub STATIC ${BGBOT_CPU_ROOT}/src/cuda_nn_stub.cpp)
 target_include_directories(bgbot_cuda_stub PUBLIC ${BGBOT_CPU_ROOT}/include)

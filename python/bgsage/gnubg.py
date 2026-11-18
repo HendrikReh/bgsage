@@ -19,6 +19,7 @@ import re
 import subprocess
 import tempfile
 
+from . import settings
 from .types import (
     CheckerPlayResult,
     CubeActionResult,
@@ -28,7 +29,12 @@ from .types import (
 )
 
 
-GNUBG_CLI = r'C:\Program Files (x86)\gnubg\gnubg-cli.exe'
+def __getattr__(name):
+    # GNUBG_CLI used to be a hardcoded Windows path; it now reports the binary
+    # resolved by bgsage.settings (configure it there, not by assignment).
+    if name == 'GNUBG_CLI':
+        return settings.gnubg_path()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 _EVAL_LEVELS = {'1ply': 0, '2ply': 1, '3ply': 2, '4ply': 3}
 
@@ -47,15 +53,20 @@ def _flip_board(checkers):
     return flipped
 
 
-def _run_gnubg(cmd, timeout=60):
-    """Run gnubg-cli with the given command and return stdout."""
+def _run_gnubg(cmd, timeout=60, gnubg_path=None):
+    """Run the GNUbg CLI with the given command and return stdout.
+
+    ``gnubg_path`` overrides the binary; by default it is resolved by
+    :func:`bgsage.settings.gnubg_path` on every call.
+    """
+    exe = gnubg_path or settings.gnubg_path()
     with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
         f.write(cmd)
         cmd_file = f.name
 
     try:
         result = subprocess.run(
-            [GNUBG_CLI, '-q', '-t', '--no-rc', '-c', cmd_file],
+            [exe, '-q', '-t', '--no-rc', '-c', cmd_file],
             capture_output=True, text=True, timeout=timeout
         )
         if result.returncode != 0:
@@ -260,7 +271,7 @@ def _parse_cube_analytics_full(output, search_start=0):
 # Module-level functions (backward-compatible)
 # ---------------------------------------------------------------------------
 
-def post_move_analytics(checkers, n_plies=0, timeout=60, jacoby=True):
+def post_move_analytics(checkers, n_plies=0, timeout=60, jacoby=True, gnubg_path=None):
     """Evaluate a post-move board position using gnubg.
 
     Returns cubeless probabilities from the perspective of the player who just
@@ -281,6 +292,7 @@ def post_move_analytics(checkers, n_plies=0, timeout=60, jacoby=True):
         n_plies: evaluation depth (0, 1, 2, or 3)
         timeout: seconds before killing gnubg process
         jacoby: if True, enable Jacoby rule
+        gnubg_path: GNUbg binary to run (default: bgsage.settings.gnubg_path())
 
     Returns:
         dict with:
@@ -337,7 +349,7 @@ def post_move_analytics(checkers, n_plies=0, timeout=60, jacoby=True):
 
     # Get pre-roll cube analytics from opponent's perspective
     cmd = _build_cube_analytics_command(opp_board, n_plies, jacoby=jacoby)
-    output = _run_gnubg(cmd, timeout=timeout)
+    output = _run_gnubg(cmd, timeout=timeout, gnubg_path=gnubg_path)
     opp_result = _parse_cube_analytics(output, n_plies)
 
     # Invert probabilities: opponent's perspective -> mover's perspective
@@ -359,7 +371,7 @@ def post_move_analytics(checkers, n_plies=0, timeout=60, jacoby=True):
 
 
 def post_move_analytics_many(checkers_list, n_plies=0, max_workers=None, timeout=60,
-                             jacoby=True):
+                             jacoby=True, gnubg_path=None):
     """Evaluate multiple post-move positions in parallel.
 
     Args:
@@ -383,7 +395,7 @@ def post_move_analytics_many(checkers_list, n_plies=0, max_workers=None, timeout
         futures = {}
         for idx, checkers in enumerate(checkers_list):
             future = executor.submit(post_move_analytics, checkers, n_plies, timeout,
-                                     jacoby=jacoby)
+                                     jacoby=jacoby, gnubg_path=gnubg_path)
             futures[future] = idx
 
         for future in as_completed(futures):
@@ -408,7 +420,11 @@ class GnuBgAnalyzer:
         print(cube.equity_nd, cube.equity_dt, cube.optimal_action)
     """
 
-    def __init__(self, eval_level="1ply", timeout=120, jacoby=True):
+    def __init__(self, eval_level="1ply", timeout=120, jacoby=True, gnubg_path=None):
+        """``gnubg_path``: the GNUbg binary for this analyzer; ``None`` uses
+        :func:`bgsage.settings.gnubg_path` (code setting, ``BGSAGE_GNUBG``,
+        the user settings file, then auto-detection)."""
+        self.gnubg_path = os.fspath(gnubg_path) if gnubg_path is not None else None
         if eval_level not in _EVAL_LEVELS:
             raise ValueError(
                 f"eval_level must be one of {list(_EVAL_LEVELS)}, got {eval_level!r}")
@@ -437,7 +453,7 @@ class GnuBgAnalyzer:
         cmd = self._build_preroll_command(board, cube_value, cube_owner,
                                          away1=away1, away2=away2,
                                          is_crawford=is_crawford, jacoby=j)
-        output = _run_gnubg(cmd, timeout=self.timeout)
+        output = _run_gnubg(cmd, timeout=self.timeout, gnubg_path=self.gnubg_path)
         r, _ = _parse_cube_analytics_full(output)
 
         probs = Probabilities(r['p_win'], r['p_gw'], r['p_bw'],
@@ -496,7 +512,7 @@ class GnuBgAnalyzer:
         cmd = self._build_preroll_command(opp_board, cube_value, cube_owner,
                                          away1=away1, away2=away2,
                                          is_crawford=is_crawford, jacoby=j)
-        output = _run_gnubg(cmd, timeout=self.timeout)
+        output = _run_gnubg(cmd, timeout=self.timeout, gnubg_path=self.gnubg_path)
         r, _ = _parse_cube_analytics_full(output)
 
         # Invert to mover's perspective
@@ -551,7 +567,7 @@ class GnuBgAnalyzer:
             cmd = self._build_preroll_command(opp_board, cube_value, cube_owner,
                                              away1=away1, away2=away2,
                                              is_crawford=is_crawford, jacoby=j)
-            output = _run_gnubg(cmd, timeout=self.timeout)
+            output = _run_gnubg(cmd, timeout=self.timeout, gnubg_path=self.gnubg_path)
             r, _ = _parse_cube_analytics_full(output)
             probs = Probabilities(
                 win=1.0 - r['p_win'], gammon_win=r['p_gl'],
@@ -569,7 +585,7 @@ class GnuBgAnalyzer:
         cmd = self._build_batch_postmove_command(
             candidates, cube_value, cube_owner,
             away1=away1, away2=away2, is_crawford=is_crawford, jacoby=j)
-        output = _run_gnubg(cmd, timeout=self.timeout)
+        output = _run_gnubg(cmd, timeout=self.timeout, gnubg_path=self.gnubg_path)
 
         move_analyses = []
         search_start = 0

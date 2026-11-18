@@ -238,9 +238,10 @@ const PubEval& static_pubeval() {
 
 // ======================== Batched candidate evaluation ========================
 
-// Grouped delta evaluation for pair-NN strategies. Candidates are classified
+// Grouped evaluation for pair-NN strategies. Candidates are classified
 // per-candidate (matching the interior-pick convention) and grouped by NN
-// index; within a group the first candidate is the delta base.
+// index; each group is one NeuralNetwork::forward_group call (delta evaluation
+// off the group's first candidate, or Accelerate on Apple builds).
 template <class S>
 void eval_groups_pair(const S& s, const std::vector<Board>& cands,
                       const int* idxs, int n,
@@ -248,7 +249,8 @@ void eval_groups_pair(const S& s, const std::vector<Board>& cands,
 {
     thread_local std::vector<int> nn_idx_of;
     thread_local std::vector<char> done;
-    thread_local std::vector<float> saved_base, saved_inputs;
+    thread_local std::vector<int> members;
+    thread_local std::vector<std::array<float, NUM_OUTPUTS>> group_out;
 
     nn_idx_of.resize(n);
     done.assign(n, 0);
@@ -266,37 +268,19 @@ void eval_groups_pair(const S& s, const std::vector<Board>& cands,
     for (int j = 0; j < n; ++j) {
         if (done[j]) continue;
         const int nidx = nn_idx_of[j];
-        const NeuralNetwork& nn = *s.nn(nidx);
-        const int ni = nn.n_inputs();
-        const int nh = nn.n_hidden();
-        if (static_cast<int>(saved_base.size()) < nh) saved_base.resize(nh);
-        if (static_cast<int>(saved_inputs.size()) < ni) saved_inputs.resize(ni);
-        const bool is_pr = (nidx == 0);
 
-        if (is_pr) {
-            auto inp = compute_tesauro_inputs(cands[idxs[j]]);
-            out[idxs[j]] = nn.forward_save_base(
-                inp.data(), saved_base.data(), saved_inputs.data());
-        } else {
-            auto inp = compute_extended_contact_inputs(cands[idxs[j]]);
-            out[idxs[j]] = nn.forward_save_base(
-                inp.data(), saved_base.data(), saved_inputs.data());
-        }
-        done[j] = 1;
-
-        for (int k = j + 1; k < n; ++k) {
+        // Collect this NN's candidates in order (the first is the delta base).
+        members.clear();
+        for (int k = j; k < n; ++k) {
             if (done[k] || nn_idx_of[k] != nidx) continue;
-            if (is_pr) {
-                auto inp = compute_tesauro_inputs(cands[idxs[k]]);
-                out[idxs[k]] = nn.forward_from_base(
-                    inp.data(), saved_base.data(), saved_inputs.data());
-            } else {
-                auto inp = compute_extended_contact_inputs(cands[idxs[k]]);
-                out[idxs[k]] = nn.forward_from_base(
-                    inp.data(), saved_base.data(), saved_inputs.data());
-            }
+            members.push_back(idxs[k]);
             done[k] = 1;
         }
+        const int m = static_cast<int>(members.size());
+        group_out.resize(m);
+        evaluate_board_group(*s.nn(nidx), nidx == 0, cands, members.data(), m,
+                             group_out.data());
+        for (int g = 0; g < m; ++g) out[members[g]] = group_out[g];
     }
 }
 
