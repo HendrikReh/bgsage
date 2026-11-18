@@ -16,6 +16,17 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
 ## [Unreleased]
 
+### Documentation
+
+- `CLAUDE.md` records that re-rolling the containment net's general rows
+  under Stage 9 did not help
+  ([#17](https://github.com/HendrikReh/bgsage/pull/17)). All 291,242 rows
+  were rolled out on Modal (~$223), and the retrained net's holdout ER fell
+  (general rows 36.8 → 24.4), but its decisions did not improve. On the money
+  benchmark's 237 containment-routed decisions it scores 3.50 / 2.05 / 1.28
+  at 1P / 2P / 3P against 3.06 / 1.94 / 1.18 for the installed net, and the
+  containment folder is a tie. The installed net stays.
+
 ## [2.0.20261118] - 2026-11-18
 
 The fork's first release.
