@@ -36,19 +36,6 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
     2.74 to 2.00 at 1-ply and from 2.30 to 1.02 at 2-ply.
   - See "Cube life by depth (money)" in `CLAUDE.md`.
 
-### Documentation
-
-- `CLAUDE.md` records a paired comparison of the race-net swap against XG
-  4-ply on all 5,117 decisions of the Benchmark PR sample. Stage 5's 200h
-  net is never worse than the S6 100h net it replaced, but no gap is
-  significant: overall PR −0.010 ± 0.008 at 1-ply and −0.038 ± 0.028 at
-  2-ply.
-  - At 2-ply the race gain is a single decision. The other 607 races
-    outside the bearoff database net to −0.003.
-  - At 1-ply the race gain is spread over many decisions: −0.088 ± 0.070.
-  - At 2-ply the race net also changes 37 contact picks, for a gain within
-    noise (−0.015 ± 0.007).
-
 ### Fixed
 
 - **The test suite runs clean on macOS**
@@ -66,6 +53,16 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
 ### Documentation
 
+- `CLAUDE.md` records a paired comparison of the race-net swap against XG
+  4-ply on all 5,117 decisions of the Benchmark PR sample. Stage 5's 200h
+  net is never worse than the S6 100h net it replaced, but no gap is
+  significant: overall PR −0.010 ± 0.008 at 1-ply and −0.038 ± 0.028 at
+  2-ply.
+  - At 2-ply the race gain is a single decision. The other 607 races
+    outside the bearoff database net to −0.003.
+  - At 1-ply the race gain is spread over many decisions: −0.088 ± 0.070.
+  - At 2-ply the race net also changes 37 contact picks, for a gain within
+    noise (−0.015 ± 0.007).
 - `CLAUDE.md` records that re-rolling the containment net's general rows
   under Stage 9 did not help
   ([#17](https://github.com/HendrikReh/bgsage/pull/17)). All 291,242 rows
@@ -74,6 +71,16 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
   benchmark's 237 containment-routed decisions it scores 3.50 / 2.05 / 1.28
   at 1P / 2P / 3P against 3.06 / 1.94 / 1.18 for the installed net, and the
   containment folder is a tie. The installed net stays.
+- The `scripts/accuracy_vs_time.py` results were re-measured after the
+  race-net swap ([#8](https://github.com/HendrikReh/bgsage/pull/8)).
+  `stage11`'s Benchmark PR at 1 / 2 / 3 / 4-ply is now
+  4.10 / 3.15 / 2.54 / 2.54, against 4.11 / 3.18 / 2.53 / 2.55 before.
+  - Between 89 and 143 of the 5,140 picks changed per level. GNUbg's PR is
+    identical to the first run.
+  - Paired against GNUbg at the same depth: −0.17 ± 0.14, −0.29 ± 0.09,
+    −0.21 ± 0.07 and −0.02 ± 0.08.
+  - Open Sage 3-ply still matches GNUbg 4-ply (−0.02 ± 0.06) at about a
+    fifth of the CPU time.
 
 ## [2.0.20261118] - 2026-11-18
 
