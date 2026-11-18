@@ -950,11 +950,23 @@ export PATH="$PWD/build/venv/bin:$PATH"
 ```
 
 ```bash
-cmake -S . -B build/cmake -G Ninja -DCMAKE_BUILD_TYPE=Release \
+cmake -S . -B build/cmake_accel -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -Dpybind11_DIR="$(python -c 'import pybind11; print(pybind11.get_cmake_dir())')"
-ninja -C build/cmake bgbot_cpp
-cp build/cmake/bgbot_cpp*.so build/
+ninja -C build/cmake_accel bgbot_cpp
+rm -f build/bgbot_cpp*.so && cp build/cmake_accel/bgbot_cpp*.so build/
 ```
+
+`build/cmake_accel` is the build directory the installed module comes from
+(Accelerate on, the default). For a rebuild after a C++ change, the `ninja`
+and `rm`/`cp` lines are enough. The main checkout also has `build/cmake_portable`
+(`-DBGBOT_USE_ACCELERATE=OFF`) and `build/cmake_base`, kept for A/B
+comparisons; don't install from them by accident.
+
+**Remove the old module before copying.** `cp` over the installed `.so`
+writes into the same file, and macOS then kills every later
+`import bgbot_cpp` with SIGKILL (exit 137, no output: pytest prints nothing),
+because the kernel's cached code signature no longer matches the file. `rm`
+first, so the copy is a new file.
 
 NEON intrinsics are used instead of AVX2, and no `-ffast-math`.
 
