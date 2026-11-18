@@ -115,6 +115,49 @@ static Board list_to_board(const std::vector<int>& v) {
     return b;
 }
 
+// Benchmark PR: parse decision dicts ('board', 'dice', 'candidates',
+// 'rollout_equities') from Python.
+static std::vector<PRDecision> pr_decisions_from_py(py::list decisions_py) {
+    std::vector<PRDecision> decisions;
+    decisions.reserve(decisions_py.size());
+    for (auto item : decisions_py) {
+        PRDecision dec;
+        auto d = item.cast<py::dict>();
+        dec.board = list_to_board(d["board"].cast<std::vector<int>>());
+        auto dice = d["dice"].cast<std::vector<int>>();
+        dec.die1 = dice[0];
+        dec.die2 = dice[1];
+        auto cands = d["candidates"].cast<std::vector<std::vector<int>>>();
+        for (auto& c : cands) {
+            dec.candidates.push_back(list_to_board(c));
+        }
+        dec.rollout_equities = d["rollout_equities"].cast<std::vector<double>>();
+        decisions.push_back(std::move(dec));
+    }
+    return decisions;
+}
+
+// Benchmark PR: overall and per-plan results as a Python dict.
+static py::dict pr_result_to_py(const PRResult& result) {
+    py::dict out;
+    out["overall_pr"] = result.overall_pr();
+    out["total_decisions"] = result.total_decisions();
+    out["total_error"] = result.total_error();
+    out["n_outside"] = result.n_outside;
+    out["n_skipped"] = result.n_skipped;
+    py::dict gp_pr, gp_n, gp_n_err;
+    const char* gp_names[] = {"purerace", "racing", "attacking", "priming", "anchoring"};
+    for (int i = 0; i < 5; ++i) {
+        gp_pr[gp_names[i]] = result.gp_pr(i);
+        gp_n[gp_names[i]] = result.gp_n_decisions[i];
+        gp_n_err[gp_names[i]] = result.gp_n_with_error[i];
+    }
+    out["per_plan_pr"] = gp_pr;
+    out["per_plan_n"] = gp_n;
+    out["per_plan_n_with_error"] = gp_n_err;
+    return out;
+}
+
 // Convert a Board to a Python-friendly vector
 static std::vector<int> board_to_list(const Board& b) {
     return std::vector<int>(b.begin(), b.end());
@@ -1967,23 +2010,7 @@ PYBIND11_MODULE(bgbot_cpp, m) {
                                          int n_h_priming,
                                          int n_h_anchoring,
                                          int n_threads) {
-        // Parse decisions from Python
-        std::vector<PRDecision> decisions;
-        decisions.reserve(decisions_py.size());
-        for (auto item : decisions_py) {
-            PRDecision dec;
-            auto d = item.cast<py::dict>();
-            dec.board = list_to_board(d["board"].cast<std::vector<int>>());
-            auto dice = d["dice"].cast<std::vector<int>>();
-            dec.die1 = dice[0];
-            dec.die2 = dice[1];
-            auto cands = d["candidates"].cast<std::vector<std::vector<int>>>();
-            for (auto& c : cands) {
-                dec.candidates.push_back(list_to_board(c));
-            }
-            dec.rollout_equities = d["rollout_equities"].cast<std::vector<double>>();
-            decisions.push_back(std::move(dec));
-        }
+        std::vector<PRDecision> decisions = pr_decisions_from_py(decisions_py);
 
         GamePlanStrategy strat(purerace_w, racing_w, attacking_w, priming_w, anchoring_w,
                                n_h_purerace, n_h_racing, n_h_attacking, n_h_priming, n_h_anchoring);
@@ -1994,23 +2021,7 @@ PYBIND11_MODULE(bgbot_cpp, m) {
             result = score_benchmark_pr(strat, nullptr, decisions, filter, n_threads);
         }
 
-        py::dict out;
-        out["overall_pr"] = result.overall_pr();
-        out["total_decisions"] = result.total_decisions();
-        out["total_error"] = result.total_error();
-        out["n_outside"] = result.n_outside;
-        out["n_skipped"] = result.n_skipped;
-        py::dict gp_pr, gp_n, gp_n_err;
-        const char* gp_names[] = {"purerace", "racing", "attacking", "priming", "anchoring"};
-        for (int i = 0; i < 5; ++i) {
-            gp_pr[gp_names[i]] = result.gp_pr(i);
-            gp_n[gp_names[i]] = result.gp_n_decisions[i];
-            gp_n_err[gp_names[i]] = result.gp_n_with_error[i];
-        }
-        out["per_plan_pr"] = gp_pr;
-        out["per_plan_n"] = gp_n;
-        out["per_plan_n_with_error"] = gp_n_err;
-        return out;
+        return pr_result_to_py(result);
     }, "Score 1-ply strategy against benchmark PR data (parallel)",
        py::arg("decisions"),
        py::arg("purerace_weights"),
@@ -2042,23 +2053,7 @@ PYBIND11_MODULE(bgbot_cpp, m) {
                                          int filter_max_moves,
                                          float filter_threshold,
                                          int n_threads) {
-        // Parse decisions from Python
-        std::vector<PRDecision> decisions;
-        decisions.reserve(decisions_py.size());
-        for (auto item : decisions_py) {
-            PRDecision dec;
-            auto d = item.cast<py::dict>();
-            dec.board = list_to_board(d["board"].cast<std::vector<int>>());
-            auto dice = d["dice"].cast<std::vector<int>>();
-            dec.die1 = dice[0];
-            dec.die2 = dice[1];
-            auto cands = d["candidates"].cast<std::vector<std::vector<int>>>();
-            for (auto& c : cands) {
-                dec.candidates.push_back(list_to_board(c));
-            }
-            dec.rollout_equities = d["rollout_equities"].cast<std::vector<double>>();
-            decisions.push_back(std::move(dec));
-        }
+        std::vector<PRDecision> decisions = pr_decisions_from_py(decisions_py);
 
         auto base = std::make_shared<GamePlanStrategy>(
             purerace_w, racing_w, attacking_w, priming_w, anchoring_w,
@@ -2073,23 +2068,7 @@ PYBIND11_MODULE(bgbot_cpp, m) {
             result = score_benchmark_pr(strat, base.get(), decisions, filter, n_threads);
         }
 
-        py::dict out;
-        out["overall_pr"] = result.overall_pr();
-        out["total_decisions"] = result.total_decisions();
-        out["total_error"] = result.total_error();
-        out["n_outside"] = result.n_outside;
-        out["n_skipped"] = result.n_skipped;
-        py::dict gp_pr, gp_n, gp_n_err;
-        const char* gp_names[] = {"purerace", "racing", "attacking", "priming", "anchoring"};
-        for (int i = 0; i < 5; ++i) {
-            gp_pr[gp_names[i]] = result.gp_pr(i);
-            gp_n[gp_names[i]] = result.gp_n_decisions[i];
-            gp_n_err[gp_names[i]] = result.gp_n_with_error[i];
-        }
-        out["per_plan_pr"] = gp_pr;
-        out["per_plan_n"] = gp_n;
-        out["per_plan_n_with_error"] = gp_n_err;
-        return out;
+        return pr_result_to_py(result);
     }, "Score N-ply strategy against benchmark PR data (parallel)",
        py::arg("decisions"),
        py::arg("purerace_weights"),
@@ -2103,6 +2082,32 @@ PYBIND11_MODULE(bgbot_cpp, m) {
        py::arg("n_hidden_priming") = 400,
        py::arg("n_hidden_anchoring") = 400,
        py::arg("n_plies") = 2,
+       py::arg("filter_max_moves") = 5,
+       py::arg("filter_threshold") = 0.08f,
+       py::arg("n_threads") = 0);
+
+    // Score any Strategy object (create_strategy / create_multipy, so every
+    // registered model type) against benchmark PR data. For N-ply, pass the
+    // N-ply strategy and a 1-ply base_strategy for the pre-filter.
+    m.def("score_benchmark_pr_strategy", [](py::list decisions_py,
+                                             std::shared_ptr<Strategy> strategy,
+                                             std::shared_ptr<Strategy> base_strategy,
+                                             int filter_max_moves,
+                                             float filter_threshold,
+                                             int n_threads) {
+        std::vector<PRDecision> decisions = pr_decisions_from_py(decisions_py);
+        MoveFilter filter{filter_max_moves, filter_threshold};
+        PRResult result;
+        {
+            py::gil_scoped_release release;
+            result = score_benchmark_pr(*strategy, base_strategy.get(), decisions,
+                                        filter, n_threads);
+        }
+        return pr_result_to_py(result);
+    }, "Score a Strategy object against benchmark PR data (parallel)",
+       py::arg("decisions"),
+       py::arg("strategy"),
+       py::arg("base_strategy") = nullptr,
        py::arg("filter_max_moves") = 5,
        py::arg("filter_threshold") = 0.08f,
        py::arg("n_threads") = 0);

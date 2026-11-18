@@ -51,7 +51,7 @@ GNUBG_CLI = gnubg_path()
 GAME_PLANS = ['purerace', 'racing', 'attacking', 'priming', 'anchoring']
 
 
-def load_benchmark_data():
+def load_benchmark_data(decision_step=1):
     """Load decisions with rollout equities pre-attached."""
     decisions_file = os.path.join(BENCHMARK_DIR, 'decisions.json')
     rollout_file = os.path.join(BENCHMARK_DIR, 'rollouts.jsonl')
@@ -63,6 +63,12 @@ def load_benchmark_data():
     with open(decisions_file, 'r') as f:
         saved = json.load(f)
     decisions = saved['decisions']
+    if decision_step > 1:
+        # Score exactly the sample generate_benchmark_pr.py --decision-step
+        # rolled out. Decisions outside it whose candidates happen to be
+        # covered are a skewed selection (they lean towards positions shared
+        # between many games), so they are not scored.
+        decisions = decisions[::decision_step]
 
     rollout_equities = {}
     if os.path.exists(rollout_file):
@@ -340,6 +346,9 @@ def main():
         description='Score GNUbg against Benchmark PR')
     parser.add_argument('--plies', type=int, action='append',
                         help='Ply depth(s) to score (can specify multiple)')
+    parser.add_argument('--decision-step', type=int, default=1,
+                        help='Score every Nth decision only: the sample '
+                             'generate_benchmark_pr.py --decision-step N rolled out')
     parser.add_argument('--workers', type=int, default=0,
                         help='Number of parallel GNUbg workers (0 = CPU count)')
     args = parser.parse_args()
@@ -354,7 +363,7 @@ def main():
     bgbot_cpp.init_escape_tables()
 
     print("Loading benchmark data...")
-    decisions, meta = load_benchmark_data()
+    decisions, meta = load_benchmark_data(args.decision_step)
     print(f"  {len(decisions)} scoreable decisions")
     print(f"  Data from {meta['n_games']} games, {meta['n_turns']} turns")
     print()

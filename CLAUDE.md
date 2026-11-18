@@ -715,8 +715,8 @@ to override. Scripts live in `scripts/`.
 |--------|-----------------|----------|
 | `run_full_benchmark.py` | Full suite: per-plan ER + contact/crashed/race ER + vs PubEval ppg + self-play distribution. Supports 1-ply through N-ply. | `--model`, `--ply N`, `--scenarios N`, `--threads N`, `--games N` |
 | `run_rollout_benchmark.py` | Top-N worst 1-ply errors compared at 2-ply, 3-ply, 4-ply, rollout | `--model`, `--top N`, `--threads N` |
-| `score_benchmark_pr.py` | Benchmark PR (equity error vs rollout reference, 103k decisions) | `--model`, `--plies N`, `--all-models`, `--all-plies` |
-| `score_benchmark_pr_gnubg.py` | GNUbg's Benchmark PR (parallel GNUbg CLI subprocesses) | `--plies N` |
+| `score_benchmark_pr.py` | Benchmark PR (equity error vs rollout reference, 103k decisions). Any registered model type (5-NN, pair, backgame) via `bgbot_cpp.score_benchmark_pr_strategy`. | `--model`, `--plies N`, `--all-models`, `--all-plies`, `--decision-step N` |
+| `score_benchmark_pr_gnubg.py` | GNUbg's Benchmark PR (parallel GNUbg CLI subprocesses) | `--plies N`, `--workers N`, `--decision-step N` |
 | `test_evaluate_probs.py` | Single position eval at 1-4 ply + GNUbg + rollouts | `--model`, `--checkers`, `--ply N` |
 | `test_cube_decision.py` | Cube decisions vs 3 reference positions at 1-4 ply + rollout | `--model` |
 | `test_unified_rollout.py` | Verify cubeful(max_cube=1) == cubeless at N-ply + rollout | `--model` |
@@ -750,6 +750,52 @@ python scripts/eval_position.py checker --checkers "..." --dice 3 1
 # Side-by-side checker play analysis (match play)
 python scripts/eval_position.py checker --checkers "..." --dice 3 1 --match 5 --score 3 0
 ```
+
+### Benchmark PR rollout sample (this fork)
+
+The full reference `data/benchmark_pr/rollouts.jsonl` is gitignored and was
+never shipped, so this fork rolled out a 1-in-20 sample of the 138,872 saved
+decisions instead (`generate_benchmark_pr.py --resume --decision-step 20`:
+6,944 decisions, 20,302 positions, Stage 5 full rollouts at 1,296 trials,
+~4.5 h on the M4 Pro). Score it with the same step, so that only the sampled
+decisions count:
+
+```bash
+python scripts/score_benchmark_pr_gnubg.py --decision-step 20 --plies 1 --plies 2
+python scripts/score_benchmark_pr.py --decision-step 20 --all-models --all-plies
+```
+
+Without `--decision-step` the scorers also take every other decision whose
+candidates all happen to be in the file, and those lean towards positions
+shared between many games: Stage 5 2-ply scores 3.37 on the sample but 5.27
+on those 4,233 extras.
+
+Measured 2026-11-18 (5,140 scored decisions; the 1,804 with a single legal
+move are skipped):
+
+| Strategy | Overall | PureRace | Racing | Attacking | Priming | Anchoring |
+|---|---|---|---|---|---|---|
+| GNUbg 1-ply | 4.31 | 0.39 | 4.85 | 5.35 | 5.76 | 5.10 |
+| GNUbg 2-ply | 3.48 | 0.37 | 3.89 | 3.85 | 4.59 | 4.62 |
+| stage5 1-ply | 4.20 | 0.70 | 4.57 | 4.93 | 5.19 | 5.39 |
+| stage5 2-ply | 3.37 | 0.62 | 3.06 | 3.82 | 4.72 | 4.58 |
+| stage9 2-ply | 3.29 | 0.82 | 3.16 | 3.80 | 4.50 | 4.12 |
+| stage11 1-ply | 4.15 | 0.80 | 4.30 | 5.02 | 5.51 | 5.03 |
+| stage11 2-ply | 3.22 | 0.82 | 3.03 | 3.78 | 4.42 | 4.00 |
+
+Read it with three caveats. The reference favours Stage 5: it is Stage 5's
+rollout, and only the moves Stage 5's 2-ply filter kept were rolled out, so a
+pick outside that set is charged the worst rolled-out move (GNUbg 1-ply lands
+outside it 159 times, stage11 about 80). No significance test was run, so gaps
+of a few hundredths (Stages 8-11 span 3.22-3.29 at 2-ply) may be noise. And
+the numbers are not comparable with the full-set PRs quoted elsewhere in this
+file. The one clear gap is the pure race, where every model since Stage 6
+shares a pure-race net at ~0.8 against GNUbg's 0.37.
+
+`score_benchmark_pr.py` builds its N-ply strategy with `create_multipy`, which
+adds the PubEval opponent prefilter BgBotAnalyzer uses; the older 5-NN-only
+`score_benchmark_pr_nply` binding has none (Stage 5 2-ply 4.104 vs 4.097 on
+an 8k-decision set; 1-ply identical).
 
 ## Comparing Sage to XG via .xg Files
 
