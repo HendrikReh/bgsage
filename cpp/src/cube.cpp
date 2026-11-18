@@ -588,6 +588,49 @@ static float cl2cf_match_unavailable(
     return mwc_dead * (1.0f - cube_x) + mwc_live * cube_x;
 }
 
+// Post-Crawford automatic double. With one side 1-away after the Crawford
+// game, the trailer doubles at the first opportunity: the leader cannot gain
+// from the cube, and the trailer can only win on their own turns, all of which
+// come after that next pre-roll opportunity. So a cube the trailer may still
+// turn (centered or trailer-owned, and not yet worth the trailer's match) is
+// valued as doubled once rather than through Janowski: the dead-cube anchor at
+// the current value scores a trailer's gammon at 3-away/1-away as 2 points
+// instead of the match, which put No Double up to 0.18 equity below
+// Double/Take at 2-ply although rollouts (GNUbg's and our own) show them equal.
+//
+// The trailer may also never double (play on at the current cube), and after
+// the double the leader takes (2x cube, then dead -- only the 1-away leader
+// could turn it) or passes. Returns true and sets `mwc` (player's view) when
+// the rule applies.
+static bool post_crawford_auto_double_mwc(
+    const std::array<float, NUM_OUTPUTS>& probs,
+    const CubeInfo& cube,
+    float& mwc)
+{
+    const MatchInfo& m = cube.match;
+    if (cube.is_money() || m.is_crawford) return false;
+    const bool player_trails = (m.away2 == 1 && m.away1 > 1);
+    const bool opponent_trails = (m.away1 == 1 && m.away2 > 1);
+    if (!player_trails && !opponent_trails) return false;
+
+    const int cv = cube.cube_value;
+    const int trailer_away = player_trails ? m.away1 : m.away2;
+    const CubeOwner trailer_owns =
+        player_trails ? CubeOwner::PLAYER : CubeOwner::OPPONENT;
+    if (cube.owner != CubeOwner::CENTERED && cube.owner != trailer_owns)
+        return false;
+    if (trailer_away <= cv) return false;  // any trailer win already takes the match
+    if (cube.max_cube_value > 0 && 2 * cv > cube.max_cube_value) return false;
+
+    const float play_on = cubeless_mwc(probs, m.away1, m.away2, cv, false);
+    const float take = cubeless_mwc(probs, m.away1, m.away2, 2 * cv, false);
+    // The trailer cashes cv points when the leader passes.
+    const float pass = get_met_after(m.away1, m.away2, cv, player_trails, false);
+    mwc = player_trails ? std::max(play_on, std::min(take, pass))
+                        : std::min(play_on, std::max(take, pass));
+    return true;
+}
+
 float cl2cf_match(const std::array<float, NUM_OUTPUTS>& probs,
                   const CubeInfo& cube, float cube_x)
 {
@@ -595,6 +638,11 @@ float cl2cf_match(const std::array<float, NUM_OUTPUTS>& probs,
     if (is_dead_cube(cube)) {
         return cubeless_mwc(probs, cube.match.away1, cube.match.away2,
                             cube.cube_value, cube.match.is_crawford);
+    }
+
+    float auto_double_mwc;
+    if (post_crawford_auto_double_mwc(probs, cube, auto_double_mwc)) {
+        return auto_double_mwc;
     }
 
     // Dispatch by cube ownership
