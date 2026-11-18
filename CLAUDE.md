@@ -2617,9 +2617,40 @@ widened set restores that slice to 3.03 and improves the family folder too
 the completed-reference numbers are in the table below). Warm-starting from
 the S9-initialised deep net (14.59) or fine-tuning the family-only net on the
 widened set (tied on the folder, worse on the money slice and on `Positions
-XG gets wrong`) both lost. The general rows carry GNUbg's targets, so on ordinary-game
-containment the net can at best match `prim_race`; re-rolling a subsample of
-them under S9 is the open lever there.
+XG gets wrong`) both lost. The general rows carry GNUbg's targets.
+
+Re-rolling them under S9 did NOT help (2026-11-18). All 291,242 general rows
+were rolled out on Modal under the S9 convention
+(`data/s11-bg-containment-general-s9-rollout`, ~$223, mean SE 0.006; the S9
+targets differ from GNUbg's by 0.029 equity on average). The installed recipe
+with those targets in place of GNUbg's (prim_race warm start, family x4)
+produced `models/s11_diag/sl_containment_s9gen.weights.best`. Its holdout ER
+on the same split fell sharply, 36.8 -> 24.4 on the general rows and
+37.8 -> 34.5 / 31.1 -> 28.6 on the two family files, but its decisions did
+not improve.
+
+On the money benchmark's 237 containment-routed decisions (installed / new,
+PR at 1P / 2P / 3P):
+
+| Net | 1P | 2P | 3P |
+|---|---|---|---|
+| installed | 3.06 | 1.94 | 1.18 |
+| new | 3.50 | 2.05 | 1.28 |
+| paired difference | +0.45 +- 0.35 | +0.11 +- 0.42 | +0.11 +- 0.15 |
+
+Most of the 1P loss is cube (2.69 -> 5.11).
+
+On the containment folder it is a tie. Bracketed by PR(RO), because the new
+net leaves the completed candidate set on 1-2% of its picks:
+
+| Reference | installed (1P / 2P / 3P) | new (1P / 2P / 3P) |
+|---|---|---|
+| S9-play | 6.77 / 4.74 / 2.52 | 6.11-6.80 / 4.58-4.85 / 2.38-2.60 |
+| S11-play twin | 6.17 / 5.67 / 2.22 | 5.67-5.96 / 5.79-6.51 / 2.50-2.68 |
+
+So the installed net stays. This is the same result as the pure-race
+retraining: holdout ER against better targets is not a lever for decision
+quality here.
 
 **Candidate completion.** A folder reference rolled out only the candidates
 the reference player's 2-ply filter kept; the phased model's picks fall
