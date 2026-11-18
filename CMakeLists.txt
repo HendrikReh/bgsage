@@ -29,8 +29,9 @@ endif()
 # them there when running from an installed wheel.
 #
 # The production model is `stage11` (PRODUCTION_MODEL in python/bgsage/weights.py),
-# a 24-NN layout: Stage 9's 17 standard pair NNs (sl_s9_*) carried unchanged,
-# plus 7 backgame/containment specialists (sl_s11_bg_*).  Both families are
+# a 24-NN layout: Stage 9's 17 standard pair NNs (sl_s9_*), with Stage 5's
+# 200h pure-race net (sl_s5_purerace) in place of sl_s9_purerace, plus 7
+# backgame/containment specialists (sl_s11_bg_*).  All three are
 # required — omitting either makes BgBotAnalyzer() fail with FileNotFoundError
 # at runtime, which the build itself would not catch.
 #
@@ -38,14 +39,23 @@ endif()
 # keep the BGSAGE_MIN_WEIGHTS floor below in step with the new file count.
 file(GLOB BGSAGE_MODEL_WEIGHTS
     "${CMAKE_CURRENT_SOURCE_DIR}/models/sl_s9_*.weights.best"
-    "${CMAKE_CURRENT_SOURCE_DIR}/models/sl_s11_*.weights.best")
+    "${CMAKE_CURRENT_SOURCE_DIR}/models/sl_s11_*.weights.best"
+    "${CMAKE_CURRENT_SOURCE_DIR}/models/sl_s5_purerace.weights.best")
+
+# The glob alone would silently skip a missing single file.
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/models/sl_s5_purerace.weights.best")
+    message(FATAL_ERROR
+        "models/sl_s5_purerace.weights.best is missing: stage11 uses it as its "
+        "pure-race net, so the wheel could not construct an analyzer.")
+endif()
 
 # Drop training artifacts the registry never loads (e.g. the TD-init variant
 # sl_s11_bg_deep_tdinit) — they'd be dead weight in every wheel.
 list(FILTER BGSAGE_MODEL_WEIGHTS EXCLUDE REGEX "_tdinit\\.weights\\.best$")
 
-# stage11 resolves to 21 distinct files (14 sl_s9_* after NN sharing + 7
-# sl_s11_bg_*).  The glob picks up all 19 sl_s9_* files, so 26 is the expected
+# stage11 resolves to 21 distinct files (13 sl_s9_* after NN sharing, 1
+# sl_s5_purerace, 7 sl_s11_bg_*).  The glob picks up all 19 sl_s9_* files, so
+# 27 is the expected
 # count; require at least 21 so a partial checkout fails the build loudly
 # rather than shipping a wheel that cannot construct an analyzer.
 set(BGSAGE_MIN_WEIGHTS 21)

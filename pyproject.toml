@@ -71,6 +71,7 @@ sdist.include = [
     "data/bearoff_1sided.db",
     "models/sl_s9_*.weights.best",
     "models/sl_s11_*.weights.best",
+    "models/sl_s5_purerace.weights.best",
 ]
 
 # ---------------------------------------------------------------------------
