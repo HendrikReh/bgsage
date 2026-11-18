@@ -23,8 +23,12 @@ GPU; that heritage is still in the code and in this file.
 - **Inherited numbers**: training times and many benchmark timings below were
   measured on upstream's Windows box (RTX 4070S, 16 threads). Re-measure on
   the Mac before quoting them for this fork.
-- **XG workflows** (Batch Analyze, `xg_batch_*.py`, `play_sage_vs_xg.py`)
-  need eXtreme Gammon on a Windows desktop and are outside this fork's scope.
+- **XG workflows**: eXtreme Gammon runs on the Mac under CrossOver, and its
+  Batch Analyze reads both the `.txt` transcripts and the `.xg` files this
+  repo writes, so the Python side of the XG tooling works here (see "XG as
+  referee for the Benchmark PR sample"). The GUI drivers (`xg_batch_win.py`,
+  `xg_batch_analyze.py`, `play_sage_vs_xg.py`) are Windows-only and untested
+  under CrossOver; run Batch Analyze by hand.
 
 ## Repo Boundary Rule
 
@@ -784,6 +788,11 @@ networks, which puts every model's pure race at 0.66-0.82:
 | stage9 2-ply | 3.24 | 0.57 | 3.16 | 3.80 | 4.50 | 4.12 |
 | stage11 1-ply | 4.11 | 0.55 | 4.30 | 5.02 | 5.51 | 5.03 |
 | stage11 2-ply | 3.17 | 0.57 | 3.03 | 3.78 | 4.42 | 4.00 |
+| stage11 + S5 200h race net, 1-ply | 4.10 | 0.54 | 4.30 | 5.02 | 5.51 | 5.03 |
+| stage11 + S5 200h race net, 2-ply | 3.14 | 0.44 | 3.00 | 3.79 | 4.42 | 3.99 |
+
+(`stage11` has used Stage 5's 200h pure-race net since 2026-11-18, the last
+two rows; the two above them are the S6 100h net it replaced.)
 
 Read it with three caveats. The reference favours Stage 5: it is Stage 5's
 rollout, and only the moves Stage 5's 2-ply filter kept were rolled out, so a
@@ -811,7 +820,54 @@ Stage 5's 200h pure-race net into stage11 gives 0.81 / 0.64 outside the
 database and 0.54 / 0.44 over all races, but this reference is Stage 5's own
 rollout, played with that very net, so part of the gain may be bias.
 GNUbg's race benchmark (`race.bm`), the independent check, is not on this
-machine.
+machine; XG is (next section), and it confirms the swap, which `stage11` now
+carries.
+
+Retraining the pure-race net on our own targets did NOT help (2026-11-18).
+`scripts/harvest_race_positions.py` + `modal_rollout.py` produced 330k race
+positions rolled out under Stage 9 play (~$22), and `scripts/run_purerace_sl.py`
+fine-tuned both nets on them: holdout ER 16.9 -> 11.1 (100h) and 15.4 -> 11.1
+(200h). On the Benchmark PR races the gain does not carry over: absolute
+error against XG 4-ply moves 9.95 -> 9.33, the within-decision error that
+decides the pick barely moves (5.52 -> 5.30; the 200h fine-tune 4.90 -> 5.29),
+and the picks are no better (outside the database, against XG at 1-ply /
+2-ply: 100h 0.66 / 0.69, 200h 0.67 / 0.58, Stage 5's untouched net 0.51 /
+0.51). Holdout ER on our own positions is the wrong selection metric for a
+race net; the candidates are in `models/race_diag/`.
+
+### XG as referee for the Benchmark PR sample
+
+`scripts/export_benchmark_pr_xg.py` writes the sample's decisions as
+one-decision `.xg` games (`generate --subset race|contact|all`; the record
+templates are cloned from any XG-analysed game, `data/benchmark_pr_xg/template.xg`),
+XG Batch-Analyzes them, `score` reads XG's ranked moves back into
+`xg_reference.jsonl`, and `sage` scores Sage (1-ply / 2-ply, `--race-net` for
+other race nets) and optionally GNUbg (`--gnubg`) against BOTH the Stage 5
+rollout and XG. XG's reference value for a move is the cubeless equity of its
+own evaluation, at whatever depth XG's filter left it (4-ply for the leaders),
+the convention of XG's own error figures. 23 sample decisions carry an illegal
+saved candidate (a move that leaves a playable die unused; 17 as the
+reference's best) and are left out.
+
+Measured 2026-11-18, XG "World Class" (4-ply), 5,117 decisions (979 race +
+4,138 contact), before the race-net swap:
+
+| Player | vs Stage 5 rollout | vs XG 4-ply |
+|---|---|---|
+| XG's #1 move | 2.80 | 0.64 |
+| Stage 5 rollout's best move | 0 | 1.92 |
+| stage11 1-ply / 2-ply | 4.05 / 3.11 | 2.07 / 1.24 |
+| GNUbg 1-ply / 2-ply | 4.26 / 3.42 | 2.35 / 1.40 |
+
+Paired on the same decisions, stage11 beats GNUbg under both references
+(2-ply: -0.17 +- 0.07 against XG, -0.30 +- 0.10 against the rollout), and XG
+rates stage11 2-ply above the Stage 5 rollout's own best moves (-0.68 +-
+0.09): beyond today's level the old reference mostly measures distance to
+Stage 5, so check improvements against XG. XG's own #1 does not score 0
+because XG ranks moves cubeful (centred cube, Jacoby off) while the reference
+is cubeless; read the XG column from ~0.6 up. In the bearoff races XG agrees
+with the exact database (Sage with the DB scores 0.00 there), while the Stage 5
+rollout's best moves cost 0.13: that is the rollout reference's noise.
 
 `score_benchmark_pr.py` builds its N-ply strategy with `create_multipy`, which
 adds the PubEval opponent prefilter BgBotAnalyzer uses; the older 5-NN-only

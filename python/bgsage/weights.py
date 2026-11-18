@@ -36,8 +36,13 @@ MODELS: dict[str, dict[str, Any]] = {
         # intermediate layouts this grew through (the 20-NN trio, 22-NN
         # "stage11p", 23-NN "stage11s", 24-NN "stage11m") are history in
         # CLAUDE.md; the strategy still accepts 22 or 23 paths for A/B work.
-        "hidden": (100,) + (400,) * 23,   # 17 standard + 3 trio + 2 phase + snake + massive = 24
+        # Pure race (index 0) is Stage 5's 200h net, not Stage 9's (= S6's
+        # 100h): scored against XG 4-ply on the Benchmark PR sample's 608
+        # races outside the bearoff DB it is better at 1-ply and 2-ply
+        # (PR 0.51 / 0.51 vs 0.60 / 0.73; scripts/export_benchmark_pr_xg.py).
+        "hidden": (200,) + (400,) * 23,   # 17 standard + 3 trio + 2 phase + snake + massive = 24
         "pattern": "sl_s9_{plan}.weights.best",   # standard NNs are Stage 9's
+        "overrides": {"purerace": "sl_s5_purerace.weights.best"},
         "plans": "backgame_pair_phased",
         "canonical_map": [0,1,2,3,4,5,6,7,8,9,10,12,12,13,14,12,12],
         "extra_backgame": ["sl_s11_bg_deep.weights.best",

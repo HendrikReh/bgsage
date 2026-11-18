@@ -76,3 +76,5 @@ backgame_ref_positions/benchmark/*rollout.batches.jsonl
 # Candidate-completion inputs and pre-merge backups (regenerable)
 backgame_ref_positions/benchmark/*candidates rollout.jsonl
 backgame_ref_positions/benchmark/*.pre-merge
+# XG analysis shards of Benchmark PR decisions (scripts/export_benchmark_pr_xg.py)
+data/benchmark_pr_xg/
