@@ -1149,8 +1149,19 @@ Modal match the local results within 1.7 SE. An 8-core container (16
 threads, $0.41/h at list price) runs at ~0.8x the M4 Pro: ~20 s and
 **~$0.002 per containment-type board** at 1,296 trials / 3-ply (Fargate was
 ~$0.005), so snake-type boards (~6x longer) cost ~$0.013. The cost estimate
-counts rollout time only; Modal's dashboard has the real bill. Starter plans
-allow 100 concurrent containers.
+counts rollout time only; Modal's dashboard has the real bill. Pure-race
+boards take ~0.6 s (~$0.0001 each); run them with `--chunk 50` so one Modal
+input carries 50 boards, or the per-input overhead rivals the rollout.
+
+Operating notes. The account's container limit (100 on the Starter plan) is
+shared by every run: a second run started while the first holds all 100 gets
+no containers and waits silently, so split them (`--containers 85` and
+`--containers 15`). Stop a run with `kill -TERM <pid>` of its Python process
+(the script turns SIGTERM into a clean app shutdown) and check
+`modal app list` — an ephemeral app whose client died keeps its containers
+running and billing until stopped with `modal app stop -y <app id>`. Modal
+pre-empts containers now and then; the affected boards are restarted
+automatically. Re-running the same command resumes.
 
 ### Training a New Model from Scratch
 
