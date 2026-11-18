@@ -13,6 +13,7 @@ Tests:
 """
 
 import os
+import shutil
 import sys
 import time
 import math
@@ -20,7 +21,7 @@ import unittest
 
 # Setup paths
 script_dir = os.path.dirname(os.path.abspath(__file__))
-project_dir = os.path.dirname(os.path.dirname(script_dir))
+project_dir = os.path.dirname(script_dir)  # the bgsage repo root
 build_dir = os.path.join(project_dir, 'build')
 
 if sys.platform == 'win32':
@@ -34,6 +35,11 @@ sys.path.insert(0, build_dir)
 sys.path.insert(0, os.path.join(project_dir, 'python'))
 
 from bgsage.gnubg import post_move_analytics, post_move_analytics_many
+from bgsage.settings import gnubg_path
+
+_GNUBG = gnubg_path()
+_GNUBG_FOUND = bool(shutil.which(_GNUBG)) or os.path.isfile(_GNUBG)
+_NO_GNUBG = f"GNUbg binary not found ({_GNUBG}); see bgsage.settings"
 
 
 def flip_board(checkers):
@@ -46,6 +52,7 @@ def flip_board(checkers):
     return flipped
 
 
+@unittest.skipUnless(_GNUBG_FOUND, _NO_GNUBG)
 class TestGnubgEndgame(unittest.TestCase):
     """Test simple endgame positions where the answer is known exactly.
 
@@ -145,6 +152,7 @@ class TestGnubgEndgame(unittest.TestCase):
         self.assertAlmostEqual(result['equity'], eq, places=3)
 
 
+@unittest.skipUnless(_GNUBG_FOUND, _NO_GNUBG)
 class TestGnubgVsStage4(unittest.TestCase):
     """Compare gnubg 2-ply with Stage 4 2-ply on top-100 worst 0-ply positions."""
 
@@ -158,6 +166,15 @@ class TestGnubgVsStage4(unittest.TestCase):
 
         DATA_DIR = os.path.join(project_dir, 'data')
         MODELS_DIR = os.path.join(project_dir, 'models')
+
+        # The GNUbg benchmark files are gitignored and not shipped.
+        contact_file = os.path.join(DATA_DIR, 'contact.bm')
+        crashed_file = os.path.join(DATA_DIR, 'crashed.bm')
+        missing = [f for f in (contact_file, crashed_file) if not os.path.isfile(f)]
+        if missing:
+            raise unittest.SkipTest(
+                "GNUbg benchmark files not present (gitignored): "
+                + ", ".join(os.path.relpath(f, project_dir) for f in missing))
 
         cls.NH = {'purerace': 120, 'racing': 250, 'attacking': 250,
                   'priming': 250, 'anchoring': 250}
@@ -174,9 +191,6 @@ class TestGnubgVsStage4(unittest.TestCase):
                 raise FileNotFoundError(f"No weights found for {t}")
 
         # Load contact + crashed benchmarks
-        contact_file = os.path.join(DATA_DIR, 'contact.bm')
-        crashed_file = os.path.join(DATA_DIR, 'crashed.bm')
-
         print("Loading benchmarks...")
         scenarios_contact = load_benchmark_file(contact_file)
         scenarios_crashed = load_benchmark_file(crashed_file)

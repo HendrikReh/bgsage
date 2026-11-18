@@ -42,7 +42,7 @@ import sys
 import pytest
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-_BUILD_DIR = os.path.abspath(os.path.join(_HERE, '..', '..', 'build'))
+_BUILD_DIR = os.path.abspath(os.path.join(_HERE, '..', 'build'))
 _PKG_DIR = os.path.abspath(os.path.join(_HERE, '..', 'python'))
 
 #: Generous relative to the ~0.2 s a healthy run takes; this only has to be

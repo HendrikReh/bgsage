@@ -5,9 +5,13 @@
 import sys
 import os
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'build'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'python'))
-os.add_dll_directory(r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64")
+_REPO = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
+sys.path.insert(0, os.path.join(_REPO, 'build'))
+sys.path.insert(0, os.path.join(_REPO, 'python'))
+if sys.platform == 'win32':
+    _cuda = r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64"
+    if os.path.isdir(_cuda):
+        os.add_dll_directory(_cuda)
 
 import bgbot_cpp
 from bgsage import BgBotAnalyzer
