@@ -46,11 +46,13 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
   This rolls out every Nth saved decision. The fork's reference is the
   1-in-20 sample: 6,944 decisions and 20,302 positions, about 4.5 hours.
   Both PR scorers accept `--decision-step N` and score exactly that sample.
+- **CHANGELOG** for the fork ([#10](https://github.com/HendrikReh/bgsage/pull/10)).
 - **`score_benchmark_pr_strategy` binding**
   ([#2](https://github.com/HendrikReh/bgsage/pull/2)).
   `score_benchmark_pr.py` now scores every registered model type: 5-NN,
   pair, and backgame-aware models including `stage11`.
-- **Accuracy against thinking time** (`scripts/accuracy_vs_time.py`). The
+- **Accuracy against thinking time** (`scripts/accuracy_vs_time.py`,
+  [#10](https://github.com/HendrikReh/bgsage/pull/10)). The
   script measures Benchmark PR and single-thread CPU time per decision for
   Open Sage and GNUbg at 1–4 ply, with both engines picking moves as in
   normal use and depths in the XG convention. First results (`stage11`,
@@ -117,6 +119,20 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
 ### Fixed
 
+- **Post-Crawford cube for the trailer**
+  ([#9](https://github.com/HendrikReh/bgsage/pull/9)). After the Crawford
+  game the trailer doubles at the first opportunity, but `cl2cf_match`
+  still interpolated towards a dead cube at the current value. On 15 BG
+  Tutor duel positions (3- or 4-away vs 1-away, cube centered) this put
+  2-ply No Double 0.058–0.184 equity below Double/Take, so analyses charged
+  the trailer an error for not doubling. GNUbg 2- and 4-ply and rollouts
+  from both engines put the two equal. The position is now valued as
+  doubled once, as long as the trailer can still turn the cube. Every
+  caller shares this one conversion: 1-ply, the N-ply leaves, rollout
+  truncation, bearoff and the Python `cl2cf` binding. The Crawford game,
+  leader-owned cubes, match-dead cubes and pre-Crawford scores are
+  unchanged. `tests/test_post_crawford_cube.py` adds 24 cases; 16 of them
+  fail on the code before the fix.
 - **Thread limits for 1-ply cubeful checker play**
   ([#3](https://github.com/HendrikReh/bgsage/pull/3)). `parallel_threads=1`
   was replaced by the CPU count (`workers <= 1` instead of `workers <= 0`),
@@ -147,7 +163,9 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
     ([#2](https://github.com/HendrikReh/bgsage/pull/2),
     [#5](https://github.com/HendrikReh/bgsage/pull/5));
   - the Modal operating notes
-    ([#7](https://github.com/HendrikReh/bgsage/pull/7)).
+    ([#7](https://github.com/HendrikReh/bgsage/pull/7));
+  - the post-Crawford auto-double rule, also in `MULTI-PLY.md`
+    ([#9](https://github.com/HendrikReh/bgsage/pull/9)).
 
 ## Not yet on `main`
 
