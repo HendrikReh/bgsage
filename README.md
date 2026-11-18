@@ -34,13 +34,16 @@ python3 -m venv build/venv
 build/venv/bin/pip install numpy pybind11 cmake ninja pytest mlx   # mlx: GPU training only
 export PATH="$PWD/build/venv/bin:$PATH"
 
-cmake -S . -B build/cmake -G Ninja -DCMAKE_BUILD_TYPE=Release \
+cmake -S . -B build/cmake_accel -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -Dpybind11_DIR="$(python -c 'import pybind11; print(pybind11.get_cmake_dir())')"
-ninja -C build/cmake bgbot_cpp
-cp build/cmake/bgbot_cpp*.so build/
+ninja -C build/cmake_accel bgbot_cpp
+rm -f build/bgbot_cpp*.so && cp build/cmake_accel/bgbot_cpp*.so build/
 
 PYTHONPATH="$PWD/build:$PWD/python" python -m pytest -q tests
 ```
+
+After a C++ change, rerun the `ninja` and `rm`/`cp` lines. Remove the old module before copying: on macOS,
+copying over the installed `.so` makes every later `import bgbot_cpp` die with SIGKILL (exit 137, no output).
 
 Accelerate is on by default; `-DBGBOT_USE_ACCELERATE=OFF` builds the portable kernels instead. For the
 measured speedups, and for comparing against GNUbg (set its location with `BGSAGE_GNUBG` or
