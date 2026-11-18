@@ -820,8 +820,9 @@ Stage 5's 200h pure-race net into stage11 gives 0.81 / 0.64 outside the
 database and 0.54 / 0.44 over all races, but this reference is Stage 5's own
 rollout, played with that very net, so part of the gain may be bias.
 GNUbg's race benchmark (`race.bm`), the independent check, is not on this
-machine; XG is (next section), and it confirms the swap, which `stage11` now
-carries.
+machine; XG is (next section). It agrees with the swap, which `stage11` now
+carries, in direction but not significantly: the 2-ply race gain is one
+decision (paired comparison in the next section).
 
 Retraining the pure-race net on our own targets did NOT help (2026-11-18).
 `scripts/harvest_race_positions.py` + `modal_rollout.py` produced 330k race
@@ -868,6 +869,32 @@ because XG ranks moves cubeful (centred cube, Jacoby off) while the reference
 is cubeless; read the XG column from ~0.6 up. In the bearoff races XG agrees
 with the exact database (Sage with the DB scores 0.00 there), while the Stage 5
 rollout's best moves cost 0.13: that is the rollout reference's noise.
+
+**The race-net swap, paired (2026-11-18).** `sage --race-net "s6
+100h=sl_s9_purerace.weights.best:100"` on both subsets scores the old race
+net next to the one `stage11` carries, on the same 5,117 decisions (the
+S6 columns reproduce the pre-swap run bit-for-bit). PR against XG 4-ply,
+diff = S5 200h - S6 100h (negative = the swap helps), with the number of
+decisions whose pick changed (better with S5 / with S6):
+
+| Subset | Ply | S6 100h | S5 200h | diff +- SE | picks changed |
+|---|---|---|---|---|---|
+| all | 1 | 2.065 | 2.055 | -0.010 +- 0.008 | 145 (84 / 61) |
+| all | 2 | 1.235 | 1.198 | -0.038 +- 0.028 | 157 (86 / 71) |
+| contact | 2 | 1.421 | 1.406 | -0.015 +- 0.007 | 37 (19 / 18) |
+| race outside DB | 1 | 0.595 | 0.507 | -0.088 +- 0.070 | 145 (84 / 61) |
+| race outside DB | 2 | 0.727 | 0.508 | -0.219 +- 0.230 | 120 (67 / 53) |
+
+Bearoff races, and contact at 1-ply, are identical under both nets. The swap
+is never worse, but no gap reaches two standard errors. The 2-ply race gain
+is a single decision (key 112280, 4-1, where the S6 net's 2-ply pick costs
+0.26 against XG and 0.23 against the rollout); the other 607 races net to
+-0.003. The 1-ply race gain is spread over many decisions (-0.083 with the
+six most extreme removed). At 2-ply the race net reaches contact decisions
+through race leaves (37 picks change), for a gain within noise. The Stage 5
+rollout reference agrees in sign everywhere but is weaker (overall 1-ply
+-0.002, 2-ply -0.035 +- 0.025). Read the swap as safe and probably slightly
+better, not as a measured strength gain.
 
 `score_benchmark_pr.py` builds its N-ply strategy with `create_multipy`, which
 adds the PubEval opponent prefilter BgBotAnalyzer uses; the older 5-NN-only
