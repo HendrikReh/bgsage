@@ -10,10 +10,10 @@ measuring the equity error against the rollout-determined best move.
 Benchmark PR = mean(error) * 500
 
 Usage:
-  python bgsage/scripts/score_benchmark_pr.py                      # production model at 1-ply
-  python bgsage/scripts/score_benchmark_pr.py --plies 2            # production model at 2-ply
-  python bgsage/scripts/score_benchmark_pr.py --model stage3       # specific model
-  python bgsage/scripts/score_benchmark_pr.py --all-models         # all registered models
+  python scripts/score_benchmark_pr.py                      # production model at 1-ply
+  python scripts/score_benchmark_pr.py --plies 2            # production model at 2-ply
+  python scripts/score_benchmark_pr.py --model stage3       # specific model
+  python scripts/score_benchmark_pr.py --all-models         # all registered models
 """
 
 import os
@@ -24,7 +24,7 @@ import argparse
 
 # Setup import paths
 script_dir = os.path.dirname(os.path.abspath(__file__))
-project_dir = os.path.dirname(os.path.dirname(script_dir))
+project_dir = os.path.dirname(script_dir)  # bgsage repo root
 build_dir = os.path.join(project_dir, 'build')
 
 if sys.platform == 'win32':
@@ -35,7 +35,7 @@ if sys.platform == 'win32':
         os.add_dll_directory(build_dir)
 
 sys.path.insert(0, build_dir)
-sys.path.insert(0, os.path.join(project_dir, 'bgsage', 'python'))
+sys.path.insert(0, os.path.join(project_dir, 'python'))
 
 import bgbot_cpp
 from bgsage.weights import MODELS, WeightConfig
@@ -49,7 +49,7 @@ FILTER_MAX_MOVES = 5
 FILTER_THRESHOLD = 0.08
 
 
-def load_benchmark_data():
+def load_benchmark_data(decision_step=1):
     """Load decisions and rollout equities, returning decisions with
     rollout equities pre-attached to each candidate."""
     decisions_file = os.path.join(BENCHMARK_DIR, 'decisions.json')
@@ -62,6 +62,12 @@ def load_benchmark_data():
     with open(decisions_file, 'r') as f:
         saved = json.load(f)
     decisions = saved['decisions']
+    if decision_step > 1:
+        # Score exactly the sample generate_benchmark_pr.py --decision-step
+        # rolled out. Decisions outside it whose candidates happen to be
+        # covered are a skewed selection (they lean towards positions shared
+        # between many games), so they are not scored.
+        decisions = decisions[::decision_step]
 
     # Load rollout equities
     rollout_equities = {}
@@ -149,6 +155,9 @@ def main():
                         help='Score all registered models at the given ply depth')
     parser.add_argument('--all-plies', action='store_true',
                         help='Score at 1-ply and 2-ply')
+    parser.add_argument('--decision-step', type=int, default=1,
+                        help='Score every Nth decision only: the sample '
+                             'generate_benchmark_pr.py --decision-step N rolled out')
     parser.add_argument('--threads', type=int, default=0,
                         help='Number of threads (0 = auto)')
     args = parser.parse_args()
@@ -156,7 +165,7 @@ def main():
     bgbot_cpp.init_escape_tables()
 
     print("Loading benchmark data...")
-    decisions, meta = load_benchmark_data()
+    decisions, meta = load_benchmark_data(args.decision_step)
     print(f"  {len(decisions)} scoreable decisions")
     print(f"  Data from {meta['n_games']} games, {meta['n_turns']} turns")
     print()
@@ -182,20 +191,26 @@ def main():
             print(f"Model {model_name}: {e}, skipping.")
             continue
 
-        wt = (w.purerace, w.racing, w.attacking, w.priming, w.anchoring)
-        ht = w.hidden_sizes
+        # create_strategy / create_multipy build every registered model type
+        # (5-NN, pair, backgame-aware), the same way BgBotAnalyzer does.
+        base = bgbot_cpp.create_strategy(
+            w.strategy_type, w.weight_paths_list, w.hidden_sizes_list)
 
         for plies in plies_list:
             label = f"{model_name} ({plies}-ply)"
             t0 = time.perf_counter()
 
             if plies == 1:
-                raw = bgbot_cpp.score_benchmark_pr_1ply(
-                    decisions, *wt, *ht, n_threads=args.threads)
+                raw = bgbot_cpp.score_benchmark_pr_strategy(
+                    decisions, base, n_threads=args.threads)
             else:
-                raw = bgbot_cpp.score_benchmark_pr_nply(
-                    decisions, *wt, *ht,
+                strat = bgbot_cpp.create_multipy(
+                    w.strategy_type, w.weight_paths_list, w.hidden_sizes_list,
                     n_plies=plies,
+                    filter_max_moves=FILTER_MAX_MOVES,
+                    filter_threshold=FILTER_THRESHOLD)
+                raw = bgbot_cpp.score_benchmark_pr_strategy(
+                    decisions, strat, base,
                     filter_max_moves=FILTER_MAX_MOVES,
                     filter_threshold=FILTER_THRESHOLD,
                     n_threads=args.threads)

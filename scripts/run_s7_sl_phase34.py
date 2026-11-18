@@ -47,6 +47,7 @@ sys.path.insert(0, build_dir)
 sys.path.insert(0, os.path.join(project_dir, 'bgsage', 'python'))
 
 import bgbot_cpp
+from bgsage import sl_train
 from bgsage.data import load_gnubg_training_data, board_from_gnubg_position_string
 
 DATA_DIR = os.path.join(project_dir, 'bgsage', 'data')
@@ -166,10 +167,10 @@ def main():
                         help='Train specific NNs (e.g., --nn race_race att_att)')
     args = parser.parse_args()
 
-    if not bgbot_cpp.cuda_available():
-        print('ERROR: CUDA not available')
+    if not sl_train.gpu_available():
+        print('ERROR: no GPU SL trainer (CUDA, or MLX on Apple Silicon: pip install mlx)')
         sys.exit(1)
-    print('CUDA GPU detected\n')
+    print(f'GPU SL trainer: {sl_train.backend()}\n')
 
     # Load optimal GPW
     gpw_path = os.path.join(SCAN_DIR, 'optimal_gpw.json')
@@ -262,7 +263,7 @@ def main():
             phase_num = phase_idx + 3  # phases 3 and 4
             print_interval = min(10, max(1, epochs // 20))
 
-            result = bgbot_cpp.cuda_supervised_train(
+            result = sl_train.supervised_train(
                 boards=boards,
                 targets=targets,
                 weights_path=current_weights,

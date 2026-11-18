@@ -17,8 +17,9 @@ GPU; that heritage is still in the code and in this file.
 - **Don't delete the inherited Windows/Linux/CUDA code unasked.** It keeps
   merges from upstream easy; removing it is the user's call.
 - **GPU training**: the CUDA SL trainer (`cuda_nn.cu`) is a stub on macOS
-  (`cuda_available()` is False), so the SL training scripts can't train here
-  yet. A Metal/MLX port is the planned replacement.
+  (`cuda_available()` is False). SL training runs on the Apple GPU through
+  MLX instead (`bgsage.sl_train`, `pip install mlx`); every training script
+  calls it.
 - **Inherited numbers**: training times and many benchmark timings below were
   measured on upstream's Windows box (RTX 4070S, 16 threads). Re-measure on
   the Mac before quoting them for this fork.
@@ -77,6 +78,7 @@ python/bgsage/               # Python package
   data.py                   # .bm file loading, training data parsing
   gnubg.py                  # GNUbg CLI wrapper for reference evaluation
   settings.py               # User settings (GNUbg binary path; see "GNUbg Path" below)
+  sl_train.py               # GPU SL trainer: CUDA, or Apple MLX (see "Training Pipeline")
   matchinfo.py              # Match play take points, dead cube take points, gammon prices
   text_export.py            # Galaxy/XG-compatible text export + move notation
   xg_compare.py             # Parse XG .xg files; compute per-game PR stats vs XG
@@ -713,8 +715,8 @@ to override. Scripts live in `scripts/`.
 |--------|-----------------|----------|
 | `run_full_benchmark.py` | Full suite: per-plan ER + contact/crashed/race ER + vs PubEval ppg + self-play distribution. Supports 1-ply through N-ply. | `--model`, `--ply N`, `--scenarios N`, `--threads N`, `--games N` |
 | `run_rollout_benchmark.py` | Top-N worst 1-ply errors compared at 2-ply, 3-ply, 4-ply, rollout | `--model`, `--top N`, `--threads N` |
-| `score_benchmark_pr.py` | Benchmark PR (equity error vs rollout reference, 103k decisions) | `--model`, `--plies N`, `--all-models`, `--all-plies` |
-| `score_benchmark_pr_gnubg.py` | GNUbg's Benchmark PR (parallel GNUbg CLI subprocesses) | `--plies N` |
+| `score_benchmark_pr.py` | Benchmark PR (equity error vs rollout reference, 103k decisions). Any registered model type (5-NN, pair, backgame) via `bgbot_cpp.score_benchmark_pr_strategy`. | `--model`, `--plies N`, `--all-models`, `--all-plies`, `--decision-step N` |
+| `score_benchmark_pr_gnubg.py` | GNUbg's Benchmark PR (parallel GNUbg CLI subprocesses) | `--plies N`, `--workers N`, `--decision-step N` |
 | `test_evaluate_probs.py` | Single position eval at 1-4 ply + GNUbg + rollouts | `--model`, `--checkers`, `--ply N` |
 | `test_cube_decision.py` | Cube decisions vs 3 reference positions at 1-4 ply + rollout | `--model` |
 | `test_unified_rollout.py` | Verify cubeful(max_cube=1) == cubeless at N-ply + rollout | `--model` |
@@ -748,6 +750,52 @@ python scripts/eval_position.py checker --checkers "..." --dice 3 1
 # Side-by-side checker play analysis (match play)
 python scripts/eval_position.py checker --checkers "..." --dice 3 1 --match 5 --score 3 0
 ```
+
+### Benchmark PR rollout sample (this fork)
+
+The full reference `data/benchmark_pr/rollouts.jsonl` is gitignored and was
+never shipped, so this fork rolled out a 1-in-20 sample of the 138,872 saved
+decisions instead (`generate_benchmark_pr.py --resume --decision-step 20`:
+6,944 decisions, 20,302 positions, Stage 5 full rollouts at 1,296 trials,
+~4.5 h on the M4 Pro). Score it with the same step, so that only the sampled
+decisions count:
+
+```bash
+python scripts/score_benchmark_pr_gnubg.py --decision-step 20 --plies 1 --plies 2
+python scripts/score_benchmark_pr.py --decision-step 20 --all-models --all-plies
+```
+
+Without `--decision-step` the scorers also take every other decision whose
+candidates all happen to be in the file, and those lean towards positions
+shared between many games: Stage 5 2-ply scores 3.37 on the sample but 5.27
+on those 4,233 extras.
+
+Measured 2026-11-18 (5,140 scored decisions; the 1,804 with a single legal
+move are skipped):
+
+| Strategy | Overall | PureRace | Racing | Attacking | Priming | Anchoring |
+|---|---|---|---|---|---|---|
+| GNUbg 1-ply | 4.31 | 0.39 | 4.85 | 5.35 | 5.76 | 5.10 |
+| GNUbg 2-ply | 3.48 | 0.37 | 3.89 | 3.85 | 4.59 | 4.62 |
+| stage5 1-ply | 4.20 | 0.70 | 4.57 | 4.93 | 5.19 | 5.39 |
+| stage5 2-ply | 3.37 | 0.62 | 3.06 | 3.82 | 4.72 | 4.58 |
+| stage9 2-ply | 3.29 | 0.82 | 3.16 | 3.80 | 4.50 | 4.12 |
+| stage11 1-ply | 4.15 | 0.80 | 4.30 | 5.02 | 5.51 | 5.03 |
+| stage11 2-ply | 3.22 | 0.82 | 3.03 | 3.78 | 4.42 | 4.00 |
+
+Read it with three caveats. The reference favours Stage 5: it is Stage 5's
+rollout, and only the moves Stage 5's 2-ply filter kept were rolled out, so a
+pick outside that set is charged the worst rolled-out move (GNUbg 1-ply lands
+outside it 159 times, stage11 about 80). No significance test was run, so gaps
+of a few hundredths (Stages 8-11 span 3.22-3.29 at 2-ply) may be noise. And
+the numbers are not comparable with the full-set PRs quoted elsewhere in this
+file. The one clear gap is the pure race, where every model since Stage 6
+shares a pure-race net at ~0.8 against GNUbg's 0.37.
+
+`score_benchmark_pr.py` builds its N-ply strategy with `create_multipy`, which
+adds the PubEval opponent prefilter BgBotAnalyzer uses; the older 5-NN-only
+`score_benchmark_pr_nply` binding has none (Stage 5 2-ply 4.104 vs 4.097 on
+an 8k-decision set; 1-ply identical).
 
 ## Comparing Sage to XG via .xg Files
 
@@ -876,7 +924,7 @@ has no `-f` option to pick another list file). Needs `cmake`, `ninja`,
 `build/venv` (gitignored) works:
 
 ```bash
-python3 -m venv build/venv && build/venv/bin/pip install numpy pybind11 cmake ninja pytest
+python3 -m venv build/venv && build/venv/bin/pip install numpy pybind11 cmake ninja pytest mlx
 export PATH="$PWD/build/venv/bin:$PATH"
 ```
 
@@ -978,14 +1026,45 @@ Use `CMakeLists_cpu.txt`. Flags: `-mavx2 -mfma -ffast-math -march=native`.
 unnatural minima. TD gives realistic probability distributions that SL refines.
 
 1. **TD Self-Play (CPU)**: 25k-200k games @ alpha=0.1. Serial only (parallel TD deprecated).
-2. **Supervised Learning (GPU)**: Backprop against GNUbg rolled-out probabilities.
-   GPU via CUDA/cuBLAS, batch size 128. **Not available on Apple Silicon** — the
-   CUDA trainer is a stub on macOS (see "Platform Scope"); TD self-play runs fine.
+2. **Supervised Learning (GPU)**: Backprop against GNUbg rolled-out probabilities,
+   batch size 128 (4096 in the S11 scripts). Scripts call
+   `bgsage.sl_train.supervised_train` / `supervised_train_preencoded`: CUDA/cuBLAS
+   when `bgbot_cpp.cuda_available()`, otherwise **Apple MLX** on the Mac GPU
+   (`pip install mlx`). See "GPU SL trainer (`bgsage.sl_train`)" below.
 
 **Key training rules:**
 - All contact NNs train on ALL contact+crashed data, NOT game-plan subsets
 - Narrow subsets cause catastrophic regression
 - Game plan weight (`--gameplan-weight`) specializes each NN during SL
+
+### GPU SL trainer (`bgsage.sl_train`)
+
+`supervised_train(boards, targets, ...)` and
+`supervised_train_preencoded(inputs, targets, ...)` take exactly the keyword
+arguments and return the dict of `bgbot_cpp.cuda_supervised_train` /
+`cuda_supervised_train_preencoded`. All training scripts call them (and
+`sl_train.gpu_available()` in place of `cuda_available()`).
+`sl_train.backend()` is `"cuda"` when the CUDA build finds a GPU, else `"mlx"`
+when MLX has Metal, else `None`.
+
+The MLX path transcribes `cpp/src/cuda_nn.cu`: same sigmoid-MSE delta
+`(t-p)·p·(1-p)` (times the per-sample weight), backprop through the
+pre-update output weights, SGD at `alpha / batch_rows` (the partial last batch
+uses its own row count), one epoch = one shuffled pass, CPU benchmark scoring
+after every epoch with best-score weights saved as `.best`, and the same
+random init (`bgbot_cpp.NeuralNetwork(nh, ni, 0.1, seed)`). It is not
+bit-identical to CUDA: NumPy draws the shuffle, MLX's sigmoid doesn't clamp at
+±15, and GPU summation order differs. `tests/test_sl_train.py` holds the MLX
+weights to a float64 NumPy transcription of the update rules (2e-5).
+
+Measured 2026-11-17 on the M4 Pro (CPU busy with a rollout job): the snake-net
+recipe (`run_s11_containment_sl.py --family-data s11-bg-snake-rollout`, from
+`sl_s9_prim_race`, 20k ep @ α=3.1 + 60k ep @ α=1.0, batch 4096) reaches
+holdout ER **53.96** (CUDA on the RTX 4070S: 53.95). A 4,096-row step takes
+about 0.9 ms, close to the GPU's compute limit for a 244-400-5 net, which puts
+that schedule at ~7.5 minutes against 2.5 minutes on the RTX. (That figure is
+computed from the step time; the validation run itself took 11 minutes with an
+earlier loop that synced the GPU after every epoch, 1.55x slower, same weights.)
 
 ### Training a New Model from Scratch
 

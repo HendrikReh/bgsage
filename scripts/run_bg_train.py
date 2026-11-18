@@ -4,6 +4,7 @@ import sys, os, shutil, gc
 sys.path.insert(0, 'build')
 os.add_dll_directory(r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64')
 import bgbot_cpp
+from bgsage import sl_train
 import numpy as np
 
 def benchmark_er(bench_boards, bench_eq, weights_path):
@@ -44,7 +45,7 @@ def run():
     print(f'ER: {er:.2f}', flush=True)
 
     print('Training...', flush=True)
-    result = bgbot_cpp.cuda_supervised_train(
+    result = sl_train.supervised_train(
         boards=boards, targets=probs, weights_path=wpath,
         n_hidden=400, n_inputs=244, alpha=3.1, epochs=10,
         batch_size=4096, seed=52, print_interval=1, save_path=wpath,

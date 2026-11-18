@@ -70,6 +70,7 @@ for d in reversed(build_dirs):
 sys.path.insert(0, os.path.join(project_dir, 'bgsage', 'python'))
 
 import bgbot_cpp
+from bgsage import sl_train
 from bgsage.data import (load_benchmark_file, load_gnubg_training_data,
                           load_benchmark_scenarios_by_indices,
                           board_from_gnubg_position_string)
@@ -545,7 +546,7 @@ def run_gpw_scan(boards, targets, pair_ids, bm_data, td_model_name, tracker,
 
             for phase_idx, (epochs, alpha) in enumerate(SCAN_PHASES):
                 print_interval = max(1, epochs // 10)
-                result = bgbot_cpp.cuda_supervised_train(
+                result = sl_train.supervised_train(
                     boards=boards,
                     targets=targets,
                     weights_path=current_weights,
@@ -671,7 +672,7 @@ def run_sl_phase34(boards, targets, pair_ids, bm_data, optimal_gpw, tracker,
             phase_num = phase_idx + 3
             print_interval = min(10, max(1, epochs // 20))
 
-            result = bgbot_cpp.cuda_supervised_train(
+            result = sl_train.supervised_train(
                 boards=boards,
                 targets=targets,
                 weights_path=current_weights,
@@ -1312,10 +1313,10 @@ def _run_pipeline(args, tracker):
     # ---------------------------------------------------------------
     # Step 2: Load data + classify
     # ---------------------------------------------------------------
-    if not bgbot_cpp.cuda_available():
-        print('ERROR: CUDA not available for SL training')
+    if not sl_train.gpu_available():
+        print('ERROR: no GPU SL trainer (CUDA, or MLX on Apple Silicon: pip install mlx)')
         sys.exit(1)
-    print('CUDA GPU detected')
+    print(f'GPU SL trainer: {sl_train.backend()}')
 
     boards, targets = load_training_data()
     pair_ids = classify_pairs(boards)

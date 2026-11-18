@@ -66,6 +66,7 @@ for d in reversed(build_dirs):
 sys.path.insert(0, os.path.join(project_dir, 'bgsage', 'python'))
 
 import bgbot_cpp
+from bgsage import sl_train
 from bgsage.data import load_benchmark_file, load_gnubg_training_data
 
 DATA_DIR = os.path.join(project_dir, 'bgsage', 'data')
@@ -367,7 +368,7 @@ def train_one_nn(nn_name, gpw, boards, targets, pair_ids, benchmark_scenarios,
 
         print_interval = min(10, max(1, epochs // 20))
 
-        result = bgbot_cpp.cuda_supervised_train(
+        result = sl_train.supervised_train(
             boards=boards,
             targets=targets,
             weights_path=current_weights,
@@ -440,7 +441,7 @@ def gpw_scan(nn_name, boards, targets, pair_ids, benchmark_scenarios,
 
         for phase_idx, (epochs, alpha) in enumerate(SCAN_PHASES):
             print_interval = max(1, epochs // 10)
-            result = bgbot_cpp.cuda_supervised_train(
+            result = sl_train.supervised_train(
                 boards=boards,
                 targets=targets,
                 weights_path=current_weights,
@@ -601,10 +602,10 @@ def main():
     needs_cuda = not (args.sl_only is False and args.gpw_scan_only is False)
     # Actually: check if we'll do any SL work
     needs_sl = not args.score_only  # we might do SL after TD
-    if needs_sl and bgbot_cpp.cuda_available():
-        print('CUDA GPU detected')
+    if needs_sl and sl_train.gpu_available():
+        print(f'GPU SL trainer: {sl_train.backend()}')
     elif needs_sl:
-        print('NOTE: CUDA not available — TD training will proceed, but SL training will require CUDA.')
+        print('NOTE: no GPU SL trainer — TD training will proceed, but SL training needs CUDA or MLX (pip install mlx).')
     print()
 
     # TD training
@@ -631,9 +632,9 @@ def main():
     all_results = {}
 
     # SL training requires CUDA
-    if not bgbot_cpp.cuda_available():
-        print('\nCUDA not available — skipping SL training.')
-        print('Run with --sl-only once CUDA build is available.')
+    if not sl_train.gpu_available():
+        print('\nNo GPU SL trainer (CUDA or MLX) — skipping SL training.')
+        print('Run with --sl-only once one is available (pip install mlx on Apple Silicon).')
         scores = score_stage7()
         return
 
