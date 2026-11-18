@@ -36,6 +36,19 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
     2.74 to 2.00 at 1-ply and from 2.30 to 1.02 at 2-ply.
   - See "Cube life by depth (money)" in `CLAUDE.md`.
 
+### Documentation
+
+- `CLAUDE.md` records a paired comparison of the race-net swap against XG
+  4-ply on all 5,117 decisions of the Benchmark PR sample. Stage 5's 200h
+  net is never worse than the S6 100h net it replaced, but no gap is
+  significant: overall PR −0.010 ± 0.008 at 1-ply and −0.038 ± 0.028 at
+  2-ply.
+  - At 2-ply the race gain is a single decision. The other 607 races
+    outside the bearoff database net to −0.003.
+  - At 1-ply the race gain is spread over many decisions: −0.088 ± 0.070.
+  - At 2-ply the race net also changes 37 contact picks, for a gain within
+    noise (−0.015 ± 0.007).
+
 ### Fixed
 
 - **The test suite runs clean on macOS**
@@ -143,7 +156,9 @@ The fork's first release.
 
 - **`stage11` uses Stage 5's 200h pure-race net**
   ([#8](https://github.com/HendrikReh/bgsage/pull/8)) instead of the 100h net
-  every model since Stage 6 shared. XG as referee confirms the swap. Sample
+  every model since Stage 6 shared. XG as referee agrees with the swap in
+  direction, though not significantly (see the paired comparison under
+  [Unreleased]). Sample
   Benchmark PR at 1-ply / 2-ply: 4.11 / 3.17 → 4.10 / 3.14, all of it in the
   pure race (0.55 / 0.57 → 0.54 / 0.44). `stage11`'s pure-race results in
   `accuracy_vs_time.py` move slightly.
