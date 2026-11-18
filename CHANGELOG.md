@@ -16,6 +16,21 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
 ## [Unreleased]
 
+### Fixed
+
+- **The test suite runs clean on macOS**
+  ([#16](https://github.com/HendrikReh/bgsage/pull/16)): 318 passed,
+  21 skipped, none failing. Three test files had upstream's Windows
+  heritage, and none of the fixes touch engine code:
+  - `test_bearoff.py` called the Windows-only `os.add_dll_directory` at
+    import; the call is now limited to Windows.
+  - `test_bearoff.py`, `test_rollout_progress_callback.py` and
+    `test_gnubg.py` looked for `build/` (and `data/`, `models/`) in the host
+    project; they now use this repo's.
+  - `test_gnubg.py` skips when no GNUbg binary is found, and its top-100
+    comparison skips when the gitignored `contact.bm` / `crashed.bm` are
+    missing.
+
 ### Documentation
 
 - `CLAUDE.md` records that re-rolling the containment net's general rows
