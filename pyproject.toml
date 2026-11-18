@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "bgsage"
-version = "2.0.20260907"
+version = "2.0.20261118"
 description = "Open Sage bot engine — a neural-network backgammon engine"
 readme = "README.md"
 license = "MPL-2.0"
@@ -71,6 +71,7 @@ sdist.include = [
     "data/bearoff_1sided.db",
     "models/sl_s9_*.weights.best",
     "models/sl_s11_*.weights.best",
+    "models/sl_s5_purerace.weights.best",
 ]
 
 # ---------------------------------------------------------------------------
@@ -95,9 +96,9 @@ manylinux-x86_64-image = "manylinux_2_28"
 archs = ["x86_64"]
 
 [tool.cibuildwheel.macos]
-# Universal build: Intel (x86_64) and Apple Silicon (arm64).
-archs = ["x86_64", "arm64"]
-# arm64 uses NEON; x86_64 uses AVX2 (set in CMakeLists_cpu.txt).
+# This fork ships Apple Silicon only (NEON + Accelerate). Upstream built a
+# universal set: archs = ["x86_64", "arm64"] (x86_64 uses AVX2).
+archs = ["arm64"]
 
 [tool.cibuildwheel.windows]
 archs = ["AMD64"]

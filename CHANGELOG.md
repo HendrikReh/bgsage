@@ -8,11 +8,17 @@ The fork branched from upstream at `139427d` (2026-10-17, "Add compact
 all-roll legal move arrays for video reconstruction"). Everything before that
 commit is upstream's history; see `git log 139427d`. The fork targets macOS
 on Apple Silicon only (see "Platform Scope" in `CLAUDE.md`). It has no
-releases yet, and the package version is still upstream's `2.0.20260907`.
+Releases keep upstream's `2.0.YYYYMMDD` version scheme, dated by the fork's
+release. They are published as GitHub releases with Apple Silicon wheels,
+not on PyPI, where the `bgsage` name is upstream's.
 
 Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
 ## [Unreleased]
+
+## [2.0.20261118] - 2026-11-18
+
+The fork's first release.
 
 ### Added
 
@@ -60,6 +66,15 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
   2.53 vs 2.75, 4-ply 2.55 vs 2.56. Open Sage 3-ply (~30 ms) matches GNUbg
   4-ply (~145 ms). The reference is Stage 5's rollout, which leans towards
   Open Sage.
+- **XG as a Benchmark PR referee** (`scripts/export_benchmark_pr_xg.py`,
+  [#8](https://github.com/HendrikReh/bgsage/pull/8)). The script exports the
+  sample as one-decision `.xg` games for XG's Batch Analyze, reads XG's
+  ranked moves back, and scores Sage and GNUbg against both the Stage 5
+  rollout and XG. Against XG 4-ply, `stage11` 2-ply (before the race-net
+  swap below) scores 1.24 and GNUbg
+  2-ply 1.40 (paired difference −0.17 ± 0.07). The PR also adds
+  `scripts/run_purerace_sl.py`, the pure-race fine-tuning experiment, which
+  did not beat Stage 5's net.
 - **Analysis tools** ([#6](https://github.com/HendrikReh/bgsage/pull/6)):
   - `scripts/race_gap_analysis.py` breaks down pure-race PR into bearoff
     positions and races outside the database.
@@ -80,6 +95,15 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
 ### Changed
 
+- **`stage11` uses Stage 5's 200h pure-race net**
+  ([#8](https://github.com/HendrikReh/bgsage/pull/8)) instead of the 100h net
+  every model since Stage 6 shared. XG as referee confirms the swap. Sample
+  Benchmark PR at 1-ply / 2-ply: 4.11 / 3.17 → 4.10 / 3.14, all of it in the
+  pure race (0.55 / 0.57 → 0.54 / 0.44). `stage11`'s pure-race results in
+  `accuracy_vs_time.py` move slightly.
+- **Release builds are Apple Silicon only.** `wheels.yml` builds macOS arm64
+  wheels and attaches them, with the sdist, to the GitHub release of a `v*`
+  tag. The PyPI job runs only in upstream's repository.
 - **Apple Accelerate path for batched NN evaluation**
   ([#1](https://github.com/HendrikReh/bgsage/pull/1)). All batched candidate
   kernels go through `NeuralNetwork::forward_group`. On Apple arm64 it runs
@@ -165,16 +189,12 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
   - the Modal operating notes
     ([#7](https://github.com/HendrikReh/bgsage/pull/7));
   - the post-Crawford auto-double rule, also in `MULTI-PLY.md`
-    ([#9](https://github.com/HendrikReh/bgsage/pull/9)).
+    ([#9](https://github.com/HendrikReh/bgsage/pull/9));
+  - the XG referee results and the failed pure-race retraining
+    ([#8](https://github.com/HendrikReh/bgsage/pull/8)).
+- The build section installs from `build/cmake_accel` and removes the old
+  module before copying it, because `cp` over a loaded `.so` makes macOS kill
+  the next import ([#12](https://github.com/HendrikReh/bgsage/pull/12)).
 
-## Not yet on `main`
-
-- **Stage 5's pure-race net in `stage11`, and XG as a Benchmark PR referee**
-  (open PR [#8](https://github.com/HendrikReh/bgsage/pull/8)).
-  `scripts/export_benchmark_pr_xg.py` exports the sample as one-decision
-  `.xg` games for XG's Batch Analyze and scores Sage and GNUbg against both
-  the Stage 5 rollout and XG. With XG as referee, the 200h Stage 5 race net
-  beats the 100h net `stage11` used, so `stage11` switches to it: Benchmark
-  PR 4.11 / 3.17 → 4.10 / 3.14. The PR also adds
-  `scripts/run_purerace_sl.py`. Once it is merged, `stage11`'s pure-race
-  results in `accuracy_vs_time.py` will move slightly.
+[Unreleased]: https://github.com/HendrikReh/bgsage/compare/v2.0.20261118...HEAD
+[2.0.20261118]: https://github.com/HendrikReh/bgsage/releases/tag/v2.0.20261118
