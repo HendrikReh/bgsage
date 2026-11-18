@@ -38,7 +38,7 @@ from dataclasses import dataclass
 
 import bgbot_cpp
 
-from .analyzer import resolve_owner
+from .analyzer import _contact_cube_life, resolve_owner
 from .types import CheckerPlayResult, CubeActionResult, MoveAnalysis, PostMoveAnalysis, Probabilities
 from .weights import WeightConfig, WeightConfigPair, default_weights
 
@@ -131,9 +131,12 @@ def batch_evaluate(
                 getattr(weights, "strategy_type", "pair"), paths, hiddens)
         else:
             strategy = bgbot_cpp.GamePlanStrategy(*weights.weight_args)
+        # The money cube life of BgBotAnalyzer at the same depth (the C++
+        # side applies contact_x to money positions only), here and below.
         raw_results = bgbot_cpp.batch_evaluate_positions(
             cpp_positions, strategy, n_threads,
             jacoby=effective_jacoby, beaver=effective_beaver,
+            contact_x=_contact_cube_life(1),
         )
     elif eval_level in ("2ply", "3ply", "4ply"):
         n_plies = int(eval_level[0])
@@ -260,6 +263,7 @@ def batch_post_move_evaluate(
         raw_results = bgbot_cpp.batch_evaluate_post_move(
             cpp_positions, strategy, n_threads,
             jacoby=effective_jacoby,
+            contact_x=_contact_cube_life(1),
         )
         level_label = "1-ply"
     elif eval_level in ("2ply", "3ply", "4ply"):
@@ -464,6 +468,7 @@ def batch_checker_play(
             cpp_inputs, strategy_1ply,
             filter_max_moves, filter_threshold, n_threads,
             jacoby=effective_jacoby,
+            contact_x_1ply=_contact_cube_life(1),
         )
         level_label = "1-ply"
     elif eval_level in ("2ply", "3ply", "4ply"):
@@ -491,6 +496,8 @@ def batch_checker_play(
             cpp_inputs, strategy_1ply, strategy_nply,
             filter_max_moves, filter_threshold, n_threads,
             jacoby=effective_jacoby,
+            contact_x_1ply=_contact_cube_life(1),
+            contact_x_nply=_contact_cube_life(n_plies),
         )
         level_label = f"{n_plies}-ply"
     else:

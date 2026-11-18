@@ -701,6 +701,18 @@ float cube_efficiency(
     return std::clamp(x, 0.6f, 0.7f);
 }
 
+float resolve_cube_x(
+    const std::array<float, NUM_OUTPUTS>& probs,
+    const CubeInfo& cube,
+    bool is_race_pos,
+    int player_pips,
+    int opponent_pips)
+{
+    if (cube.cube_x_override >= 0.0f) return cube.cube_x_override;
+    if (!is_race_pos && cube.contact_x >= 0.0f) return cube.contact_x;
+    return cube_efficiency(probs, is_race_pos, player_pips, opponent_pips);
+}
+
 // Money game cube decision (1-ply / raw NN).
 static CubeDecision cube_decision_1ply_money(
     const std::array<float, NUM_OUTPUTS>& probs,
@@ -874,14 +886,9 @@ CubeDecision cube_decision_1ply(
     const Board& board,
     bool is_race_pos)
 {
-    float x;
-    if (cube.cube_x_override >= 0.0f) {
-        x = cube.cube_x_override;
-    } else {
-        auto [pp, op] = pip_counts(board);
-        x = cube_efficiency(probs, is_race_pos, pp, op);
-    }
-    return cube_decision_1ply(probs, cube, x);
+    auto [pp, op] = pip_counts(board);
+    return cube_decision_1ply(probs, cube,
+                              resolve_cube_x(probs, cube, is_race_pos, pp, op));
 }
 
 // ---------------------------------------------------------------------------
@@ -1088,9 +1095,8 @@ static float resolve_cube_x(
     const std::array<float, NUM_OUTPUTS>& probs,
     const CubeInfo& cube, const Board& board, bool race)
 {
-    if (cube.cube_x_override >= 0.0f) return cube.cube_x_override;
     auto [pp, op] = pip_counts(board);
-    return cube_efficiency(probs, race, pp, op);
+    return resolve_cube_x(probs, cube, race, pp, op);
 }
 
 // Helper: evaluate a pre-roll board at 1-ply Janowski cubeful.
@@ -1327,8 +1333,9 @@ static void cubeful_recursive_multi(
                 arCf[i] = cubeless_value(pre_roll_probs, aci[i]);
                 continue;
             }
-            float x = (aci[i].cube_x_override >= 0.0f)
-                       ? aci[i].cube_x_override : default_x;
+            float x = (aci[i].cube_x_override >= 0.0f) ? aci[i].cube_x_override
+                       : (!race && aci[i].contact_x >= 0.0f) ? aci[i].contact_x
+                       : default_x;
             if (aci[i].is_money()) {
                 arCf[i] = cl2cf_money(pre_roll_probs, aci[i].owner, x,
                                        aci[i].jacoby_active());

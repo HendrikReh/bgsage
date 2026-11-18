@@ -39,6 +39,9 @@ sys.path.insert(0, build_dir)
 sys.path.insert(0, os.path.join(repo_dir, "python"))
 
 import bgbot_cpp
+from unittest import mock
+
+import bgsage.analyzer
 from bgsage import BgBotAnalyzer
 from bgsage.board import flip_board, check_game_over, is_race, possible_moves
 
@@ -147,6 +150,22 @@ def best_move_1ply_cubeless(board, d1, d2, post_move_analyzer):
             best_eq = eq
             best_board = cand
     return best_board
+
+
+def setUpModule():
+    # The per-roll checks compare an N-ply tree's interior against standalone
+    # (N-1)- and (N-2)-ply analyses. The money cube life is depth-dependent
+    # (MONEY_CONTACT_CUBE_LIFE), so a 2-ply tree's 1-ply leaf and a standalone
+    # 1-ply analysis use different values by design. Pin every depth to the
+    # engine default here so the checks compare like with like.
+    _PATCHER.start()
+
+
+def tearDownModule():
+    _PATCHER.stop()
+
+
+_PATCHER = mock.patch.dict(bgsage.analyzer.MONEY_CONTACT_CUBE_LIFE, clear=True)
 
 
 class TestTwoPlyDetailsND(unittest.TestCase):

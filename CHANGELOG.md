@@ -16,6 +16,26 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
 ## [Unreleased]
 
+### Changed
+
+- **Money cube analysis at 1-ply and 2-ply uses a higher contact cube life**
+  (0.75 and 0.80 instead of 0.68; `MONEY_CONTACT_CUBE_LIFE` in
+  `analyzer.py`).
+  - Both levels used to over-double, because their cube trees end in a 1-ply
+    Janowski leaf.
+  - The cube PR on the money benchmark falls from 3.21 to 2.36 at 1-ply and
+    from 2.92 to 1.31 at 2-ply.
+  - The value applies to every cubeful equity at that depth, so checker play
+    and cube action stay consistent. Checker-play PR is unchanged within
+    noise.
+  - Races, match play, 3-ply and deeper, and rollouts are untouched. C++
+    callers keep the old values unless they pass the new
+    `CubeInfo.contact_x`.
+  - Checked against XG World Class on all 2,196 benchmark cube positions
+    (`scripts/export_money_cube_xg.py`): against XG the cube PR falls from
+    2.74 to 2.00 at 1-ply and from 2.30 to 1.02 at 2-ply.
+  - See "Cube life by depth (money)" in `CLAUDE.md`.
+
 ### Fixed
 
 - **The test suite runs clean on macOS**
