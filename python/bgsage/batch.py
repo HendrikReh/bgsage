@@ -38,7 +38,9 @@ from dataclasses import dataclass
 
 import bgbot_cpp
 
-from .analyzer import _contact_cube_life, _contact_cube_slope, resolve_owner
+from .analyzer import (
+    CUBEFUL_FILTERED_PLIES, _contact_cube_life, _contact_cube_slope, resolve_owner,
+)
 from .types import CheckerPlayResult, CubeActionResult, MoveAnalysis, PostMoveAnalysis, Probabilities
 from .weights import WeightConfig, WeightConfigPair, default_weights
 
@@ -424,8 +426,11 @@ def batch_checker_play(
     Returns:
         List of :class:`~bgsage.types.CheckerPlayResult`, one per input
         position.  Each contains a ``moves`` list sorted best-first by
-        cubeful equity, with survivors evaluated at the requested ply and
-        the rest at 1-ply.
+        cubeful equity: the list ``BgBotAnalyzer.checker_play`` gives at the
+        same level, with the bearoff database off.  At the depths in
+        ``CUBEFUL_FILTERED_PLIES`` (2-ply) the 1-ply filter's survivors and
+        promotions are evaluated at the requested ply and the rest at 1-ply;
+        at 3-ply and deeper every move is.
     """
     if weights is None:
         weights = default_weights()
@@ -503,6 +508,7 @@ def batch_checker_play(
             contact_x_pip_slope_1ply=_contact_cube_slope(1),
             contact_x_nply=_contact_cube_life(n_plies),
             contact_x_pip_slope_nply=_contact_cube_slope(n_plies),
+            cubeful_filtered_plies=sorted(CUBEFUL_FILTERED_PLIES),
         )
         level_label = f"{n_plies}-ply"
     else:

@@ -1121,8 +1121,9 @@ class _CubefulAnalyzer:
             # At the depths in CUBEFUL_FILTERED_PLIES (2-ply) only the 1-ply
             # filter's survivors go through the cube-aware tree; the moves it
             # pruned keep 1-ply values converted by 1-ply Janowski, as in the
-            # cubeless path and in batch_checker_play, and enter the search
-            # only through the stale-top-two promotion below. Scoring every
+            # cubeless path, and enter the search only through the
+            # stale-top-two promotion below (batch_checker_play_nply in the
+            # bindings repeats these steps; keep the two in step). Scoring every
             # legal move at 2-ply let the pick fall on moves the filter had
             # rejected: the more candidates compete, the more surely the
             # maximum lands on an over-valued one. On the snake folder

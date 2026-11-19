@@ -413,8 +413,13 @@ returns `list[dict]`.
 C++ batch checker play: `bgbot_cpp.batch_checker_play(inputs, strategy_1ply, [strategy_nply,]
 filter_max_moves, filter_threshold, n_threads)` via pybind11; takes `list[dict]` with
 `{board, die1, die2, cube_value, cube_owner}`, returns `list[dict]` each with `moves` list
-sorted by cubeful equity desc. Two overloads: 1-ply (GamePlanStrategy only) and N-ply
-(GamePlanStrategy + MultiPlyStrategy). Survivors evaluated at N-ply, rest at 1-ply.
+sorted by cubeful equity desc. Overloads for 1-ply and for N-ply (1-ply strategy +
+MultiPlyStrategy). The N-ply ones (`batch_checker_play_nply` in `bindings.cpp`) take the
+analyzer's steps, so the Python wrapper returns `BgBotAnalyzer.checker_play`'s list field
+for field (bearoff database off: the batch attaches none). At the depths in
+`cubeful_filtered_plies` (the wrapper passes `CUBEFUL_FILTERED_PLIES`, i.e. 2-ply) only the
+filter's survivors and promotions go through the cube-aware tree, the rest keep 1-ply
+values; at other depths every move does. `tests/test_batch_checker_play_parity.py`.
 
 **Python batch wrapper** — `batch_checker_play()` (`python/bgsage/batch.py`):
 ```python
@@ -2977,7 +2982,8 @@ Open Sage net has shown in the region. **Why 2-ply scores worse than 1-ply
    `batch_checker_play` overloads — the app's analytics path — promoted only
    the runner-up in the same way. Both now promote whichever of the top two
    still carries a 1-ply value until both are full-depth
-   (`_first_stale_top_two` in `analyzer.py`, `stale_top` in `bindings.cpp`).
+   (`_first_stale_top_two` in `analyzer.py`, `stale_top_two` in
+   `batch_checker_play_nply` in `bindings.cpp`).
    The rollout path always had the right rule (promote #1 until it is
    rollout-grade); it is now the rule everywhere.
 
@@ -3145,7 +3151,7 @@ What it shows:
 
 *The cause of the snake 2-ply gap (2026-11-19).* Cubeful checker play
 scored every legal move in the cube-aware 2-ply tree. It skipped the 1-ply
-move filter that cubeless N-ply and `batch_checker_play` apply. In 103 of
+move filter that cubeless N-ply applies. In 103 of
 the 795 snake checker decisions the pick was a move the filter had pruned:
 - At 1-ply that move ranked 7th (median), 0.11 behind the filtered pick.
 - 2-ply valued it 0.044 above the filtered pick.
@@ -3163,8 +3169,10 @@ That is a separate disagreement, still open.
 At 2-ply, cubeful checker play now searches only the filter's survivors.
 The pruned moves keep 1-ply Janowski values and enter the search only
 through the stale-top-two promotion (`CUBEFUL_FILTERED_PLIES` in
-`analyzer.py`, `tests/test_cubeful_nply_filter.py`). Paired against the
-old 2-ply, checker PR on the snake folder:
+`analyzer.py`, `tests/test_cubeful_nply_filter.py`). `batch_checker_play`
+had the same flaw (it ran the cube tree for every move) and takes the same
+steps since 2026-11-19. Paired against the old 2-ply, checker PR on the
+snake folder:
 
 | Reference | vs XG | vs rollout |
 |---|---|---|
