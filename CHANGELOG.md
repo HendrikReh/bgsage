@@ -54,6 +54,23 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
 ### Changed
 
+- **One implementation of the dice rules in the move generator.**
+  - The two sorted `possible_boards` overloads repeated the same traversal
+    word for word, and `possible_boards_unsorted` repeated the rules once
+    more:
+    - doubles play as many dice as they can;
+    - otherwise both dice, else the larger, else the smaller;
+    - with no legal move, the player stands pat.
+  - Now one `apply_dice_rules` in `moves.cpp` drives both generators, and
+    the returning overload delegates to the buffer one. Maintenance only:
+    the output is byte-identical and the timings are unchanged within noise.
+  - A before-and-after corpus checks this: 413 boards, every ordered roll,
+    14,760 cases with 304,354 boards. It covers stand-pats, the larger- and
+    smaller-die rules, partial doubles, bear-offs, wins mid-roll and hits.
+  - New binding `bgbot_cpp.possible_moves_unsorted` exposes the hot paths'
+    first-seen order. `tests/test_move_generator.py` pins both outputs with
+    a digest computed before the change.
+
 - **Cubeful checker play at 3-ply and deeper skips the cubeless pre-pass.**
   - At these depths every legal move goes through the cube-aware tree,
     which replaces each candidate's probs, both equities and depth label.
