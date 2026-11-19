@@ -86,9 +86,8 @@ def test_batch_one_ply_matches_the_analyzer():
     positions = [{"board": CONTACT, "cube_value": 1, "cube_owner": "centered"},
                  {"board": CONTACT, "cube_value": 1, "cube_owner": "centered",
                   "away1": 5, "away2": 3}]
-    # One call per position: a batch holding any match position turns Jacoby
-    # off for all of them.
-    batch = [bgsage.batch_evaluate([p], eval_level="1ply", n_threads=1)[0] for p in positions]
+    # One batch for both: the money row keeps Jacoby beside the match row.
+    batch = bgsage.batch_evaluate(positions, eval_level="1ply", n_threads=1)
     for pos, b in zip(positions, batch):
         a = analyzer.cube_action(CONTACT, away1=pos.get("away1", 0), away2=pos.get("away2", 0))
         assert b.equity_nd == pytest.approx(a.equity_nd, abs=1e-6)

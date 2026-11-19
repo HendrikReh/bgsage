@@ -91,9 +91,9 @@ def batch_evaluate(
         filter_max_moves: Max moves for N-ply move filter.
         filter_threshold: Equity threshold for N-ply move filter.
         jacoby: If True, gammons/backgammons don't count when cube is
-            centered (money games only). Auto-disabled for match play.
+            centered (money games only). Ignored for match play positions.
         beaver: If True, opponent can beaver after being doubled
-            (money games only). Auto-disabled for match play.
+            (money games only). Ignored for match play positions.
 
     Returns:
         List of :class:`PositionEval`, one per input position.
@@ -117,10 +117,10 @@ def batch_evaluate(
         else:
             cpp_positions.append((board, cube_value, cube_owner))
 
-    # Auto-disable Jacoby and beaver for match play positions
-    has_match = any(p.get("away1", 0) > 0 or p.get("away2", 0) > 0 for p in positions)
-    effective_jacoby = jacoby and not has_match
-    effective_beaver = beaver and not has_match
+    # Jacoby and beaver apply to the money positions only: the native side
+    # checks each position's match state (CubeInfo::jacoby_active needs
+    # is_money(), and the beaver lives on the money paths), so match rows in
+    # the same batch ignore the flags and money rows keep them.
 
     if eval_level == "1ply":
         if is_pair:
@@ -135,7 +135,7 @@ def batch_evaluate(
         # side applies contact_x to money positions only), here and below.
         raw_results = bgbot_cpp.batch_evaluate_positions(
             cpp_positions, strategy, n_threads,
-            jacoby=effective_jacoby, beaver=effective_beaver,
+            jacoby=jacoby, beaver=beaver,
             contact_x=_contact_cube_life(1),
             contact_x_pip_slope=_contact_cube_slope(1),
         )
@@ -164,7 +164,7 @@ def batch_evaluate(
             )
         raw_results = bgbot_cpp.batch_evaluate_positions(
             cpp_positions, strategy, n_threads,
-            jacoby=effective_jacoby, beaver=effective_beaver,
+            jacoby=jacoby, beaver=beaver,
         )
     else:
         raise ValueError(
@@ -224,7 +224,7 @@ def batch_post_move_evaluate(
         filter_max_moves: Max moves for N-ply move filter.
         filter_threshold: Equity threshold for N-ply move filter.
         jacoby: If True, gammons/backgammons don't count when cube is
-            centered (money games only). Auto-disabled for match play.
+            centered (money games only). Ignored for match play positions.
 
     Returns:
         List of :class:`~bgsage.types.PostMoveAnalysis`, one per input position.
@@ -247,9 +247,9 @@ def batch_post_move_evaluate(
         else:
             cpp_positions.append((board, cube_owner))
 
-    # Auto-disable Jacoby for match play positions
-    has_match = any(p.get("away1", 0) > 0 or p.get("away2", 0) > 0 for p in positions)
-    effective_jacoby = jacoby and not has_match
+    # Jacoby applies to the money positions only; the native side checks
+    # each position's match state, so a match row never switches it off for
+    # the money rows of the same batch.
 
     # Strategy construction goes through the unified ``create_strategy`` /
     # ``create_multipy`` factories — same path BgBotAnalyzer uses — so all
@@ -263,7 +263,7 @@ def batch_post_move_evaluate(
         )
         raw_results = bgbot_cpp.batch_evaluate_post_move(
             cpp_positions, strategy, n_threads,
-            jacoby=effective_jacoby,
+            jacoby=jacoby,
             contact_x=_contact_cube_life(1),
             contact_x_pip_slope=_contact_cube_slope(1),
         )
@@ -284,7 +284,7 @@ def batch_post_move_evaluate(
         )
         raw_results = bgbot_cpp.batch_evaluate_post_move(
             cpp_positions, strategy, n_threads,
-            jacoby=effective_jacoby,
+            jacoby=jacoby,
         )
         level_label = f"{n_plies}-ply"
     else:
@@ -461,15 +461,15 @@ def batch_checker_play(
     else:
         strategy_1ply = bgbot_cpp.GamePlanStrategy(*weights.weight_args)
 
-    # Auto-disable Jacoby for match play positions
-    has_match = any(p.get("away1", 0) > 0 or p.get("away2", 0) > 0 for p in positions)
-    effective_jacoby = jacoby and not has_match
+    # Jacoby applies to the money positions only; the native side checks
+    # each position's match state, so a match row never switches it off for
+    # the money rows of the same batch.
 
     if eval_level == "1ply":
         raw_results = bgbot_cpp.batch_checker_play(
             cpp_inputs, strategy_1ply,
             filter_max_moves, filter_threshold, n_threads,
-            jacoby=effective_jacoby,
+            jacoby=jacoby,
             contact_x_1ply=_contact_cube_life(1),
             contact_x_pip_slope_1ply=_contact_cube_slope(1),
         )
@@ -498,7 +498,7 @@ def batch_checker_play(
         raw_results = bgbot_cpp.batch_checker_play(
             cpp_inputs, strategy_1ply, strategy_nply,
             filter_max_moves, filter_threshold, n_threads,
-            jacoby=effective_jacoby,
+            jacoby=jacoby,
             contact_x_1ply=_contact_cube_life(1),
             contact_x_pip_slope_1ply=_contact_cube_slope(1),
             contact_x_nply=_contact_cube_life(n_plies),

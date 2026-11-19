@@ -120,6 +120,25 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
 ### Fixed
 
+- **Batch functions apply Jacoby and the beaver per position.**
+  - `batch_evaluate`, `batch_cube_action`, `batch_post_move_evaluate` and
+    `batch_checker_play` used to switch Jacoby (and in `batch_evaluate`
+    the beaver) off for the whole batch as soon as one row was a match.
+    A money position's result then depended on the rest of the batch.
+    Example: the starting position, 1-ply, Stage 11:
+    - `batch_evaluate` cubeful equity: +0.1133 alone, +0.1181 beside a
+      5-away/3-away row;
+    - its Double/Take equity lost the beaver (DB −0.4508 became DT
+      −0.2254);
+    - `batch_checker_play`'s best move: +0.2359 alone, +0.2472 in the
+      mixed batch.
+  - The native batch functions already apply both rules to money positions
+    only, so the flags are now passed through unchanged. Batches without a
+    match row are unaffected.
+  - `tests/test_batch_mixed_rules.py` checks every row of mixed batches,
+    in both orders, against the same row alone at 1-ply and 2-ply. It needs
+    no benchmark files.
+
 - **The test suite runs clean on macOS**
   ([#16](https://github.com/HendrikReh/bgsage/pull/16)): 318 passed,
   21 skipped, none failing. Three test files had upstream's Windows
