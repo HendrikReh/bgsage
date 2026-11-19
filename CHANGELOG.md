@@ -83,6 +83,37 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
   - Elapsed times are unchanged within noise. They were measured under
     load from another job (load average ~32).
 
+- **Batch calls load each model once, and can keep it loaded**
+  (`BatchModels`).
+  - Every batch function used to build its strategies from the weight
+    files on every call: ~15 ms for Stage 11, paid even by an empty batch.
+    N-ply checker play paid it twice, because its N-ply strategy loaded a
+    second copy of the base.
+  - Now:
+    - an empty batch checks the level and returns without loading
+      anything;
+    - N-ply strategies are built around the batch's base, through the new
+      `bgbot_cpp.create_multipy_from_base`;
+    - all model types go through `create_strategy`.
+  - A caller-owned `BatchModels` keeps the strategies for later calls. Pass
+    it as `models=` to `batch_evaluate`, `batch_post_move_evaluate`,
+    `batch_cube_action` or `batch_checker_play`.
+  - Results are unchanged. `tests/test_batch_models.py` holds them to
+    strategies built the old way for Stage 11 and Stage 5 at 1-ply and
+    2-ply, counts the factory calls, and runs concurrent calls on one
+    shared `BatchModels`.
+  - Median per call, Stage 11, 10 threads, measured under load from
+    another job (load average ~28):
+
+    | Call | before | after | reused `BatchModels` |
+    |---|---|---|---|
+    | empty batch, 1-ply / 2-ply checker | 20-27 / 65-77 ms | 0.01 / 0.03 ms | 0.00 ms |
+    | 1-ply pre-roll, 1 position | 29-32 ms | 20-31 ms | 0.01 ms |
+    | 2-ply checker, 1 position | 72-83 ms | 40-45 ms | 3.4 ms |
+
+    Batches of 32 and more are dominated by the search, and under this load
+    their timings are noise.
+
 - **Cubeful checker play at 3-ply and deeper skips the cubeless pre-pass.**
   - At these depths every legal move goes through the cube-aware tree,
     which replaces each candidate's probs, both equities and depth label.

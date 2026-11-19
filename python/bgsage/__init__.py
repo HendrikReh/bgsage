@@ -16,7 +16,7 @@ Quick start::
 """
 
 from .analyzer import BgBotAnalyzer, RolloutCancelled, create_analyzer
-from .batch import PositionEval, batch_checker_play, batch_cube_action, batch_evaluate, batch_post_move_evaluate
+from .batch import BatchModels, PositionEval, batch_checker_play, batch_cube_action, batch_evaluate, batch_post_move_evaluate
 from .board import (
     STARTING_BOARD,
     can_double_match,
@@ -60,6 +60,7 @@ __all__ = [
     "BgBotAnalyzer",
     "RolloutCancelled",
     "GnuBgAnalyzer",
+    "BatchModels",
     "batch_checker_play",
     "batch_cube_action",
     "batch_evaluate",
