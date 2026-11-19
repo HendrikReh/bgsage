@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Mark Higgins
 #include "bgbot/moves.h"
 #include <algorithm>
+#include <array>
 #include <cstdint>
 
 namespace bgbot {
@@ -168,96 +169,6 @@ void generate_boards_strict(const Board& b, const int* dice, int n_dice,
     }
 }
 
-} // anonymous namespace
-
-std::vector<Board> possible_boards(const Board& board, int die1, int die2) {
-    std::vector<Board> results;
-    results.reserve(32);
-    std::array<std::vector<Board>, 4> scratch_by_depth;
-    for (auto& scratch : scratch_by_depth) {
-        scratch.reserve(16);
-    }
-
-    if (die1 == die2) {
-        // Doubles: must use maximum number of dice possible (4, then 3, ...)
-        int dice[4] = {die1, die1, die1, die1};
-        for (int n = 4; n >= 1; --n) {
-            generate_boards_strict(board, dice, n, results, scratch_by_depth.data());
-            if (!results.empty()) break;
-        }
-    } else {
-        // Non-doubles: must use both dice if possible
-        int dice_a[2] = {die1, die2};
-        int dice_b[2] = {die2, die1};
-        generate_boards_strict(board, dice_a, 2, results, scratch_by_depth.data());
-        generate_boards_strict(board, dice_b, 2, results, scratch_by_depth.data());
-
-        if (results.empty()) {
-            // Can't use both dice. Must use the larger one if possible.
-            int large = std::max(die1, die2);
-            int small = std::min(die1, die2);
-            possible_boards_one_die(board, large, results);
-            if (results.empty()) {
-                possible_boards_one_die(board, small, results);
-            }
-        }
-    }
-
-    if (results.empty()) {
-        results.push_back(board);
-        return results;
-    }
-
-    sort_unique_boards(results);
-
-    return results;
-}
-
-void possible_boards(const Board& board, int die1, int die2,
-                     std::vector<Board>& results) {
-    results.clear();
-    thread_local std::array<std::vector<Board>, 4> scratch_by_depth;
-    for (auto& scratch : scratch_by_depth) {
-        if (scratch.capacity() < 16) {
-            scratch.reserve(16);
-        }
-    }
-
-    if (die1 == die2) {
-        // Doubles: must use maximum number of dice possible (4, then 3, ...)
-        int dice[4] = {die1, die1, die1, die1};
-        for (int n = 4; n >= 1; --n) {
-            generate_boards_strict(board, dice, n, results, scratch_by_depth.data());
-            if (!results.empty()) break;
-        }
-    } else {
-        // Non-doubles: must use both dice if possible
-        int dice_a[2] = {die1, die2};
-        int dice_b[2] = {die2, die1};
-        generate_boards_strict(board, dice_a, 2, results, scratch_by_depth.data());
-        generate_boards_strict(board, dice_b, 2, results, scratch_by_depth.data());
-
-        if (results.empty()) {
-            // Can't use both dice. Must use the larger one if possible.
-            int large = std::max(die1, die2);
-            int small = std::min(die1, die2);
-            possible_boards_one_die(board, large, results);
-            if (results.empty()) {
-                possible_boards_one_die(board, small, results);
-            }
-        }
-    }
-
-    if (results.empty()) {
-        results.push_back(board);
-        return;
-    }
-
-    sort_unique_boards(results);
-}
-
-namespace {
-
 uint64_t board_hash64(const Board& b) {
     uint64_t h = 0x9e3779b97f4a7c15ULL;
     for (int i = 0; i < 26; ++i) {
@@ -337,49 +248,81 @@ void generate_strict_dedup(const Board& b, const int* dice, int n_dice,
     }
 }
 
-} // namespace
-
-void possible_boards_unsorted(const Board& board, int die1, int die2,
-                              std::vector<Board>& results)
-{
-    results.clear();
+// Per-thread scratch vectors, one per recursion depth (up to four dice).
+std::vector<Board>* scratch_buffers() {
     thread_local std::array<std::vector<Board>, 4> scratch_by_depth;
     for (auto& scratch : scratch_by_depth) {
         if (scratch.capacity() < 16) scratch.reserve(16);
     }
-    MoveDedup& dedup = g_move_dedup;
-    dedup.begin();
+    return scratch_by_depth.data();
+}
 
+// The dice-use rules, shared by both generators. `strict(dice, n)` appends
+// every board reached by playing all n dice in that order; this decides
+// which dice sequences the player must play:
+//  * doubles: as many of the four dice as can be played (4, then 3, 2, 1);
+//  * otherwise both dice, in either order; failing that the larger die
+//    alone, failing that the smaller (one board per origin point, so the
+//    one-die results need no deduplication);
+//  * no legal move at all: the unchanged board (the player stands pat).
+template <class Strict>
+void apply_dice_rules(const Board& board, int die1, int die2,
+                      std::vector<Board>& results, Strict&& strict)
+{
     if (die1 == die2) {
         int dice[4] = {die1, die1, die1, die1};
         for (int n = 4; n >= 1; --n) {
-            generate_strict_dedup(board, dice, n, results,
-                                  scratch_by_depth.data(), dedup);
+            strict(dice, n);
             if (!results.empty()) break;
         }
     } else {
         int dice_a[2] = {die1, die2};
         int dice_b[2] = {die2, die1};
-        generate_strict_dedup(board, dice_a, 2, results,
-                              scratch_by_depth.data(), dedup);
-        generate_strict_dedup(board, dice_b, 2, results,
-                              scratch_by_depth.data(), dedup);
+        strict(dice_a, 2);
+        strict(dice_b, 2);
 
         if (results.empty()) {
-            int large = std::max(die1, die2);
-            int small = std::min(die1, die2);
-            possible_boards_one_die(board, large, results);
+            possible_boards_one_die(board, std::max(die1, die2), results);
             if (results.empty()) {
-                possible_boards_one_die(board, small, results);
+                possible_boards_one_die(board, std::min(die1, die2), results);
             }
-            // One-die fallback bypasses the dedup table; duplicates are
-            // impossible there (each origin point yields a distinct board).
         }
     }
 
     if (results.empty()) {
         results.push_back(board);
     }
+}
+
+} // anonymous namespace
+
+void possible_boards(const Board& board, int die1, int die2,
+                     std::vector<Board>& results) {
+    results.clear();
+    std::vector<Board>* scratch = scratch_buffers();
+    apply_dice_rules(board, die1, die2, results, [&](const int* dice, int n) {
+        generate_boards_strict(board, dice, n, results, scratch);
+    });
+    sort_unique_boards(results);
+}
+
+std::vector<Board> possible_boards(const Board& board, int die1, int die2) {
+    std::vector<Board> results;
+    results.reserve(32);
+    possible_boards(board, die1, die2, results);
+    return results;
+}
+
+void possible_boards_unsorted(const Board& board, int die1, int die2,
+                              std::vector<Board>& results)
+{
+    results.clear();
+    std::vector<Board>* scratch = scratch_buffers();
+    MoveDedup& dedup = g_move_dedup;
+    dedup.begin();
+    apply_dice_rules(board, die1, die2, results, [&](const int* dice, int n) {
+        generate_strict_dedup(board, dice, n, results, scratch, dedup);
+    });
 }
 
 } // namespace bgbot
