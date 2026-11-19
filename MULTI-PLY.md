@@ -1277,9 +1277,15 @@ level.
 
 The `cube_decision_nply_with_details` function captures per-roll cubeful equities for
 the first two turns of a cube decision analysis, providing visibility into the
-internal structure of the N-ply evaluation. It runs on its own self-contained
-detail-capturing recursion (separate from the main cubeful engine) so that it
-can record per-roll boards and equities at both levels.
+internal structure of the N-ply evaluation. It runs the main cubeful engine
+(`cubeful_eval_recursive` in `cube_eval.cpp`) on the same tree as
+`cube_decision_nply_multi`, with a per-roll capture (`NodeCapture`) at the root
+and, from 3-ply, at each of its 21 children: the board each roll chose, the
+child's value and probs, and the node's values before its cube collapse. The
+captured nodes skip their cache lookups (a cached node has no per-roll record);
+nothing else changes, so the headline decision equals the plain call's exactly.
+(Until 2026-11-19 it ran a separate recursion with cubeless picks, whose
+headline drifted from the plain call's by up to 0.09.)
 
 ### Output Structure
 
@@ -1306,9 +1312,9 @@ All equities are normalized to per-initial-cube units. The DT section equities
 reflect the opponent's optimal cube action at the doubled cube level, scaled back to
 per-initial-cube units.
 
-Move selection at both levels uses 1-ply cubeless equity (the main cubeful
-engine picks by 1-ply cubeful equity against the primary cube state; the
-detail recursion keeps the simpler cubeless pick). Equities are evaluated at
+Move selection at both levels is the engine's: 1-ply cubeful equity against
+the primary cube state (the ND scenario's), so the ND and DT sections share one
+board per roll. Equities are evaluated at
 (N-1)-ply for player rolls and (N-2)-ply for opponent rolls — so at 3-ply,
 player-roll equities are 2-ply accurate and opponent-roll equities use 1-ply
 Janowski.

@@ -7,12 +7,12 @@ Start with the **mixed-batch rule fix** (section 3): it is a few lines of Python
 | Section | State |
 | --- | --- |
 | 1. Cubeless pre-pass at 3-ply+ | done in [#28](https://github.com/HendrikReh/bgsage/pull/28) |
-| 2. Batch model construction | open |
+| 2. Batch model construction | done in [#33](https://github.com/HendrikReh/bgsage/pull/33) (`BatchModels`) |
 | 3. Mixed-batch rules | done in [#27](https://github.com/HendrikReh/bgsage/pull/27) |
 | 4. Batch 2-ply filter parity | done in [#30](https://github.com/HendrikReh/bgsage/pull/30); see the notes below |
-| 5. Details path | open |
-| 6. Cache clearing | open |
-| 7. Move generator | open |
+| 5. Details path | done in [#36](https://github.com/HendrikReh/bgsage/pull/36): the details run on the engine, so the headline equals the plain call exactly; results change (see the PR) |
+| 6. Cache clearing | done in [#34](https://github.com/HendrikReh/bgsage/pull/34): the legacy table is allocated on first insert |
+| 7. Move generator | done in [#35](https://github.com/HendrikReh/bgsage/pull/35) |
 
 Notes on #30:
 - It found three more differences between batch and analyzer, besides the filter:
@@ -21,7 +21,7 @@ Notes on #30:
   - it searched match positions at cube value 1.
 - The batch now returns the analyzer's list field for field (bearoff database off).
 - With mixed cube states, the best move had differed on 4 of 40 positions at 2-ply.
-- The line anchors below point at `f164c92`. Sections 1, 3 and 4 have moved code since.
+- The line anchors below point at `f164c92`; every section has moved code since.
 
 ## Baseline and current behavior
 

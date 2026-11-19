@@ -3,23 +3,20 @@
 """
 Tests for incl_2ply_details in cube action analytics.
 
-Verifies that the per-roll details returned by cube_action(incl_2ply_details=True)
-are consistent with independent checker play and cube action evaluations at the
-corresponding ply levels.
-
-The details path (pick_best_move_for_roll in cpp/src/cube.cpp) selects moves by
-1-ply cubeless equity, after narrowing big candidate sets (>16) to the top 15 by
-PubEval — the same prefilter the cubeful recursion applies at interior nodes
-(cube_decision_nply_unified always passes the PubEval filter). This test mirrors
-that:
-- Board verification: PubEval keep-15 prefilter + 1-ply cubeless checker play
-- Equity verification: cube_action at (n-1)-ply on the resulting board
+The details are captured from the evaluation engine's own tree: the tree the
+plain cube_action call walks, with the 21 player rolls (and, from 3-ply, the
+21 opponent rolls below each) recorded as it goes. So:
+- the headline equities equal the plain call's exactly;
+- each roll's board is the engine's pick (1-ply cubeful against the cube
+  state of the side to move in the ND scenario, PubEval keep-15 prefilter
+  above 16 candidates, root routing), shared by the ND and DT sections;
+- each ND per-roll equity is the opponent's (N-1)-ply cube analysis of that
+  board, and each opponent-roll equity the player's (N-2)-ply one.
 
 Run with:
     python -m pytest bgsage/tests/test_2ply_details.py -v
     python -m unittest bgsage.tests.test_2ply_details -v
 """
-
 import os
 import sys
 import unittest
@@ -48,19 +45,23 @@ from bgsage.board import flip_board, check_game_over, is_race, possible_moves
 # Test position: contact/priming position with non-trivial cube dynamics
 BOARD = [0, 0, 0, 2, 3, 0, 4, -2, 2, 0, 0, 0, -4, 2, -3, 0, -1, 0, 0, -3, 2, 0, -2, 0, 0, 0]
 
-# Per-roll equity tolerance, by analysis ply. The details path picks moves at
-# its two captured levels by 1-ply cubeless equity (required so the ND and DT
-# sections share one board per roll), while the standalone cube_action used as
-# the reference picks interior moves by 1-ply cubeful equity (cube_eval.cpp).
-# When the two pick rules choose different moves somewhere in the subtree, the
-# per-roll equities legitimately diverge — more at deeper ply (observed max
-# ~0.013 at 3-ply request depth, ~0.030 at 4-ply on the test position). The
-# headline equity_nd/equity_dt still agree with the plain (no-details) call to
-# within ~0.003. A plumbing bug (wrong perspective, scaling, or roll mapping)
-# produces diffs of 0.1+, so these tolerances still catch real breakage.
-# At 2-ply the reference subtree is a single 1-ply Janowski leaf below the
-# pick, so there is no interior-pick divergence — observed exact agreement.
-EQUITY_TOL = {2: 0.001, 3: 0.02, 4: 0.05}
+# Per-roll equity tolerances against standalone analyses of the same board.
+#
+# ND: the roll's subtree IS the standalone (N-1)-ply cube analysis of the
+# opponent's position, so from 3-ply on the two agree exactly. At 2-ply the
+# 1-ply leaf reuses the pick batch's grouped NN output (Accelerate, exact
+# sigmoid) where the standalone 1-ply call evaluates the board on its own
+# (lookup-table sigmoid): up to ~0.003 apart (observed 0.0024).
+# Opponent rolls: the same one level deeper (a 1-ply leaf at 3-ply), doubled
+# when the opponent's double is taken (observed 0.0063 there).
+# DT: the tree makes one move pick per roll for both scenarios, against the
+# ND cube state, while a standalone DT analysis (cube 2) picks against its
+# own cube state, so their subtrees can choose different moves (observed
+# 0.020 at 3-ply, 0.018 at 4-ply). A plumbing bug (wrong perspective,
+# scaling, or roll mapping) produces diffs of 0.1+.
+ND_TOL = {2: 0.005, 3: 1e-4, 4: 1e-4}
+OPP_TOL = {3: 0.01, 4: 1e-4}
+DT_TOL = {2: 0.006, 3: 0.03, 4: 0.03}
 
 # The 21 dice combinations (matching C++ ALL_ROLLS order)
 DICE_ROLLS = [
@@ -73,83 +74,10 @@ DICE_ROLLS = [
 ]
 
 
-# PubEval prefilter constants — mirror pick_best_move_for_roll in cpp/src/cube.cpp.
-PREFILTER_THRESHOLD = 16
-PREFILTER_KEEP = 15
-
-
-def _load_pubeval_weights():
-    """Parse the Tesauro PubEval weights from cpp/src/pubeval.cpp (the default
-    weights of the PubEval prefilter passed by cube_decision_nply_unified)."""
-    import re
-    src_path = os.path.join(repo_dir, "cpp", "src", "pubeval.cpp")
-    with open(src_path, encoding="utf-8") as f:
-        src = f.read()
-    weights = {}
-    for name in ("CONTACT_TESAURO", "RACE_TESAURO"):
-        m = re.search(name + r"\[122\]\s*=\s*\{(.*?)\};", src, re.S)
-        vals = [float(x) for x in m.group(1).split(",") if x.strip()]
-        assert len(vals) == 122, f"{name}: parsed {len(vals)} weights"
-        weights[name] = vals
-    return weights["CONTACT_TESAURO"], weights["RACE_TESAURO"]
-
-
-_PUBEVAL_CONTACT, _PUBEVAL_RACE = _load_pubeval_weights()
-
-
-def _pubeval_score(board, pre_move_is_race):
-    """Python port of PubEval::evaluate (cpp/src/pubeval.cpp), Tesauro weights."""
-    go = check_game_over(board)
-    if go != 0:
-        # Terminals always survive the prefilter (scored 1e30 in C++).
-        return 1e30
-    x = [0.0] * 122
-    for i in range(24):
-        n = board[24 - i]
-        if n == 0:
-            continue
-        if n == -1:
-            x[5 * i] = 1.0
-        if n == 1:
-            x[5 * i + 1] = 1.0
-        if n >= 2:
-            x[5 * i + 2] = 1.0
-        if n == 3:
-            x[5 * i + 3] = 1.0
-        if n >= 4:
-            x[5 * i + 4] = (n - 3) / 2.0
-    x[120] = board[0] / 2.0
-    borne_off = 15 - sum(v for v in board[1:25] if v > 0) - board[25]
-    x[121] = borne_off / 15.0
-    w = _PUBEVAL_RACE if pre_move_is_race else _PUBEVAL_CONTACT
-    return sum(wi * xi for wi, xi in zip(w, x))
-
-
-def best_move_1ply_cubeless(board, d1, d2, post_move_analyzer):
-    """Pick best move mirroring pick_best_move_for_roll in cpp/src/cube.cpp:
-    PubEval keep-15 prefilter for >16 candidates, then 1-ply cubeless argmax."""
-    candidates = [list(c) for c in possible_moves(board, d1, d2)]
-    if not candidates:
-        return board  # no moves: standing pat
-    if len(candidates) > PREFILTER_THRESHOLD:
-        pre_race = is_race(board)
-        order = sorted(
-            range(len(candidates)),
-            key=lambda i: (-_pubeval_score(candidates[i], pre_race), i),
-        )
-        candidates = [candidates[i] for i in order[:PREFILTER_KEEP]]
-    best_board = None
-    best_eq = -1e30
-    for cand in candidates:
-        go = check_game_over(cand)
-        if go != 0:
-            eq = float(go)
-        else:
-            eq = post_move_analyzer.post_move_analytics(cand).cubeless_equity
-        if eq > best_eq:
-            best_eq = eq
-            best_board = cand
-    return best_board
+def assert_legal(test, before, d1, d2, after, msg):
+    """`after` is a legal result of rolling d1-d2 from `before` (same
+    perspective), standing pat included."""
+    test.assertIn(list(after), [list(c) for c in possible_moves(before, d1, d2)], msg)
 
 
 def setUpModule():
@@ -173,7 +101,7 @@ class TestTwoPlyDetailsND(unittest.TestCase):
 
     def _run_nd_test(self, n_plies: int):
         """Core ND test logic for a given ply level."""
-        tol = EQUITY_TOL[n_plies]
+        tol = ND_TOL[n_plies]
         analyzer = BgBotAnalyzer(eval_level=f"{n_plies}ply", cubeful=True)
 
         result = analyzer.cube_action(
@@ -197,7 +125,6 @@ class TestTwoPlyDetailsND(unittest.TestCase):
             msg=f"ND weighted average ({avg_equity:.6f}) should match equity_nd ({result.equity_nd:.6f})",
         )
 
-        post_move_analyzer = BgBotAnalyzer(eval_level="1ply", cubeful=False)
         opp_cube_analyzer = BgBotAnalyzer(eval_level=f"{n_plies - 1}ply", cubeful=True)
         # The opponent-roll level is captured only at 3-ply and above (at
         # 2-ply it would sit below the 1-ply leaf).
@@ -211,28 +138,15 @@ class TestTwoPlyDetailsND(unittest.TestCase):
             self.assertEqual(pr["die1"], d1)
             self.assertEqual(pr["die2"], d2)
 
-            # --- Verify player's best move board ---
-            candidates = possible_moves(BOARD, d1, d2)
-
-            if not candidates:
-                self.assertEqual(
-                    list(pr["checkers"]), list(BOARD),
-                    f"Roll {d1}-{d2}: no moves, board should be unchanged",
+            # --- The player's board: a legal play of this roll ---
+            assert_legal(self, BOARD, d1, d2, pr["checkers"],
+                         f"Roll {d1}-{d2}: post-move board is not a legal play")
+            if check_game_over(list(pr["checkers"])) != 0:
+                self.assertNotIn(
+                    "opponent_rolls", pr,
+                    f"Roll {d1}-{d2}: terminal should not have opponent_rolls",
                 )
-            else:
-                best_board = best_move_1ply_cubeless(BOARD, d1, d2, post_move_analyzer)
-                self.assertEqual(
-                    list(pr["checkers"]), list(best_board),
-                    f"Roll {d1}-{d2}: post-move board should match 1-ply cubeless best",
-                )
-
-                game_over = check_game_over(best_board)
-                if game_over != 0:
-                    self.assertNotIn(
-                        "opponent_rolls", pr,
-                        f"Roll {d1}-{d2}: terminal should not have opponent_rolls",
-                    )
-                    continue
+                continue
 
             # --- Verify player-roll equity via opponent's cube action ---
             post_move_board = list(pr["checkers"])
@@ -279,17 +193,8 @@ class TestTwoPlyDetailsND(unittest.TestCase):
                     self.assertEqual(opp_r["die1"], od1)
                     self.assertEqual(opp_r["die2"], od2)
 
-                    opp_candidates = possible_moves(opp_board, od1, od2)
-                    if not opp_candidates:
-                        expected_board = flip_board(opp_board)
-                    else:
-                        opp_best = best_move_1ply_cubeless(opp_board, od1, od2, post_move_analyzer)
-                        expected_board = flip_board(opp_best)
-
-                    self.assertEqual(
-                        list(opp_r["checkers"]), list(expected_board),
-                        f"Roll {d1}-{d2}, opp {od1}-{od2}: board mismatch",
-                    )
+                    assert_legal(self, opp_board, od1, od2, flip_board(opp_r["checkers"]),
+                                 f"Roll {d1}-{d2}, opp {od1}-{od2}: not a legal play")
 
                     player_post_opp_board = list(opp_r["checkers"])
                     opp_post = flip_board(player_post_opp_board)
@@ -312,7 +217,7 @@ class TestTwoPlyDetailsND(unittest.TestCase):
                         expected_opp_eq = player_cube.optimal_equity
 
                     self.assertAlmostEqual(
-                        opp_r["cubeful_equity"], expected_opp_eq, delta=tol,
+                        opp_r["cubeful_equity"], expected_opp_eq, delta=OPP_TOL[n_plies],
                         msg=f"Roll {d1}-{d2}, opp {od1}-{od2}: "
                             f"equity {opp_r['cubeful_equity']:.4f} "
                             f"vs expected {expected_opp_eq:.4f}",
@@ -336,7 +241,7 @@ class TestTwoPlyDetailsDT(unittest.TestCase):
 
     def _run_dt_test(self, n_plies: int):
         """Core DT test logic for a given ply level."""
-        tol = EQUITY_TOL[n_plies]
+        tol = DT_TOL[n_plies]
         analyzer = BgBotAnalyzer(eval_level=f"{n_plies}ply", cubeful=True)
 
         result = analyzer.cube_action(
@@ -360,7 +265,7 @@ class TestTwoPlyDetailsDT(unittest.TestCase):
             msg=f"DT weighted average ({avg_equity:.6f}) should match equity_dt ({result.equity_dt:.6f})",
         )
 
-        # Boards should match ND (same move selection — cubeless)
+        # Boards match ND: one move pick per roll serves both scenarios
         nd_rolls = result.details["nd"]
         for roll_idx in range(21):
             self.assertEqual(
@@ -368,24 +273,13 @@ class TestTwoPlyDetailsDT(unittest.TestCase):
                 f"Roll {roll_idx}: DT and ND boards should be identical",
             )
 
-        post_move_analyzer = BgBotAnalyzer(eval_level="1ply", cubeful=False)
         # For DT, opponent's cube action is at (n-1)-ply with cube=2, opponent owns
         opp_cube_analyzer = BgBotAnalyzer(eval_level=f"{n_plies - 1}ply", cubeful=True)
 
         for roll_idx, pr in enumerate(dt_rolls):
             d1, d2 = DICE_ROLLS[roll_idx]
-
-            candidates = possible_moves(BOARD, d1, d2)
-            if candidates:
-                best_board = best_move_1ply_cubeless(BOARD, d1, d2, post_move_analyzer)
-                game_over = check_game_over(best_board)
-                if game_over != 0:
-                    # Terminal: DT equity should be 2x the cubeless equity
-                    nd_eq = nd_rolls[roll_idx]["cubeful_equity"]
-                    # For terminal, ND equity = cubeless_equity (with Jacoby if active)
-                    # DT equity should be 2x cubeless_equity (Jacoby inactive since cube turned)
-                    # Just verify DT is present
-                    continue
+            if check_game_over(list(pr["checkers"])) != 0:
+                continue
 
             post_move_board = list(pr["checkers"])
             opp_board = flip_board(post_move_board)
@@ -418,14 +312,12 @@ class TestTwoPlyDetailsDT(unittest.TestCase):
 
 
 class TestDetailsHeadlineMatchesPlain(unittest.TestCase):
-    """The headline equities of a details call must match the plain call.
+    """The headline equities of a details call equal the plain call's.
 
-    Regression for the n_plies=2 bug where cube_decision_nply_with_details
-    always ran its two manual recursion levels, so a 2-ply details request
-    silently returned 3-ply-grade headline equities (~0.06 off plain 2-ply on
-    this position) at ~21x the cost. The only legitimate divergence is the
-    interior pick rule (1-ply cubeless in the details path vs 1-ply cubeful in
-    the plain recursion), observed <= ~0.003.
+    The details are captured from the very tree the plain call walks, so the
+    two agree exactly. (Regression: before 2026-06 a 2-ply details request ran
+    3-ply-grade levels, ~0.06 off plain 2-ply; until 2026-11 the details ran
+    on an older recursion with cubeless picks and drifted up to 0.05.)
     """
 
     def _run_headline_test(self, n_plies: int):
@@ -438,11 +330,12 @@ class TestDetailsHeadlineMatchesPlain(unittest.TestCase):
             BOARD, cube_value=1, cube_owner="centered",
             jacoby=True, beaver=True, incl_2ply_details=True,
         )
-        for field in ("equity_nd", "equity_dt", "equity_dp"):
-            self.assertAlmostEqual(
-                getattr(detailed, field), getattr(plain, field), delta=0.005,
-                msg=f"{n_plies}-ply {field}: details {getattr(detailed, field):.6f} "
-                    f"vs plain {getattr(plain, field):.6f}",
+        for field in ("equity_nd", "equity_dt", "equity_dp", "should_double",
+                      "should_take", "optimal_action"):
+            self.assertEqual(
+                getattr(detailed, field), getattr(plain, field),
+                msg=f"{n_plies}-ply {field}: details {getattr(detailed, field)!r} "
+                    f"vs plain {getattr(plain, field)!r}",
             )
 
     def test_2ply_headline(self):
@@ -452,6 +345,10 @@ class TestDetailsHeadlineMatchesPlain(unittest.TestCase):
     def test_3ply_headline(self):
         """3-ply details headline == plain 3-ply."""
         self._run_headline_test(3)
+
+    def test_4ply_headline(self):
+        """4-ply details headline == plain 4-ply."""
+        self._run_headline_test(4)
 
     def test_2ply_headline_dancing(self):
         """2-ply headline equality on a position with dancing rolls.
@@ -475,10 +372,10 @@ class TestDetailsHeadlineMatchesPlain(unittest.TestCase):
             jacoby=True, beaver=True, incl_2ply_details=True,
         )
         for field in ("equity_nd", "equity_dt"):
-            self.assertAlmostEqual(
-                getattr(detailed, field), getattr(plain, field), delta=0.005,
-                msg=f"dancing {field}: details {getattr(detailed, field):.6f} "
-                    f"vs plain {getattr(plain, field):.6f}",
+            self.assertEqual(
+                getattr(detailed, field), getattr(plain, field),
+                msg=f"dancing {field}: details {getattr(detailed, field)!r} "
+                    f"vs plain {getattr(plain, field)!r}",
             )
         # A roll without a 1 dances: standing pat, board unchanged.
         for pr in detailed.details["nd"]:
@@ -488,6 +385,42 @@ class TestDetailsHeadlineMatchesPlain(unittest.TestCase):
                 break
         else:
             self.fail("Roll 2-3 not found in nd details")
+
+
+class TestDetailsAcrossCubeStates(unittest.TestCase):
+    """Headline and per-roll averages across cube states and root routing."""
+
+    # A snake: the 24-NN layout pins every contact node of its tree to NN 22.
+    SNAKE = [0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 2, 3, 3, 2, 2, 1, -7, -7, 0]
+    CASES = [
+        (BOARD, dict(cube_value=1, cube_owner="centered", away1=5, away2=3)),
+        (BOARD, dict(cube_value=2, cube_owner="player", away1=7, away2=4)),
+        (BOARD, dict(cube_value=1, cube_owner="centered", away1=1, away2=4, is_crawford=True)),
+        (BOARD, dict(cube_value=2, cube_owner="opponent")),
+        (SNAKE, dict(cube_value=1, cube_owner="centered")),
+    ]
+
+    def test_headline_and_averages(self):
+        for n_plies in (2, 3):
+            analyzer = BgBotAnalyzer(eval_level=f"{n_plies}ply", cubeful=True)
+            for board, kw in self.CASES:
+                plain = analyzer.cube_action(board, **kw)
+                detailed = analyzer.cube_action(board, incl_2ply_details=True, **kw)
+                label = f"{n_plies}-ply {kw}"
+                for field in ("equity_nd", "equity_dt", "equity_dp", "optimal_action"):
+                    self.assertEqual(getattr(detailed, field), getattr(plain, field),
+                                     f"{label}: {field}")
+                for section, headline in (("nd", detailed.equity_nd), ("dt", None)):
+                    rolls = detailed.details[section]
+                    self.assertEqual(len(rolls), 21, label)
+                    if headline is None:
+                        continue   # equity_dt may carry the beaver
+                    avg = sum(r["cubeful_equity"] * (1 if r["die1"] == r["die2"] else 2)
+                              for r in rolls) / 36.0
+                    self.assertAlmostEqual(avg, headline, places=4, msg=label)
+                for nd, dt in zip(detailed.details["nd"], detailed.details["dt"]):
+                    self.assertEqual(nd["checkers"], dt["checkers"], label)
+                    assert_legal(self, board, nd["die1"], nd["die2"], nd["checkers"], label)
 
 
 class TestTwoPlyDetailsErrors(unittest.TestCase):

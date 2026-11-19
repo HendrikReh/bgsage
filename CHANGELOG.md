@@ -54,6 +54,42 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
 ### Changed
 
+- **`cube_action(incl_2ply_details=True)` runs on the evaluation engine.**
+  - The per-roll details came from an older recursion in `cube.cpp` that
+    differed from the engine behind the plain call in three ways:
+    - it picked moves by 1-ply cubeless equity at the captured levels;
+    - it called the network one candidate at a time, with the lookup
+      sigmoid;
+    - it had no root routing.
+  - Its headline `equity_nd` / `equity_dt` therefore drifted from the plain
+    call's, by up to 0.07 at 2-ply and 0.09 at 3-ply on 76 random
+    positions. `CLAUDE.md` claimed they matched.
+  - The details are now recorded from the very tree the plain call walks,
+    with a per-roll capture at its top two levels. So:
+    - the headline and the decision equal the plain call's exactly, at
+      every depth and for money and match alike;
+    - each ND player-roll equity equals the opponent's standalone
+      (N-1)-ply cube analysis of that board (from 3-ply on, exactly);
+    - the boards are the engine's picks: 1-ply cubeful against the ND cube
+      state, with root routing.
+  - This changes results. On the 76 positions (half 5-away/3-away), 4-7% of
+    the per-roll boards changed. ND per-roll equities, and so `roll_luck`
+    values, moved by a median of 0.001; the 95th percentile was 0.003 at
+    2-ply and 0.026 at 3-ply.
+  - The details call now costs what a plain call does. Median, Stage 11,
+    4 threads, machine idle:
+
+    | Level | plain | details before | details after |
+    |---|---|---|---|
+    | 2-ply | 1.7 ms | 1.9 ms | 1.6 ms |
+    | 3-ply | 9.3-9.7 ms | 11.9-12.0 ms | 9.6-9.7 ms |
+    | 4-ply | 130-131 ms | 165-166 ms | 130 ms |
+
+  - `tests/test_2ply_details.py` now checks the details against the plain
+    call (exactly) and against standalone analyses of each roll's board,
+    for money, match, Crawford, an opponent-owned cube and a root-routed
+    snake.
+
 - **One implementation of the dice rules in the move generator.**
   - The two sorted `possible_boards` overloads repeated the same traversal
     word for word, and `possible_boards_unsorted` repeated the rules once

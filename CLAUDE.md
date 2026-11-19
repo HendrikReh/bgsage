@@ -325,15 +325,17 @@ and **DT** (Double/Take) scenarios. The ND section shows equities assuming the
 player does not double; the DT section shows equities assuming the player doubles
 and the opponent takes — even when those are not the optimal decisions. All boards
 are from the original player's perspective. All equities are per-initial-cube, from
-the player's perspective. No extra computational cost — data is captured from the
-interior of the existing N-ply cubeful recursion.
+the player's perspective. No extra computational cost: the details are recorded
+from the very tree the plain call walks (`cube_decision_nply_with_details` in
+`cube_eval.cpp` runs the evaluation engine with a per-roll capture at its top two
+levels), so `equity_nd` / `equity_dt` / the decision equal the plain call's exactly.
 
 `cube.details` — dict with two keys:
 - `"nd"` — list of 21 player roll dicts (No Double scenario)
 - `"dt"` — list of 21 player roll dicts (Double/Take scenario)
 
-Boards (`checkers`) are identical in both sections (move selection is cubeless,
-so cube state doesn't affect which move is chosen). Only the equities differ.
+Boards (`checkers`) are identical in both sections: the tree makes one move pick
+per roll for both scenarios. Only the equities differ.
 
 Each player roll dict (in both `"nd"` and `"dt"`):
 
@@ -365,22 +367,31 @@ redouble; per-roll equities reflect the opponent's optimal cube action at the
 doubled cube level, scaled back to per-initial-cube units. The weighted average
 of `cubeful_equity` across all 21 DT player rolls equals `equity_dt`.
 
-Move selection at both captured levels uses 1-ply cubeless equity (this is what
-keeps the ND and DT boards identical — cube state never affects the pick), with
-the same PubEval keep-15 prefilter the recursion applies when a roll has >16
-candidates. Note the recursion's own interior picks below these levels are 1-ply
-CUBEFUL (see "N-Ply Cubeful Algorithm"), so per-roll detail equities can diverge
-slightly from standalone (N-1)-ply evaluations of the same boards. Equities are
-evaluated at (N-1)-ply for player rolls and (N-2)-ply for opponent rolls — so at
-3-ply, player-roll equities are 2-ply accurate and opponent-roll equities use
-1-ply Janowski.
+Move selection is the engine's at every level, the captured ones included:
+1-ply cubeful equity against the ND scenario's cube state of the side to move
+(see "N-Ply Cubeful Algorithm"), after the PubEval keep-15 prefilter when a roll
+has >16 candidates, with root routing (a snake root pins the whole tree, as in
+the plain call). Equities are evaluated at (N-1)-ply for player rolls and
+(N-2)-ply for opponent rolls — so at 3-ply, player-roll equities are 2-ply
+accurate and opponent-roll equities use 1-ply Janowski. An ND player-roll equity
+is the opponent's standalone (N-1)-ply cube analysis of that board (exactly, from
+3-ply on; at 2-ply within ~0.003, because the 1-ply leaf reuses the pick batch's
+grouped NN output). A DT per-roll equity can differ more from a standalone
+cube-2 analysis, since its subtree's picks are made against the ND cube state
+(`tests/test_2ply_details.py`).
+
+Until 2026-11-19 the details ran on an older recursion in `cube.cpp` with 1-ply
+cubeless picks at the captured levels, scalar NN calls and no root routing: its
+headline equities drifted from the plain call's by up to 0.09, and it cost
+1.1-1.3x a plain call. On 76 random positions (half 5-away/3-away) the switch
+changed 4-7% of the per-roll boards and moved ND per-roll equities (and so
+luck values) by a median 0.001, p95 0.003-0.026.
 
 **2-ply behavior**: at 2-ply only the player-roll level is captured — the
 opponent-roll level would sit below the 1-ply leaf. Each post-move position is
 evaluated directly at the 1-ply Janowski leaf (the same subtree the plain 2-ply
 call evaluates), so per-roll equities are 1-ply accurate, `opponent_rolls` is
-absent from every entry, headline equities match the plain (no-details) 2-ply
-call, and the cost is that of a plain 2-ply cube evaluation. (Before 2026-06 the
+absent from every entry, and the cost is that of a plain 2-ply cube evaluation. (Before 2026-06 the
 details path always ran its two manual recursion levels, so a 2-ply details
 request silently returned 3-ply-grade headline equities at ~21x the cost.)
 
