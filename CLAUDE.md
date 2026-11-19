@@ -1857,8 +1857,27 @@ cubeful equity is still minus the opponent's cube analysis.
 - `cube_action`, 1-ply and N-ply.
 - Checker play, in the 1-ply Janowski path and the N-ply cube-aware tree.
 - 1-ply `post_move_analytics`.
-- `batch_evaluate`, `batch_post_move_evaluate` and `batch_checker_play`, at
-  the matching levels.
+- `batch_checker_play`, at the matching levels (its N-ply path is the
+  cube-aware tree).
+- `batch_evaluate`, `batch_cube_action` and `batch_post_move_evaluate`, with
+  the **1-ply** value at every depth (`ROOT_JANOWSKI_CUBE_LIFE_PLY` in
+  `batch.py`). These paths build no cube tree: they apply Janowski once, at
+  the root, to N-ply cubeless probs, which is the construct the 1-ply value
+  was fitted for. Measured 2026-11-19 against XG on the 2,196 money cube
+  positions (`scripts/score_batch_cube_life_xg.py`), `batch_cube_action`
+  cube PR (blunders) with 0.68 / the 1-ply value / the 2-ply value:
+
+  | Depth | 0.68 | 1-ply value | 2-ply value | 1-ply value - 0.68, paired |
+  |---|---|---|---|---|
+  | 2-ply | 2.33 (19) | 1.00 (14) | 1.20 (22) | -1.33 +- 0.12 |
+  | 3-ply | 1.97 (17) | 1.04 (19) | 1.15 (20) | -0.93 +- 0.14 |
+  | 4-ply | 1.98 (12) | 0.94 (12) | 0.95 (15) | -1.04 +- 0.11 |
+
+  The gain holds on both seed halves and against the Sage reference. A
+  (value, slope) grid fitted on one seed half at 2-ply lands at 0.72-0.74 +
+  0.00175/pip, next to the 1-ply value (out of fold 1.11). The analyzer's
+  2-ply cube tree scores 0.77 (8) on the same positions. Before 2026-11-19
+  these paths used the 1-ply value at 1-ply only and 0.68 deeper.
 
 **Mechanism.** `CubeInfo.contact_x` (C++; -1 = `cube_efficiency()`) replaces
 the cube efficiency of contact positions only. This differs from

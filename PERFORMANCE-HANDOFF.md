@@ -148,7 +148,7 @@ The historical spot check used nine fixed money positions, with one warmed analy
 ## Side observations (not checked further)
 
 - **Fixed:** the batch entry points never attached the bearoff database, while `BgBotAnalyzer` loads it by default (`bearoff_db=True`), so batch and analyzer disagreed on bearoff positions. `BatchModels` now attaches it by default; see `CHANGELOG.md`.
-- `batch_evaluate` and `batch_post_move_evaluate` pass `contact_x` only at 1-ply; at 2-ply they keep the 0.68 contact cube life. `CLAUDE.md` lists them under "at the matching levels". These batch paths use Janowski on N-ply cubeless probs rather than the cube tree, so whether the 2-ply value should apply there is a separate question.
+- **Resolved:** `batch_evaluate` and `batch_post_move_evaluate` passed `contact_x` only at 1-ply and kept 0.68 deeper. Measured against XG, their root Janowski fits the analyzer's 1-ply value best at 2-, 3- and 4-ply (2-ply cube PR 2.33 -> 1.00), so they now use it at every depth; see `CHANGELOG.md`.
 
 ## Test commands
 

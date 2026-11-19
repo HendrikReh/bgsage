@@ -128,6 +128,34 @@ def test_batch_post_move_one_ply_matches_the_analyzer():
     assert b.cubeful_equity == pytest.approx(a.cubeful_equity, abs=1e-5)
 
 
+@pytest.mark.parametrize("level", ["1ply", "2ply", "3ply"])
+@pytest.mark.parametrize("api,native", [
+    (bgsage.batch_evaluate, "batch_evaluate_positions"),
+    (bgsage.batch_post_move_evaluate, "batch_evaluate_post_move"),
+])
+def test_batch_root_janowski_uses_the_one_ply_cube_life(level, api, native):
+    # The pre-roll and post-move batch paths apply Janowski at the root at
+    # every depth, the construct the 1-ply money value was fitted for
+    # (scripts/score_batch_cube_life_xg.py); the native side applies it to
+    # money positions only.
+    fn = getattr(bgbot_cpp, native)
+    with patch.object(bgbot_cpp, native, side_effect=fn) as call:
+        api([{"board": CONTACT, "cube_value": 1, "cube_owner": "centered"}],
+            eval_level=level, n_threads=1)
+    assert call.call_args.kwargs["contact_x"] == MONEY_CONTACT_CUBE_LIFE[1]
+    assert call.call_args.kwargs["contact_x_pip_slope"] == MONEY_CONTACT_CUBE_LIFE_PIP_SLOPE[1]
+
+
+def test_batch_cube_life_changes_money_rows_only():
+    money = {"board": CONTACT, "cube_value": 1, "cube_owner": "centered"}
+    match = dict(money, away1=5, away2=3)
+    with patch.dict(bgsage.analyzer.MONEY_CONTACT_CUBE_LIFE, clear=True):
+        flat = bgsage.batch_evaluate([money, match], eval_level="2ply", n_threads=1)
+    now = bgsage.batch_evaluate([money, match], eval_level="2ply", n_threads=1)
+    assert now[0].cubeful_equity != flat[0].cubeful_equity
+    assert now[1].cubeful_equity == flat[1].cubeful_equity
+
+
 # ---------------------------------------------------------------------------
 # contact_x_pip_slope
 # ---------------------------------------------------------------------------
