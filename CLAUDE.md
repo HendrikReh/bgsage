@@ -1168,6 +1168,17 @@ The weight-load saving needs a long-lived analyzer: code that builds a new
 `BgBotAnalyzer` per call still pays it (the cube strategy loads lazily on the
 analyzer's first `cube_action`).
 
+Since 2026-11-19 an N-ply analyzer's checker side loads the model once: the
+N-ply strategy is built around the 1-ply strategy's base
+(`create_multipy_from_base`, also for the rollout analyzer's 2-ply prefilter
+strategy), so a 3-ply analyzer loads Stage 11 twice (checker side, then the
+cube strategy on first use) instead of three times. The cube strategy keeps
+its own base, so its evaluator configuration (root routing) stays separate.
+The bearoff database is loaded once per process (`analyzer.load_bearoff_db`)
+and shared by analyzers and `BatchModels`, which loads it only when a batch
+has positions. Constructing a 3-ply analyzer takes 17-20 ms instead of
+35-41 ms; analysis times are unchanged (`tests/test_analyzer_model_reuse.py`).
+
 ### Upstream builds (not supported in this fork)
 
 Kept for reference and upstream merges; nobody tests them here.

@@ -41,7 +41,6 @@ batches load them once instead by passing a :class:`BatchModels`::
 
 from __future__ import annotations
 
-import functools
 import os
 import threading
 from dataclasses import dataclass
@@ -49,7 +48,8 @@ from dataclasses import dataclass
 import bgbot_cpp
 
 from .analyzer import (
-    CUBEFUL_FILTERED_PLIES, _contact_cube_life, _contact_cube_slope, resolve_owner,
+    CUBEFUL_FILTERED_PLIES, _contact_cube_life, _contact_cube_slope, load_bearoff_db,
+    resolve_owner,
 )
 from .types import CheckerPlayResult, CubeActionResult, MoveAnalysis, PostMoveAnalysis, Probabilities
 from .weights import WeightConfig, WeightConfigPair, bearoff_db_path, default_weights
@@ -84,14 +84,6 @@ def _check_level(eval_level: str) -> int:
     return int(eval_level[0])
 
 
-@functools.lru_cache(maxsize=None)
-def _load_bearoff_db(path: str):
-    """The bearoff database at `path`, loaded once per process (it is
-    immutable once loaded), or None when it does not load."""
-    db = bgbot_cpp.BearoffDB()
-    return db if db.load(path) else None
-
-
 class BatchModels:
     """Loaded strategies for the batch functions, owned by the caller.
 
@@ -115,13 +107,18 @@ class BatchModels:
     def __init__(self, weights: WeightConfig | WeightConfigPair | None = None,
                  bearoff_db: bool | str = True):
         self.weights = default_weights() if weights is None else weights
-        path = bearoff_db if isinstance(bearoff_db, str) else (
+        self._db_path = bearoff_db if isinstance(bearoff_db, str) else (
             bearoff_db_path() if bearoff_db else None)
-        self.bearoff_db = _load_bearoff_db(path) if path else None
         self._lock = threading.Lock()
         self._raw_base = None
         self._base = None
         self._multipy: dict[tuple, object] = {}
+
+    @property
+    def bearoff_db(self):
+        """The bearoff database, loaded on first use (shared per process), or
+        None when off or missing."""
+        return load_bearoff_db(self._db_path) if self._db_path else None
 
     def base(self):
         """The 1-ply strategy, loaded on first use (bearoff-aware when the
