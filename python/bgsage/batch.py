@@ -69,6 +69,27 @@ _LEVELS = ("1ply", "2ply", "3ply", "4ply")
 ROOT_JANOWSKI_CUBE_LIFE_PLY = 1
 
 
+#: Auto mode (``n_threads=0``) of the 1-ply pre-roll and post-move batches
+#: starts one worker per this many positions. Each position costs about 5 us
+#: there, less than starting and joining a worker, so the native default (one
+#: worker per core) made small batches slower. Measured 2026-11-19 (Stage 11,
+#: M4 Pro, warm BatchModels), median us: 4 positions 21 serial / 56 auto,
+#: 8: 37 / 78, 32: 142 serial / 96 at 4 workers / 153 auto, 128: 755 / 290 at
+#: 8 workers; with 8 per worker every size is within 7% of its best count.
+#: Checker play (~100 us per 1-ply position) and N-ply evaluations keep the
+#: native default, which already caps workers at the batch size.
+CHEAP_POSITIONS_PER_WORKER = 8
+
+
+def _auto_threads(n_threads: int, n_positions: int, n_plies: int) -> int:
+    """The thread count for a pre-roll / post-move batch: an explicit count
+    as given; in auto mode at 1-ply, one worker per
+    ``CHEAP_POSITIONS_PER_WORKER`` positions, at most one per core."""
+    if n_threads > 0 or n_plies > 1:
+        return n_threads
+    return max(1, min(os.cpu_count() or 1, n_positions // CHEAP_POSITIONS_PER_WORKER))
+
+
 def _root_cube_life_kwargs() -> dict:
     return dict(contact_x=_contact_cube_life(ROOT_JANOWSKI_CUBE_LIFE_PLY),
                 contact_x_pip_slope=_contact_cube_slope(ROOT_JANOWSKI_CUBE_LIFE_PLY))
@@ -259,7 +280,7 @@ def batch_evaluate(
     strategy = (models.base() if n_plies == 1 else
                 models.multipy(n_plies, filter_max_moves, filter_threshold))
     raw_results = bgbot_cpp.batch_evaluate_positions(
-        cpp_positions, strategy, n_threads,
+        cpp_positions, strategy, _auto_threads(n_threads, len(cpp_positions), n_plies),
         jacoby=jacoby, beaver=beaver, **_root_cube_life_kwargs(),
     )
 
@@ -353,7 +374,8 @@ def batch_post_move_evaluate(
     strategy = (models.base() if n_plies == 1 else
                 models.multipy(n_plies, filter_max_moves, filter_threshold))
     raw_results = bgbot_cpp.batch_evaluate_post_move(
-        cpp_positions, strategy, n_threads, jacoby=jacoby, **_root_cube_life_kwargs(),
+        cpp_positions, strategy, _auto_threads(n_threads, len(cpp_positions), n_plies),
+        jacoby=jacoby, **_root_cube_life_kwargs(),
     )
     level_label = f"{n_plies}-ply"
 

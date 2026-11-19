@@ -54,3 +54,30 @@ def test_cubeless_one_ply_does_not_add_a_pool(threads):
 def test_one_ply_results_do_not_depend_on_thread_budget(match_play):
     outputs = [evaluate("1ply", n, match_play=match_play)[1] for n in (1, 2, 4)]
     assert outputs[0] == outputs[1] == outputs[2]
+
+
+# ---------------------------------------------------------------------------
+# An explicit budget of one runs inline (it used to be raised to two).
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("level", ["2ply", "3ply"])
+@pytest.mark.parametrize("match_play", [False, True], ids=["money", "match"])
+def test_n_ply_budget_of_one_runs_inline(level, match_play):
+    limits, _ = evaluate(level, 1, match_play=match_play)
+    assert limits == []
+    assert BgBotAnalyzer(eval_level=level, parallel_threads=1)._analyzer._inner._parallel_threads == 1
+
+
+@pytest.mark.parametrize("level", ["2ply", "3ply"])
+@pytest.mark.parametrize("match_play", [False, True], ids=["money", "match"])
+def test_n_ply_results_do_not_depend_on_thread_budget(level, match_play):
+    outputs = [evaluate(level, n, match_play=match_play)[1] for n in (1, 2, 4, 0)]
+    assert all(o == outputs[0] for o in outputs)
+
+
+def test_n_ply_cube_action_does_not_depend_on_thread_budget():
+    board = [0, 0, 0, 0, 2, 2, 4, -2, 2, 0, 2, 0, -2, 3, -1, 0, -1, -2, 0, -2, -3, -2, 0, 0, 0, 0]
+    out = [asdict(BgBotAnalyzer(eval_level="3ply", parallel_threads=n).cube_action(board))
+           for n in (1, 2, 4)]
+    assert out[0] == out[1] == out[2]

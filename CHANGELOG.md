@@ -16,6 +16,40 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
 ## [Unreleased]
 
+### Changed
+
+- **An explicit thread budget of one runs inline, and cheap batches start
+  workers only for enough work.**
+  - **Budget of one.** An N-ply `BgBotAnalyzer(parallel_threads=1)` was
+    raised to two threads, and its cubeful checker play started a
+    two-worker pool per call. The money benchmark asks for one thread per
+    analysis because it already runs ten analyses at once. Now an explicit
+    budget is kept as given: with one, the native search runs serially and
+    the per-candidate conversions run inline, with no pool. Pools are also
+    skipped when there is a single candidate.
+  - **Auto mode for cheap batches.** The 1-ply `batch_evaluate` and
+    `batch_post_move_evaluate` cost about 5 us per position, less than
+    starting a worker, yet auto mode started one per core. Now it starts one
+    worker per `CHEAP_POSITIONS_PER_WORKER` (8) positions. Checker play
+    (about 100 us per 1-ply position), N-ply levels and explicit counts are
+    unchanged.
+  - Median, Stage 11, warm `BatchModels`, 1-ply `batch_evaluate` in auto
+    mode:
+
+    | Positions | before | after |
+    |---|---|---|
+    | 4 | 47 us | 24 us |
+    | 16 | 165 us | 97 us |
+    | 32 | 188 us | 136 us |
+    | 256 | 699 us | 703 us |
+
+  - A 415-decision slice of the money benchmark, ten analyses at once with
+    one thread each, gives the same PR in the same time. Its peak thread
+    count falls from 47 to 12 at 3-ply and from 20 to 12 at 2-ply.
+  - Results never depend on the thread count. This is checked at 1-4
+    threads and auto, for the analyzer at 2-ply and 3-ply (money and match)
+    and for both batch paths at 1-ply and 2-ply.
+
 ### Documentation
 
 - `CLAUDE.md` records a paired comparison of the N-ply cube tree's interior
