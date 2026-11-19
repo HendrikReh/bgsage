@@ -36,6 +36,22 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
   retired upstream replay runners stay retired; `CLAUDE.md` no longer
   describes them as working.
 
+- **XG as referee for the folder benchmarks**
+  (`scripts/export_folder_benchmark_xg.py`, `scripts/score_folder_vs_xg.py`).
+  - The export script writes a folder reference's decisions as one-decision
+    `.xg` games.
+  - `score_folder_vs_xg.py picks` computes Sage's picks. `score` grades
+    them against XG and the rollout reference, with paired level
+    differences.
+  - Grading uses only XG's full-depth values, because XG's shallower values
+    are off scale in these positions. `complete` writes the games that let
+    XG analyse the remaining picks.
+  - First use, the snake folder, XG World Class: 3-ply is the best level
+    and 2-ply the worst. Against XG, 3P - 2P is -6.3 +- 1.7 on both
+    references and 3P - 1P is -3.3 +- 1.9 / -2.7 +- 1.8. This settles the
+    disagreement between the two rollout references in favour of the
+    S11-play twin.
+
 ### Changed
 
 - **The 2-ply money contact cube life now rises with the average pip count

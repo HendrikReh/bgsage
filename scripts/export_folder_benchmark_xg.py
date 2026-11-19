@@ -141,14 +141,19 @@ from benchmark_money import BLUNDER_THRESHOLD, PR_MULTIPLIER, _scored  # noqa: E
 from export_pasko_benchmark_xg import (  # noqa: E402
     _build_move_rec, _templates, derive_half_moves, write_xg,
 )
-from score_backgame_pr import cube_subdecisions, load_reference  # noqa: E402
+from score_backgame_pr import cube_subdecisions, load_reference, rollout_file  # noqa: E402
 
 #: The thirteen folder benchmarks (names as ``score_backgame_pr --category`` takes them).
 FOLDERS = ("21 backgame", "31 backgame", "32 backgame", "41 backgame", "42 backgame",
            "51 backgame", "52 backgame", "43 backgame", "53 backgame", "54 backgame",
            "containment", "snake", "massive backgame")
 
-DEFAULT_TEMPLATE = _PROJECT_ROOT / "data" / "money_benchmark" / "xg" / "seed_2.xg"
+#: Any XG-analysed unlimited game with Jacoby + Beaver on. The upstream template
+#: is gone from this fork; the Benchmark PR export's template has the same header.
+DEFAULT_TEMPLATE = next(
+    (p for p in (_PROJECT_ROOT / "data" / "money_benchmark" / "xg" / "seed_2.xg",
+                 _PROJECT_ROOT / "data" / "benchmark_pr_xg" / "template.xg") if p.exists()),
+    _PROJECT_ROOT / "data" / "benchmark_pr_xg" / "template.xg")
 DEFAULT_OUT_DIR = _PROJECT_ROOT / "data" / "backgame_xg"
 DEFAULT_SCORES_DIR = _PROJECT_ROOT / "data" / "backgame_xg_scores"
 DEFAULT_PER_FILE = 200
@@ -378,9 +383,12 @@ def verify_shard(path: Path, games: list[dict]) -> None:
 def _selected_folders(names) -> list[str]:
     if not names:
         return list(FOLDERS)
-    bad = [n for n in names if n not in FOLDERS]
+    # A reference twin rolled out under another player (e.g. "snake s11play",
+    # whose file is "snake s11play rollout.jsonl") is exported like a folder.
+    bad = [n for n in names if n not in FOLDERS and not rollout_file(n).exists()]
     if bad:
-        raise SystemExit(f"Unknown folder(s) {bad}; choose from: {', '.join(FOLDERS)}")
+        raise SystemExit(f"Unknown folder(s) {bad}; choose from: {', '.join(FOLDERS)} "
+                         f"or a reference twin with its own '<name> rollout.jsonl'")
     return list(names)
 
 
