@@ -54,6 +54,36 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
 ### Changed
 
+- **The N-ply batch cube path uses the 1-ply money cube life.**
+  - `batch_evaluate`, `batch_cube_action` and `batch_post_move_evaluate`
+    build no cube tree. At every depth they apply Janowski once, at the root,
+    to cubeless probs. They used the analyzer's 1-ply money cube life at
+    1-ply and the engine's 0.68 from 2-ply on, although `CLAUDE.md` said
+    "at the matching levels".
+  - The analyzer's N-ply values were fitted for the cube tree's 1-ply
+    leaves. The 1-ply value was fitted for exactly this construct, and
+    measured against XG it fits best.
+  - Measured on the money benchmark's 2,196 cube positions (2,842
+    decisions), `batch_cube_action` cube PR against XG, blunders in
+    brackets:
+
+    | Depth | 0.68 | 1-ply value | 2-ply value |
+    |---|---|---|---|
+    | 2-ply | 2.33 (19) | 1.00 (14) | 1.20 (22) |
+    | 3-ply | 1.97 (17) | 1.04 (19) | 1.15 (20) |
+    | 4-ply | 1.98 (12) | 0.94 (12) | 0.95 (15) |
+
+    The paired difference to 0.68 is -1.33 +- 0.12, -0.93 +- 0.14 and
+    -1.04 +- 0.11. The gain holds on both seed halves and against the Sage
+    reference. Against the 2-ply value, the 1-ply value is ahead at 2-ply
+    (-0.19 +- 0.08) and 3-ply (-0.11 +- 0.05) and tied at 4-ply.
+  - Now these paths use the 1-ply value at every depth
+    (`ROOT_JANOWSKI_CUBE_LIFE_PLY`), for money positions only.
+    `scripts/score_batch_cube_life_xg.py` reproduces the table.
+  - This changes the N-ply batch cube decisions and cubeful equities of
+    money contact positions. Match play, races and `batch_checker_play` are
+    unaffected.
+
 - **`cube_action(incl_2ply_details=True)` runs on the evaluation engine.**
   - The per-roll details came from an older recursion in `cube.cpp` that
     differed from the engine behind the plain call in three ways:

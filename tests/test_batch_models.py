@@ -109,8 +109,8 @@ def test_results_equal_the_old_construction(model, level):
     w = MODELS[model]
     n = int(level[0])
     strategy = _old_base(w) if n == 1 else _old_multipy(w, n)
-    kw = dict(contact_x=_contact_cube_life(1), contact_x_pip_slope=_contact_cube_slope(1)) \
-        if n == 1 else {}
+    # The pre-roll batch path uses the 1-ply money cube life at every depth.
+    kw = dict(contact_x=_contact_cube_life(1), contact_x_pip_slope=_contact_cube_slope(1))
     old = bgbot_cpp.batch_evaluate_positions(_cpp_pre_roll(PRE_ROLL), strategy, 2, **kw)
     new = batch_evaluate(PRE_ROLL, eval_level=level, weights=w, n_threads=2,
                          bearoff_db=False)

@@ -56,6 +56,23 @@ from .weights import WeightConfig, WeightConfigPair, bearoff_db_path, default_we
 
 _LEVELS = ("1ply", "2ply", "3ply", "4ply")
 
+#: Cube life of the pre-roll and post-move batch paths: at every depth they
+#: apply Janowski once, at the root, to cubeless probs (N-ply probs from
+#: 2-ply on), with no cube tree. That is the construct the analyzer's 1-ply
+#: money value was fitted for; the N-ply values were fitted for the cube
+#: tree's 1-ply leaves instead. Measured 2026-11-19 against XG on the money
+#: benchmark's 2,196 cube positions (scripts/score_batch_cube_life_xg.py),
+#: batch_cube_action cube PR with the engine's 0.68 / the 1-ply value / the
+#: 2-ply value: 2-ply 2.33 / 1.00 / 1.20, 3-ply 1.97 / 1.04 / 1.15, 4-ply
+#: 1.98 / 0.94 / 0.95. Money only, like the analyzer's (the native side
+#: applies contact_x to money positions alone).
+ROOT_JANOWSKI_CUBE_LIFE_PLY = 1
+
+
+def _root_cube_life_kwargs() -> dict:
+    return dict(contact_x=_contact_cube_life(ROOT_JANOWSKI_CUBE_LIFE_PLY),
+                contact_x_pip_slope=_contact_cube_slope(ROOT_JANOWSKI_CUBE_LIFE_PLY))
+
 
 def _check_level(eval_level: str) -> int:
     """The depth of a batch evaluation level; raises ValueError for any other."""
@@ -239,21 +256,12 @@ def batch_evaluate(
     # is_money(), and the beaver lives on the money paths), so match rows in
     # the same batch ignore the flags and money rows keep them.
 
-    if n_plies == 1:
-        # The money cube life of BgBotAnalyzer at the same depth (the C++
-        # side applies contact_x to money positions only), here and below.
-        raw_results = bgbot_cpp.batch_evaluate_positions(
-            cpp_positions, models.base(), n_threads,
-            jacoby=jacoby, beaver=beaver,
-            contact_x=_contact_cube_life(1),
-            contact_x_pip_slope=_contact_cube_slope(1),
-        )
-    else:
-        raw_results = bgbot_cpp.batch_evaluate_positions(
-            cpp_positions,
-            models.multipy(n_plies, filter_max_moves, filter_threshold),
-            n_threads, jacoby=jacoby, beaver=beaver,
-        )
+    strategy = (models.base() if n_plies == 1 else
+                models.multipy(n_plies, filter_max_moves, filter_threshold))
+    raw_results = bgbot_cpp.batch_evaluate_positions(
+        cpp_positions, strategy, n_threads,
+        jacoby=jacoby, beaver=beaver, **_root_cube_life_kwargs(),
+    )
 
     return [
         PositionEval(
@@ -342,19 +350,11 @@ def batch_post_move_evaluate(
     # each position's match state, so a match row never switches it off for
     # the money rows of the same batch.
 
-    if n_plies == 1:
-        raw_results = bgbot_cpp.batch_evaluate_post_move(
-            cpp_positions, models.base(), n_threads,
-            jacoby=jacoby,
-            contact_x=_contact_cube_life(1),
-            contact_x_pip_slope=_contact_cube_slope(1),
-        )
-    else:
-        raw_results = bgbot_cpp.batch_evaluate_post_move(
-            cpp_positions,
-            models.multipy(n_plies, filter_max_moves, filter_threshold),
-            n_threads, jacoby=jacoby,
-        )
+    strategy = (models.base() if n_plies == 1 else
+                models.multipy(n_plies, filter_max_moves, filter_threshold))
+    raw_results = bgbot_cpp.batch_evaluate_post_move(
+        cpp_positions, strategy, n_threads, jacoby=jacoby, **_root_cube_life_kwargs(),
+    )
     level_label = f"{n_plies}-ply"
 
     return [
@@ -390,7 +390,10 @@ def batch_cube_action(
     Cube decisions use Janowski interpolation on the N-ply cubeless probs
     (same approach as ``batch_evaluate``), **not** the expensive recursive
     N-ply cubeful search from ``cube_decision_nply``.  This is much faster
-    and adequate for most use cases.
+    and adequate for most use cases.  In money positions the conversion uses
+    the analyzer's 1-ply contact cube life at every depth
+    (``ROOT_JANOWSKI_CUBE_LIFE_PLY``): Janowski at the root is the construct
+    that value was fitted for.
 
     Each position dict must contain:
         board: list[int]  — 26-element board from mover's perspective
