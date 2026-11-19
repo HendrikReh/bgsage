@@ -71,6 +71,66 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
     first-seen order. `tests/test_move_generator.py` pins both outputs with
     a digest computed before the change.
 
+- **The legacy N-ply position cache is allocated on first use.**
+  - `MultiPlyStrategy`'s thread-local `PosCache` has 262,144 entries of
+    136 bytes, about 36 MB per thread. Only the old cubeless recursion
+    fills it: the hybrid evaluator and full-depth-opponent mode. The
+    default tree goes through the cubeful engine and never does.
+  - Even so, every thread that called `clear_cache()` allocated the table
+    and zeroed it on each clear. That includes every rollout worker, which
+    clears it at the start of its trials.
+  - Now the table is allocated on its first insert, and a clear zeroes it
+    only when something was inserted since the last one.
+  - Results are byte-identical between the two builds on:
+    - the hybrid and full-depth evaluators, which do use the cache;
+    - 3-ply checker play;
+    - truncated-rollout cube analysis.
+
+    `tests/test_legacy_pos_cache.py` checks that the cache still fills,
+    hits and clears.
+  - Peak memory, Stage 11, two positions (cube action plus checker play):
+
+    | Level | before | after |
+    |---|---|---|
+    | `truncated1`, 10 threads | 1,013-1,026 MB | 503-509 MB |
+    | `truncated1`, 2 threads | 706-710 MB | 436-438 MB |
+    | `3ply`, 10 threads | 349-351 MB | 312-320 MB |
+
+  - A warm `clear_cache()` takes 0.03-0.10 ms instead of 0.20 ms.
+  - Elapsed times are unchanged within noise. They were measured under
+    load from another job (load average ~32).
+
+- **Batch calls load each model once, and can keep it loaded**
+  (`BatchModels`).
+  - Every batch function used to build its strategies from the weight
+    files on every call: ~15 ms for Stage 11, paid even by an empty batch.
+    N-ply checker play paid it twice, because its N-ply strategy loaded a
+    second copy of the base.
+  - Now:
+    - an empty batch checks the level and returns without loading
+      anything;
+    - N-ply strategies are built around the batch's base, through the new
+      `bgbot_cpp.create_multipy_from_base`;
+    - all model types go through `create_strategy`.
+  - A caller-owned `BatchModels` keeps the strategies for later calls. Pass
+    it as `models=` to `batch_evaluate`, `batch_post_move_evaluate`,
+    `batch_cube_action` or `batch_checker_play`.
+  - Results are unchanged. `tests/test_batch_models.py` holds them to
+    strategies built the old way for Stage 11 and Stage 5 at 1-ply and
+    2-ply, counts the factory calls, and runs concurrent calls on one
+    shared `BatchModels`.
+  - Median per call, Stage 11, 10 threads, measured under load from
+    another job (load average ~28):
+
+    | Call | before | after | reused `BatchModels` |
+    |---|---|---|---|
+    | empty batch, 1-ply / 2-ply checker | 20-27 / 65-77 ms | 0.01 / 0.03 ms | 0.00 ms |
+    | 1-ply pre-roll, 1 position | 29-32 ms | 20-31 ms | 0.01 ms |
+    | 2-ply checker, 1 position | 72-83 ms | 40-45 ms | 3.4 ms |
+
+    Batches of 32 and more are dominated by the search, and under this load
+    their timings are noise.
+
 - **Cubeful checker play at 3-ply and deeper skips the cubeless pre-pass.**
   - At these depths every legal move goes through the cube-aware tree,
     which replaces each candidate's probs, both equities and depth label.
