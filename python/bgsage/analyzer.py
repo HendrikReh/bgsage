@@ -929,6 +929,20 @@ class _CubefulAnalyzer:
                 )
             return -opp_eq
 
+    def _uses_cube_aware_tree(self, owner) -> bool:
+        """Whether checker play scores candidates in the N-ply cube-aware tree."""
+        return (
+            isinstance(self._inner, _MultiPlyAnalyzer)
+            and self._cubeful_ply > 1
+            and owner is not None
+        )
+
+    def _searches_every_move(self, owner) -> bool:
+        """Whether every legal move goes through the cube-aware tree, so the
+        cubeless filter-and-search pass has nothing left to decide."""
+        return (self._uses_cube_aware_tree(owner)
+                and self._cubeful_ply not in CUBEFUL_FILTERED_PLIES)
+
     def checker_play_analytics(
         self, board, die1, die2, cube_value=1, cube_owner="centered",
         progress_callback=None,
@@ -939,11 +953,22 @@ class _CubefulAnalyzer:
         inner = self._inner
         is_rollout = isinstance(inner, _RolloutAnalyzer)
 
-        results = inner.checker_play_analytics(
-            board, die1, die2, cube_value, cube_owner, progress_callback,
-            away1=away1, away2=away2, is_crawford=is_crawford, jacoby=jacoby, beaver=beaver, max_cube_value=max_cube_value,
-            force_boards=force_boards,
-        )
+        if self._searches_every_move(owner):
+            # Every legal move goes through the cube-aware tree below, which
+            # replaces its probs, both equities and depth label, and the list
+            # is then re-sorted by a total order: nothing of the cubeless
+            # filter-and-search pass would survive but the boards. So
+            # enumerate them instead of running that pass (12-24% of a 3-ply
+            # call, more with more threads). ``force_boards`` has nothing to
+            # force here: every board is searched.
+            results = [{"board": list(b)}
+                       for b in bgbot_cpp.possible_moves(board, die1, die2)]
+        else:
+            results = inner.checker_play_analytics(
+                board, die1, die2, cube_value, cube_owner, progress_callback,
+                away1=away1, away2=away2, is_crawford=is_crawford, jacoby=jacoby, beaver=beaver, max_cube_value=max_cube_value,
+                force_boards=force_boards,
+            )
         if not results:
             return results
 
@@ -1053,11 +1078,7 @@ class _CubefulAnalyzer:
         # match equity). Otherwise the displayed probs are from MultiPlyStrategy's
         # cubeless tree, where the opponent picks gammon-greedy moves in match
         # play. The fix mirrors the post_move_analytics path.
-        use_cube_aware_probs = (
-            isinstance(inner, _MultiPlyAnalyzer)
-            and self._cubeful_ply > 1
-            and owner is not None
-        )
+        use_cube_aware_probs = self._uses_cube_aware_tree(owner)
 
         if use_cube_aware_probs:
             total_threads = getattr(inner, "_parallel_threads", 1) or 1

@@ -54,6 +54,21 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
 ### Changed
 
+- **Cubeful checker play at 3-ply and deeper skips the cubeless pre-pass.**
+  - At these depths every legal move goes through the cube-aware tree,
+    which replaces each candidate's probs, both equities and depth label.
+    The cubeless filter-and-search pass that ran first decided nothing, so
+    the wrapper now only enumerates the legal boards.
+  - Results are unchanged: the full ordered move list matches the old path
+    field for field (`tests/test_cubeful_full_width.py`: contact, bearoff,
+    a blocked roll, a root-pinned snake, Crawford, capped and
+    opponent-owned cubes, `force_boards`).
+  - Measured on 24 random positions with the CPU loaded by another job, so
+    only the ratios hold: 3-ply total time -17% with 2 threads and -14% with
+    10 threads (median -18% / -37%), 4-ply -14% (8 positions, 10 threads).
+  - 2-ply keeps the pass: its filter and promotion pick which moves the
+    cube-aware tree searches.
+
 - **Cubeful 2-ply checker play now searches only the 1-ply filter's
   survivors** (`CUBEFUL_FILTERED_PLIES` in `analyzer.py`).
   - It used to score every legal move in the cube-aware 2-ply tree. In
