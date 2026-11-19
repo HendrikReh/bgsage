@@ -38,6 +38,23 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
 ### Changed
 
+- **The 1-ply money contact cube life now rises with the average pip
+  count**: x = 0.7375 + 0.00175 x (average pips - 120), about 0.66 at 75
+  pips and 0.79 at 150 (`MONEY_CONTACT_CUBE_LIFE_PIP_SLOPE` in
+  `analyzer.py`).
+  - Fitted to XG World Class's cube decisions on the money benchmark's 2,196
+    cube positions (`scripts/fit_contact_cube_life.py`). Fitted on half the
+    seeds and scored on the other half, the 1-ply cube PR falls by
+    0.34 +- 0.11 against XG and 0.45 +- 0.11 against the Sage reference,
+    compared with a flat cube life fitted the same way.
+  - Undoes most of the blunder increase of the flat 0.75: 1-ply cube
+    blunders against XG 42 -> 33.
+  - Money benchmark at 1-ply: cube PR 2.36 -> 1.89, checker play unchanged.
+    2-ply and deeper, races, match play and rollouts are untouched.
+  - Engine: new `CubeInfo.contact_x_pip_slope` and `contact_cube_x()`; every
+    binding that takes `contact_x` takes `contact_x_pip_slope`. C++ callers
+    that don't pass it are bit-identical.
+
 - **Money cube analysis at 1-ply and 2-ply uses a higher contact cube life**
   (0.75 and 0.80 instead of 0.68; `MONEY_CONTACT_CUBE_LIFE` in
   `analyzer.py`).

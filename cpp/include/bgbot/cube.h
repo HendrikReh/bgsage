@@ -33,6 +33,11 @@ struct CubeInfo {
     // analysis (the 1-ply Janowski leaf otherwise over-doubles at 1-ply and
     // 2-ply). Default -1 keeps every C++ caller on cube_efficiency().
     float contact_x = -1.0f;
+    // With contact_x set: the contact cube life rises by this much per pip
+    // of the AVERAGE pip count above CONTACT_X_PIP_PIVOT (see
+    // contact_cube_x()). 0 keeps contact_x flat. The average makes it the
+    // same from either side, as the race formula in cube_efficiency() does.
+    float contact_x_pip_slope = 0.0f;
 
     bool is_money() const { return match.is_money(); }
 
@@ -63,6 +68,7 @@ inline CubeInfo flip_cube_perspective(const CubeInfo& cube) {
     opp.beaver = cube.beaver;
     opp.max_cube_value = cube.max_cube_value;
     opp.contact_x = cube.contact_x;
+    opp.contact_x_pip_slope = cube.contact_x_pip_slope;
     return opp;
 }
 
@@ -205,6 +211,14 @@ float cube_efficiency(
     bool is_race_pos,
     int player_pips,
     int opponent_pips);
+
+// Average pip count at which contact_cube_x() returns contact_x itself.
+constexpr float CONTACT_X_PIP_PIVOT = 120.0f;
+
+// Contact cube life under `cube` (contact_x must be set):
+// clamp(contact_x + contact_x_pip_slope * (avg_pips - CONTACT_X_PIP_PIVOT),
+// 0.5, 1.0). The clamp is a guard; fitted slopes stay well inside it.
+float contact_cube_x(const CubeInfo& cube, int player_pips, int opponent_pips);
 
 // Cube efficiency for a position under `cube`: cube_x_override if set, else
 // cube_efficiency(), with cube.contact_x replacing it for contact positions.

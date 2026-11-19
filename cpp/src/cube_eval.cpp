@@ -144,6 +144,8 @@ uint64_t cube_fp_one(uint64_t h, const CubeInfo& c) {
                       static_cast<int32_t>(c.cube_x_override * 4096.0f)) + 31);
     h = fp_mix(h, static_cast<uint32_t>(
                       static_cast<int32_t>(c.contact_x * 4096.0f)) + 37);
+    h = fp_mix(h, static_cast<uint32_t>(
+                      static_cast<int32_t>(c.contact_x_pip_slope * 1048576.0f)) + 41);
     return h;
 }
 
@@ -386,6 +388,7 @@ void leaf_from_post_probs(
         pre_roll_probs,
         (cci > 0 && aci_in[0].cube_value > 0) ? aci_in[0] : CubeInfo{},
         board, race);
+    auto [leaf_pp, leaf_op] = pip_counts(board);
 
     CubeInfo aci[EVAL_MAX_CCI * 2];
     make_cube_pos_local(aci_in, cci, fTop, aci, false);
@@ -401,7 +404,8 @@ void leaf_from_post_probs(
             continue;
         }
         float x = (aci[i].cube_x_override >= 0.0f) ? aci[i].cube_x_override
-                   : (!race && aci[i].contact_x >= 0.0f) ? aci[i].contact_x
+                   : (!race && aci[i].contact_x >= 0.0f)
+                       ? contact_cube_x(aci[i], leaf_pp, leaf_op)
                    : default_x;
         if (aci[i].is_money()) {
             arCf[i] = cl2cf_money(pre_roll_probs, aci[i].owner, x,

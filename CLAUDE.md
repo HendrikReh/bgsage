@@ -1794,13 +1794,18 @@ with the GIL automatically acquired.
 Janowski interpolation for both money games and match play. Optional Jacoby rule
 for unlimited games (default on in Python API). Cube efficiency: 0.68 contact,
 pip-dependent for race (unchanged for match play). The Python API raises the
-contact value for money analysis at 1-ply and 2-ply (next section).
+contact value for money analysis at 1-ply and 2-ply, and at 1-ply makes it rise
+with the average pip count (next section).
 
 ### Cube life by depth (money)
 
 `BgBotAnalyzer` and the `bgsage.batch` functions use a higher Janowski cube
 life for CONTACT positions in money analysis at 1-ply and 2-ply:
-`MONEY_CONTACT_CUBE_LIFE = {1: 0.75, 2: 0.80}` in `analyzer.py`. Races keep
+`MONEY_CONTACT_CUBE_LIFE = {1: 0.7375, 2: 0.80}` in `analyzer.py`. At 1-ply
+the value also rises with the average pip count,
+`MONEY_CONTACT_CUBE_LIFE_PIP_SLOPE = {1: 0.00175}`: x = 0.7375 + 0.00175 x
+(average pips - 120), about 0.66 at 75 pips and 0.79 at 150 (see "Pip slope
+at 1-ply" below). Races keep
 their pip-based value, match play and 3-ply and deeper keep 0.68, and
 rollout levels are untouched.
 
@@ -1824,7 +1829,14 @@ the cube efficiency of contact positions only. This differs from
 `cube.cpp` is the one place that resolves it. The bindings take `contact_x`;
 `batch_checker_play` takes `contact_x_1ply` / `contact_x_nply`, and the batch
 bindings apply it to money positions only. C++ callers that don't pass it are
-bit-identical to before.
+bit-identical to before. `CubeInfo.contact_x_pip_slope` (default 0, flat)
+makes the contact value `contact_x + slope * (average pips - 120)`, clamped
+to [0.5, 1.0] (`contact_cube_x()` in `cube.cpp`, bound as
+`bgbot_cpp.contact_cube_x`). Each position takes its own pip count, at the
+root and at every leaf, so the value is the same from either side, as the
+race formula's is. Every binding that takes `contact_x` also takes
+`contact_x_pip_slope` (`contact_x_pip_slope_1ply` / `_nply` for
+`batch_checker_play`), and the slope is part of the cubeful cache key.
 
 **Tuning.** Tuned 2026-11-18 on the odd seeds of the money benchmark's 2,842
 cube decisions and checked on the even seeds. Cube PR, old -> new:
@@ -1855,8 +1867,8 @@ Checker play is unaffected within noise (paired: 1-ply +0.017 +- 0.011, 2-ply
 | massive | 6.97 / 6.46 -> 3.42 / 2.32 | 8.49 / 7.97 -> 4.23 / 3.09 |
 
 Caveats:
-- At 1-ply the cube PR falls but cube blunders rise (29 -> 39 on the full
-  set).
+- At 1-ply the flat 0.75 cut the cube PR but raised cube blunders (29 -> 39
+  on the full set); the pip slope below brings them back down.
 - Match play is excluded because the same values do not help on the 5-point
   match benchmark: 1-ply 2.35 -> 2.38, 2-ply 1.58 -> 1.82. 0.75 at 2-ply gave
   1.32 there, but without a held-out check.
@@ -1895,6 +1907,41 @@ On the held-out even seeds against XG (1,107 positions):
 So the 2-ply gain is confirmed independently. The 1-ply value helps on
 average, but it trades many small over-doubles for a few missed clear
 doubles: blunders rise under every reference.
+
+**Pip slope at 1-ply** (2026-11-18). `scripts/fit_contact_cube_life.py
+--xg-dir data/money_cube_xg` fits the contact cube life to XG's verdicts on
+the same 2,196 positions. It sweeps a flat cube life from 0.55 to 1.00 per
+position at 1-ply and 2-ply. At 1-ply a cube decision is one Janowski
+conversion of the position itself, so the sweep scores any model that takes
+x from the position's own pips exactly. Of the features tried, only the
+pip count held up on both seed halves at both levels: the best cube life is
+lower late in the game (about 0.65 under 100 average pips, 0.80 over 130)
+and lower when the doubler trails in the race, but the race standing adds
+nothing once the average pip count is in. Gammon rate, plan pair, P(win) and
+cube ownership gave no optimum that held across halves.
+
+Fitted on one half of the seeds against XG and scored on the other, both ways
+round (cube PR, blunders in brackets):
+
+| 1-ply, out of fold | vs XG | vs Sage reference |
+|---|---|---|
+| flat cube life (refitted the same way) | 2.07 (40) | 2.49 (37) |
+| pip slope | 1.73 (35) | 2.04 (37) |
+| paired, slope - flat | -0.34 +- 0.11 | -0.45 +- 0.11 |
+
+The two halves give slopes of 0.00250 and 0.00175 per pip; the shipped
+values (0.7375, 0.00175) are the fit on all seeds. With the engine
+implementation, against the flat 0.75 of the previous table (the same
+positions the fit used, so in sample): cube PR 2.00 (42) -> 1.62 (33) vs XG
+and 2.36 (39) -> 1.89 (34) vs the Sage reference. Full money benchmark at
+1-ply: total PR 2.43 -> 2.35, cube 2.36 -> 1.89, checker 2.441 -> 2.435
+(paired -0.006 +- 0.010; 30 of 14,693 picks change).
+
+2-ply keeps the flat 0.80 and is bit-identical. The sweep, which can only
+apply the root's value to the whole 2-ply tree, hints at a gain there too
+(out of fold -0.13 +- 0.07 vs XG, -0.18 +- 0.10 vs the Sage reference, same
+slope 0.00175), but only an engine run that gives every leaf its own value
+can confirm it. The slope is money only, like the rest of the table.
 
 Tests: `tests/test_contact_cube_life.py`. `tests/test_2ply_details.py` pins
 the table empty, because it compares an N-ply tree's interior with
