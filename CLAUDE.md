@@ -2134,6 +2134,25 @@ this array:
   `aciCubePos[0]`) — captures match-awareness throughout the tree without per-cube
   forking. For multi-cube callers (e.g. `cube_decision_nply` carrying ND+DT) the pick
   is biased toward `cubes[0]`; this matches the rollout's shared-board MVP.
+  **Measured against a cubeless pick (2026-11-19)**: an experiment switch made
+  every interior pick by money cubeless equity instead (same prefilter and
+  tie-break), and the benchmarks were rescored with paired per-decision
+  differences (cubeless - cubeful, PR):
+
+  | Benchmark | 2-ply | 3-ply |
+  |---|---|---|
+  | money benchmark (17,535 decisions) | -0.000 +- 0.005 | -0.011 +- 0.007 |
+  | money cube decisions vs XG (2,196 positions) | -0.007 +- 0.015 | -0.027 +- 0.014 |
+  | 5-point match benchmark (18,292 decisions) | **+0.028 +- 0.009** | **+0.029 +- 0.012** |
+
+  The cubeful pick is clearly better in match play: there the cubeless pick
+  plays worse checker moves (3-ply checker +0.034 +- 0.013, checker blunders
+  5 -> 9), because it ignores what gammons are worth at the score. In money
+  play the two are level within noise (no gap reaches two standard errors,
+  blunder counts unchanged), so a money-only cubeless pick would gain at most
+  ~0.01 PR, unproven. The rule stays cubeful everywhere. (The 3-ply
+  "deeper value" comparison in the #36 notes compared two different trees and
+  is not evidence either way.)
 - Janowski `x` is applied at 1-ply leaf nodes for the final cubeful conversion AND
   at interior nodes for the cubeful move-pick (using each candidate's own cube_x)
 - The cci array grows and shrinks at each level (1->2->4->...->collapse back)

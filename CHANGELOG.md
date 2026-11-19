@@ -16,6 +16,17 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
 ## [Unreleased]
 
+### Documentation
+
+- `CLAUDE.md` records a paired comparison of the N-ply cube tree's interior
+  move pick (1-ply cubeful against the primary cube state) against a
+  cubeless pick, made with an experiment switch that was not merged. In the
+  5-point match benchmark the cubeless pick is clearly worse (total PR
+  +0.028 +- 0.009 at 2-ply, +0.029 +- 0.012 at 3-ply; 3-ply checker
+  blunders 5 -> 9). In money play the two are level within noise (money
+  benchmark 3-ply -0.011 +- 0.007, cube decisions against XG 3-ply
+  -0.027 +- 0.014). The engine keeps the cubeful pick.
+
 ## [2.0.20261119] - 2026-11-19
 
 ### Added
