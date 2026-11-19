@@ -38,6 +38,19 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
 ### Changed
 
+- **The 2-ply money contact cube life now rises with the average pip count
+  too**: x = 0.7625 + 0.00125 x (average pips - 120), about 0.71 at 75 pips
+  and 0.80 at 150, instead of a flat 0.80. Every leaf of the 2-ply tree takes
+  its own pip count.
+  - Fitted to XG World Class's cube decisions on the money benchmark's 2,196
+    cube positions. `scripts/fit_contact_cube_life.py` now plays every grid
+    point through the engine, so it scores the leaves' own values at 2-ply.
+  - Fitted on half the seeds and scored on the other half, against a flat
+    cube life fitted the same way: 2-ply cube PR -0.19 +- 0.08 against XG
+    and -0.22 +- 0.09 against the Sage reference; cube blunders against XG
+    16 -> 10.
+  - Money benchmark at 2-ply: cube PR 1.31 -> 1.04 (cube blunders 19 -> 12),
+    checker play unchanged.
 - **The 1-ply money contact cube life now rises with the average pip
   count**: x = 0.7375 + 0.00175 x (average pips - 120), about 0.66 at 75
   pips and 0.79 at 150 (`MONEY_CONTACT_CUBE_LIFE_PIP_SLOPE` in

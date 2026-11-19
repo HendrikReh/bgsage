@@ -127,19 +127,22 @@ SERIAL_CUBEFUL_1PLY = True
 #: benchmark's 2,842 cube decisions and checked on the even ones (cube PR
 #: 1-ply 3.06 -> 2.53, 2-ply 2.78 -> 1.27). Races keep their pip-based
 #: value. Not applied to match play: on the 5-point match benchmark the same
-#: values do not help (1-ply 2.35 -> 2.38, 2-ply 1.58 -> 1.82). At 1-ply the
-#: value is the one at 120 average pips; the slope below makes it rise with
-#: the pip count (it replaced a flat 0.75).
-MONEY_CONTACT_CUBE_LIFE: dict[int, float] = {1: 0.7375, 2: 0.80}
+#: values do not help (1-ply 2.35 -> 2.38, 2-ply 1.58 -> 1.82). The values
+#: are the ones at 120 average pips; the slopes below make them rise with
+#: the pip count (they replaced a flat 0.75 and 0.80).
+MONEY_CONTACT_CUBE_LIFE: dict[int, float] = {1: 0.7375, 2: 0.7625}
 
 #: Per-pip slope of the contact cube life above, by depth: the engine uses
 #: ``MONEY_CONTACT_CUBE_LIFE[n] + slope * (average pips - 120)`` (clamped to
-#: [0.5, 1.0]), so at 1-ply the cube life runs from about 0.66 at 75 pips to
-#: 0.79 at 150. Fitted at 1-ply to XG World Class's cube decisions on the
-#: money benchmark's cube positions, half the seeds at a time; scored on the
-#: other half, cube PR 2.00 -> 1.61 against XG and 2.36 -> 1.93 against the
-#: Sage reference, with fewer blunders. At 2-ply no slope beat the flat 0.80.
-MONEY_CONTACT_CUBE_LIFE_PIP_SLOPE: dict[int, float] = {1: 0.00175}
+#: [0.5, 1.0]) for every position it converts, root and leaves alike, so at
+#: 1-ply the cube life runs from about 0.66 at 75 pips to 0.79 at 150, and
+#: at 2-ply from 0.71 to 0.80. Fitted to XG World Class's cube decisions on
+#: the money benchmark's cube positions, half the seeds at a time; scored on
+#: the other half against a flat cube life fitted the same way, cube PR
+#: 2.07 -> 1.68 (1-ply) and 1.09 -> 0.90 (2-ply) against XG, 2.49 -> 1.98
+#: and 1.44 -> 1.21 against the Sage reference, with fewer blunders
+#: (scripts/fit_contact_cube_life.py).
+MONEY_CONTACT_CUBE_LIFE_PIP_SLOPE: dict[int, float] = {1: 0.00175, 2: 0.00125}
 
 
 def _contact_cube_life(n_plies: int, away1: int = 0, away2: int = 0) -> float:
