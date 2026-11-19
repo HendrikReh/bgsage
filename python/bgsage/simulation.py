@@ -97,6 +97,14 @@ def _players(players):
     return players
 
 
+def _decide(player, board, context):
+    """The player's cube decision: ``cube_decision`` when the policy offers
+    it (BgBotAnalyzer does; it skips the probabilities the simulation never
+    reads), else ``cube_action``. Both give the same flags."""
+    decide = getattr(player, "cube_decision", None) or player.cube_action
+    return decide(list(board), **context)
+
+
 def _check_cancel(cancel):
     if cancel is not None and cancel():
         raise SimulationCancelled('simulation cancelled')
@@ -158,11 +166,11 @@ def simulate_game(*, seed: int = 42, config: GameConfig | None = None,
                 **context, 'cube_action': None, 'dice': None, 'post_board': None}
         turns.append(turn)
         if not opening and not cfg.is_crawford and owner != 'opponent' and cube < cfg.max_cube_value:
-            offer = players[active - 1].cube_action(list(board), **context)
+            offer = _decide(players[active - 1], board, context)
             turn['cube_action'] = 'no_double'
             if offer.should_double:
                 _check_cancel(cancel)
-                response = players[2 - active].cube_action(list(board), **context)
+                response = _decide(players[2 - active], board, context)
                 if not response.should_take:
                     turn['cube_action'] = 'double/pass'
                     return finish(active, 1, 'pass')

@@ -5756,7 +5756,8 @@ PYBIND11_MODULE(bgbot_cpp, m) {
                                             bool beaver, int max_cube_value, float contact_x, float contact_x_pip_slope,
                                             const BearoffDB* bearoff_db,
                                             bool incl_2ply_details,
-                                            std::shared_ptr<Strategy> strategy) {
+                                            std::shared_ptr<Strategy> strategy,
+                                            bool decision_only) {
         if (incl_2ply_details && n_plies < 2) {
             throw std::invalid_argument(
                 "incl_2ply_details requires n_plies >= 2");
@@ -5784,22 +5785,29 @@ PYBIND11_MODULE(bgbot_cpp, m) {
             } else {
                 cd = cube_decision_nply(board, ci, *base_strat, n_plies, filter, n_threads, &pubeval_filter);
             }
-            Board flipped = flip(board);
-            MultiPlyStrategy multipy(base_strat, n_plies, filter,
-                                     /*full_depth_opponent=*/false,
-                                     /*parallel_evaluate=*/n_threads > 1,
-                                     /*parallel_threads=*/n_threads);
-            if (bearoff_db && bearoff_db->is_loaded()) {
-                multipy.set_bearoff_db(bearoff_db);
+            if (!decision_only) {
+                Board flipped = flip(board);
+                MultiPlyStrategy multipy(base_strat, n_plies, filter,
+                                         /*full_depth_opponent=*/false,
+                                         /*parallel_evaluate=*/n_threads > 1,
+                                         /*parallel_threads=*/n_threads);
+                if (bearoff_db && bearoff_db->is_loaded()) {
+                    multipy.set_bearoff_db(bearoff_db);
+                }
+                auto post_probs = multipy.evaluate_probs(flipped, flipped);
+                multipy.clear_cache();
+                pre_roll_probs = invert_probs(post_probs);
+                cl_eq = cubeless_equity(pre_roll_probs);
             }
-            auto post_probs = multipy.evaluate_probs(flipped, flipped);
-            multipy.clear_cache();
-            pre_roll_probs = invert_probs(post_probs);
-            cl_eq = cubeless_equity(pre_roll_probs);
         }
         py::dict result;
-        result["probs"] = pre_roll_probs;
-        result["cubeless_equity"] = cl_eq;
+        // decision_only skips the separate cubeless N-ply search behind these
+        // two fields (about half the call at 2-ply, two thirds at 3-ply): the
+        // decision and its equities come from the cube tree alone.
+        if (!decision_only) {
+            result["probs"] = pre_roll_probs;
+            result["cubeless_equity"] = cl_eq;
+        }
         result["equity_nd"] = cd.equity_nd;
         result["equity_dt"] = cd.equity_dt;
         result["equity_dp"] = cd.equity_dp;
@@ -5829,5 +5837,6 @@ PYBIND11_MODULE(bgbot_cpp, m) {
        py::arg("contact_x") = -1.0f,
        py::arg("contact_x_pip_slope") = 0.0f,
        py::arg("bearoff_db") = nullptr,
-       py::arg("incl_2ply_details") = false, py::arg("strategy") = nullptr);
+       py::arg("incl_2ply_details") = false, py::arg("strategy") = nullptr,
+       py::arg("decision_only") = false);
 }
