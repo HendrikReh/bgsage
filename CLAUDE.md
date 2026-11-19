@@ -3229,7 +3229,46 @@ disagree widely here:
   46.3).
 - Sage costs 31-39 against XG.
 - XG's own figures are a mix of 4-ply and Roller+.
-- `XG Roller++` would be the stronger referee if a closer call needs one.
+
+*Why XG and the rollouts disagree in snakes (2026-11-19).* XG misjudges
+the positions themselves. The cube and the move ranking are not the cause:
+- **Values, same move, cubeless.** XG's offset from either Sage rollout
+  has sd 0.39 equity per decision (P(win) sd 0.12). The two Sage rollouts
+  (S9 play, S11 play) agree to 0.07 (P(win) 0.022). In ordinary contact
+  positions XG and Sage agree to 0.009 in P(win) (Benchmark PR sample, XG
+  4-ply #1 against Sage 2-ply).
+- **Not the cube.** Graded on shared moves, XG's #1 costs PR 24.2 against
+  the rollout cubeful, and its cubeless pick costs 17.7 graded cubeless.
+  Within each engine, switching between cubeful and cubeless ranking
+  changes little (PR 1.3 for the rollout, 5.4 for XG).
+- **One-sided.** XG rates the trapped side higher. When the mover holds
+  the snake, XG's cubeless equity is 0.27 (4-ply) / 0.34 (Roller+) below
+  the rollouts, with 0.11 more gammon losses. When the mover is trapped,
+  it is 0.17 / 0.40 above. The worst cases have one straggler in front of
+  a full far-side prime, the trapped side with 14 checkers home and none
+  off, and the holder ~240 pips behind. There XG gives the trapped side
+  +1.25 and the rollouts -0.34.
+- **XG's net is outside its range.** 14% of XG's full-depth 4-ply
+  evaluations are impossible probability vectors (gammon loss above total
+  loss, or gammon win above win). They occur in 130 of 696 decisions,
+  against none in 600 contact decisions.
+- **XG's levels disagree with each other.** XG analysed 123 positions at
+  4-ply in one copy and Roller+ in the other. Its values for the same
+  moves differ by sd 0.34 between the two. On the 79 of them the rollouts
+  cover, Roller+ is further from the rollouts than 4-ply (offset sd 0.42
+  vs 0.22, pick PR 4.7 vs 2.5), so `XG Roller++` would not settle it.
+- **The rollouts are robust to trial play.** Re-rolling 40 XG #1 boards
+  with 1-ply play (Stage 9 and stage11 alike) moves their values by
+  0.13-0.15. On the 25 largest disagreements every one moves toward XG,
+  but by only 0.15 of a 1.24 gap. GNUbg 2-ply, an independent net, lands
+  nearer the rollouts than XG on 23 of those 25.
+- **Where XG's error comes from.** Where XG's level is within 0.2 of the
+  rollouts (422 / 399 decisions), XG's #1 costs PR 10.1 / 7.0 against
+  them. The decisions off by more than 0.5 (200 / 97) cost 51 / 40 and
+  carry 57% / 44% of its error.
+
+So in snakes the rollouts are the better reference. The XG verdicts above
+count where they agree with the twin, not as an independent arbiter.
 
 Where the widened rule costs something. A control run (the arm disabled,
 same completed references) reproduces the widened-rule containment-folder
