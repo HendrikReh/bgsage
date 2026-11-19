@@ -1437,7 +1437,11 @@ Default TINY: 5 moves, 0.08 threshold.
 candidates keep their 1-ply equity, which is not on the survivors' N-ply
 scale, so whichever of #1/#2 is stale is promoted (evaluated at N-ply) and
 the list re-sorted until both are full-depth. See Stage 11s for the bug
-this replaced.
+this replaced. Cubeful checker play (`cubeful=True`) follows the same rule
+at 2-ply: only the survivors (and promotions) go through the cube-aware
+tree. At 3-ply and deeper it scores every legal move there
+(`CUBEFUL_FILTERED_PLIES` in `analyzer.py`; see "The cause of the snake
+2-ply gap" under Stage 11s).
 
 ### Iterative Deepening Filter Chain
 
@@ -2967,8 +2971,9 @@ Open Sage net has shown in the region. **Why 2-ply scores worse than 1-ply
    that move topped the list without ever being evaluated: 312 of the 795
    cubeless 2-ply picks were such moves, carrying 55 of that level's 68 PR
    points, against 31 for a faithful 2-ply of the survivors alone. The
-   cubeful wrapper was immune (it re-scores every candidate through the
-   cube-aware N-ply tree), so the benchmark tables never saw it, but the C++
+   cubeful wrapper was immune (it then re-scored every candidate through the
+   cube-aware N-ply tree; at 2-ply it no longer does, see "The cause of the
+   snake 2-ply gap"), so the benchmark tables never saw it, but the C++
    `batch_checker_play` overloads — the app's analytics path — promoted only
    the runner-up in the same way. Both now promote whichever of the top two
    still carries a 1-ply value until both are full-depth
@@ -3136,6 +3141,49 @@ What it shows:
   twin. So the "2-ply anomaly is gone" of point (1) holds only on the
   S9-play reference. Picks from before the cube-life change show the same
   gap (+3.3 / +3.8 vs XG), so it is not caused by that change.
+  The cause and the fix are in the next paragraph.
+
+*The cause of the snake 2-ply gap (2026-11-19).* Cubeful checker play
+scored every legal move in the cube-aware 2-ply tree. It skipped the 1-ply
+move filter that cubeless N-ply and `batch_checker_play` apply. In 103 of
+the 795 snake checker decisions the pick was a move the filter had pruned:
+- At 1-ply that move ranked 7th (median), 0.11 behind the filtered pick.
+- 2-ply valued it 0.044 above the filtered pick.
+- XG and both rollouts put it 0.04-0.06 below.
+- 92 of the 103 are holder decisions, mostly releases. The decisions have
+  many legal moves (median 45), and the more candidates compete, the more
+  surely the maximum lands on an over-valued one.
+
+Not the cause: the cube life (0.68 to 1.0 changes ~25 picks, the gap
+stays), the Jacoby rule, and cubeful versus cubeless conversion at 1-ply
+(the two pick alike). Switching root routing off moves 2-ply in opposite
+directions under the two kinds of reference (XG -5.6, both rollouts +10).
+That is a separate disagreement, still open.
+
+At 2-ply, cubeful checker play now searches only the filter's survivors.
+The pruned moves keep 1-ply Janowski values and enter the search only
+through the stale-top-two promotion (`CUBEFUL_FILTERED_PLIES` in
+`analyzer.py`, `tests/test_cubeful_nply_filter.py`). Paired against the
+old 2-ply, checker PR on the snake folder:
+
+| Reference | vs XG | vs rollout |
+|---|---|---|
+| S9-play | -2.73 +- 0.66 | -2.85 +- 0.70 |
+| S11-play twin | -2.51 +- 0.66 | -2.15 +- 0.65 |
+
+That brings 2-ply level with 1-ply in snakes, not ahead of it. Elsewhere at
+2-ply the change is neutral, and it runs 2.2-2.4x faster:
+- money benchmark: checker 1.40 -> 1.38, paired -0.016 +- 0.022, blunders
+  40 -> 37, 45 s -> 19 s;
+- 5-point match benchmark: checker 1.22 -> 1.22, paired +0.001 +- 0.012,
+  43 s -> 20 s;
+- ten backgame folders pooled: -0.04 +- 0.02;
+- containment, massive and `Positions XG gets wrong`: within noise.
+
+3-ply keeps the full search. With the filter, the money benchmark's 3-ply
+checker PR rose 0.59 -> 0.64 (paired +0.044 +- 0.011; 124 decisions worse,
+62 better), although it helped the snake folder against the rollouts
+(-5.3 +- 1.7 and -2.2 +- 0.7) and was neutral against XG.
 
 Read only the ranking of the levels. In absolute terms XG and the rollouts
 disagree widely here:
