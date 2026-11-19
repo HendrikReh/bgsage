@@ -9,7 +9,8 @@ unless given one, the N-ply strategy is built around the same base
 (``create_multipy_from_base``), and an empty batch loads nothing.
 
 These tests hold the results to strategies built the old way (one
-create_strategy / create_multipy per call) and count the factory calls.
+create_strategy / create_multipy per call, no bearoff database) and count
+the factory calls.
 """
 
 import os
@@ -111,7 +112,8 @@ def test_results_equal_the_old_construction(model, level):
     kw = dict(contact_x=_contact_cube_life(1), contact_x_pip_slope=_contact_cube_slope(1)) \
         if n == 1 else {}
     old = bgbot_cpp.batch_evaluate_positions(_cpp_pre_roll(PRE_ROLL), strategy, 2, **kw)
-    new = batch_evaluate(PRE_ROLL, eval_level=level, weights=w, n_threads=2)
+    new = batch_evaluate(PRE_ROLL, eval_level=level, weights=w, n_threads=2,
+                         bearoff_db=False)
     for o, r in zip(old, new):
         assert r.cubeful_equity == o["cubeful_equity"]
         assert r.equity_nd == o["equity_nd"] and r.equity_dt == o["equity_dt"]
@@ -133,7 +135,8 @@ def test_results_equal_the_old_construction(model, level):
             contact_x_nply=_contact_cube_life(n),
             contact_x_pip_slope_nply=_contact_cube_slope(n),
             cubeful_filtered_plies=sorted(CUBEFUL_FILTERED_PLIES))
-    new_cp = batch_checker_play(POSITIONS, eval_level=level, weights=w, n_threads=2)
+    new_cp = batch_checker_play(POSITIONS, eval_level=level, weights=w, n_threads=2,
+                                bearoff_db=False)
     for o, r in zip(old_cp, new_cp):
         assert [(tuple(m["board"]), m["equity"], m["eval_level"]) for m in o["moves"]] == \
             [(tuple(m.board), m.equity, m.eval_level) for m in r.moves]
@@ -237,3 +240,31 @@ def test_concurrent_calls_can_share_models():
         t.join()
     assert not errors
     assert results == [expected] * 4
+
+
+# ---------------------------------------------------------------------------
+# The bearoff database
+# ---------------------------------------------------------------------------
+
+
+BEAROFF = [0, 3, 3, 2, 3, 2, 2] + [0] * 12 + [-2, -3, -2, -3, -2, -2] + [0]
+
+
+def test_the_bearoff_database_is_loaded_once_and_matches_the_analyzer():
+    from bgsage import BgBotAnalyzer
+    a, b = BatchModels(), BatchModels()
+    assert a.bearoff_db is not None and a.bearoff_db is b.bearoff_db
+    assert BatchModels(bearoff_db=False).bearoff_db is None
+    rows = [dict(board=BEAROFF, cube_value=1, cube_owner="centered")]
+    analyzer = BgBotAnalyzer(eval_level="1ply")
+    assert batch_evaluate(rows, models=a)[0].equity_nd == \
+        pytest.approx(analyzer.cube_action(BEAROFF).equity_nd, abs=1e-6)
+    assert batch_post_move_evaluate(rows, models=a)[0].cubeful_equity == pytest.approx(
+        analyzer.post_move_analytics(BEAROFF, cube_owner="centered").cubeful_equity, abs=1e-6)
+    assert batch_evaluate(rows, models=a)[0].equity_nd != \
+        batch_evaluate(rows, bearoff_db=False)[0].equity_nd
+
+
+def test_bearoff_db_goes_with_weights_not_models():
+    with pytest.raises(ValueError):
+        batch_evaluate(PRE_ROLL[:1], models=BatchModels(), bearoff_db=False)

@@ -41,6 +41,7 @@ batches load them once instead by passing a :class:`BatchModels`::
 
 from __future__ import annotations
 
+import functools
 import os
 import threading
 from dataclasses import dataclass
@@ -51,7 +52,7 @@ from .analyzer import (
     CUBEFUL_FILTERED_PLIES, _contact_cube_life, _contact_cube_slope, resolve_owner,
 )
 from .types import CheckerPlayResult, CubeActionResult, MoveAnalysis, PostMoveAnalysis, Probabilities
-from .weights import WeightConfig, WeightConfigPair, default_weights
+from .weights import WeightConfig, WeightConfigPair, bearoff_db_path, default_weights
 
 _LEVELS = ("1ply", "2ply", "3ply", "4ply")
 
@@ -66,6 +67,14 @@ def _check_level(eval_level: str) -> int:
     return int(eval_level[0])
 
 
+@functools.lru_cache(maxsize=None)
+def _load_bearoff_db(path: str):
+    """The bearoff database at `path`, loaded once per process (it is
+    immutable once loaded), or None when it does not load."""
+    db = bgbot_cpp.BearoffDB()
+    return db if db.load(path) else None
+
+
 class BatchModels:
     """Loaded strategies for the batch functions, owned by the caller.
 
@@ -75,23 +84,38 @@ class BatchModels:
     once, on first use, and every N-ply strategy is built around it, so no
     weights are loaded twice. Results are the same either way.
 
+    ``bearoff_db`` works as in :class:`~bgsage.BgBotAnalyzer`: True (the
+    default) loads the one-sided bearoff database from ``data/``, a string
+    loads it from that path, False leaves it out. With it, the 1-ply strategy
+    returns the database's exact probs at bearoff positions and the N-ply
+    strategies stop their search there, as the analyzer's do; a missing
+    file leaves it out silently, as the analyzer does.
+
     Strategies are immutable once built and safe to share between threads
     and between concurrent batch calls; their N-ply caches are per thread.
     """
 
-    def __init__(self, weights: WeightConfig | WeightConfigPair | None = None):
+    def __init__(self, weights: WeightConfig | WeightConfigPair | None = None,
+                 bearoff_db: bool | str = True):
         self.weights = default_weights() if weights is None else weights
+        path = bearoff_db if isinstance(bearoff_db, str) else (
+            bearoff_db_path() if bearoff_db else None)
+        self.bearoff_db = _load_bearoff_db(path) if path else None
         self._lock = threading.Lock()
+        self._raw_base = None
         self._base = None
         self._multipy: dict[tuple, object] = {}
 
     def base(self):
-        """The 1-ply strategy, loaded on first use."""
+        """The 1-ply strategy, loaded on first use (bearoff-aware when the
+        database is loaded)."""
         with self._lock:
             if self._base is None:
                 w = self.weights
-                self._base = bgbot_cpp.create_strategy(
+                self._raw_base = bgbot_cpp.create_strategy(
                     w.strategy_type, w.weight_paths_list, w.hidden_sizes_list)
+                self._base = (self._raw_base if self.bearoff_db is None else
+                              bgbot_cpp.BearoffStrategy(self._raw_base, self.bearoff_db))
             return self._base
 
     def multipy(self, n_plies: int, filter_max_moves: int = 5,
@@ -102,24 +126,30 @@ class BatchModels:
         across positions.
         """
         key = (n_plies, filter_max_moves, float(filter_threshold))
-        base = self.base()
+        self.base()
         with self._lock:
             strategy = self._multipy.get(key)
             if strategy is None:
+                # Around the raw base, with the database attached to the
+                # search itself, as BgBotAnalyzer builds its N-ply strategy.
                 strategy = bgbot_cpp.create_multipy_from_base(
-                    base, n_plies=n_plies,
+                    self._raw_base, n_plies=n_plies,
                     filter_max_moves=filter_max_moves,
                     filter_threshold=filter_threshold,
                     parallel_evaluate=False, parallel_threads=0)
+                if self.bearoff_db is not None:
+                    bgbot_cpp.multipy_set_bearoff_db(strategy, self.bearoff_db)
                 self._multipy[key] = strategy
             return strategy
 
 
-def _resolve_models(weights, models) -> BatchModels:
+def _resolve_models(weights, models, bearoff_db) -> BatchModels:
     if models is None:
-        return BatchModels(weights)
+        return BatchModels(weights, bearoff_db=True if bearoff_db is None else bearoff_db)
     if weights is not None and weights is not models.weights:
         raise ValueError("pass weights or models, not both")
+    if bearoff_db is not None:
+        raise ValueError("pass bearoff_db to BatchModels, not with models=")
     return models
 
 
@@ -150,6 +180,7 @@ def batch_evaluate(
     jacoby: bool = True,
     beaver: bool = True,
     models: BatchModels | None = None,
+    bearoff_db: bool | str | None = None,
 ) -> list[PositionEval]:
     """Evaluate a batch of pre-roll positions in parallel.
 
@@ -177,12 +208,14 @@ def batch_evaluate(
             (money games only). Ignored for match play positions.
         models: Loaded strategies to use and keep (see :class:`BatchModels`);
             give this or ``weights``.
+        bearoff_db: The bearoff database, as in :class:`BatchModels` (default
+            on, like the analyzer); give it with ``weights``, not ``models``.
 
     Returns:
         List of :class:`PositionEval`, one per input position.
     """
     n_plies = _check_level(eval_level)
-    models = _resolve_models(weights, models)
+    models = _resolve_models(weights, models, bearoff_db)
     if not positions:
         return []
 
@@ -249,6 +282,7 @@ def batch_post_move_evaluate(
     filter_threshold: float = 0.08,
     jacoby: bool = True,
     models: BatchModels | None = None,
+    bearoff_db: bool | str | None = None,
 ) -> list[PostMoveAnalysis]:
     """Evaluate a batch of post-move positions in parallel.
 
@@ -278,12 +312,14 @@ def batch_post_move_evaluate(
             centered (money games only). Ignored for match play positions.
         models: Loaded strategies to use and keep (see :class:`BatchModels`);
             give this or ``weights``.
+        bearoff_db: The bearoff database, as in :class:`BatchModels` (default
+            on, like the analyzer); give it with ``weights``, not ``models``.
 
     Returns:
         List of :class:`~bgsage.types.PostMoveAnalysis`, one per input position.
     """
     n_plies = _check_level(eval_level)
-    models = _resolve_models(weights, models)
+    models = _resolve_models(weights, models, bearoff_db)
     if not positions:
         return []
 
@@ -343,6 +379,7 @@ def batch_cube_action(
     jacoby: bool = True,
     beaver: bool = True,
     models: BatchModels | None = None,
+    bearoff_db: bool | str | None = None,
 ) -> list[CubeActionResult]:
     """Evaluate cube decisions for a batch of pre-roll positions in parallel.
 
@@ -375,6 +412,8 @@ def batch_cube_action(
         filter_threshold: Equity threshold for N-ply move filter.
         models: Loaded strategies to use and keep (see :class:`BatchModels`);
             give this or ``weights``.
+        bearoff_db: The bearoff database, as in :class:`BatchModels` (default
+            on, like the analyzer); give it with ``weights``, not ``models``.
 
     Returns:
         List of :class:`~bgsage.types.CubeActionResult`, one per input position.
@@ -389,6 +428,7 @@ def batch_cube_action(
         jacoby=jacoby,
         beaver=beaver,
         models=models,
+        bearoff_db=bearoff_db,
     )
 
     level_label = f"{_check_level(eval_level)}-ply"
@@ -425,6 +465,7 @@ def batch_checker_play(
     filter_threshold: float = 0.08,
     jacoby: bool = True,
     models: BatchModels | None = None,
+    bearoff_db: bool | str | None = None,
 ) -> list[CheckerPlayResult]:
     """Evaluate checker play for a batch of positions in parallel.
 
@@ -457,18 +498,20 @@ def batch_checker_play(
         models: Loaded strategies to use and keep (see :class:`BatchModels`);
             give this or ``weights``. The N-ply search is built around the
             same base as the 1-ply scoring, so one set of weights is loaded.
+        bearoff_db: The bearoff database, as in :class:`BatchModels` (default
+            on, like the analyzer); give it with ``weights``, not ``models``.
 
     Returns:
         List of :class:`~bgsage.types.CheckerPlayResult`, one per input
         position.  Each contains a ``moves`` list sorted best-first by
         cubeful equity: the list ``BgBotAnalyzer.checker_play`` gives at the
-        same level, with the bearoff database off.  At the depths in
+        same level and bearoff database setting.  At the depths in
         ``CUBEFUL_FILTERED_PLIES`` (2-ply) the 1-ply filter's survivors and
         promotions are evaluated at the requested ply and the rest at 1-ply;
         at 3-ply and deeper every move is.
     """
     n_plies = _check_level(eval_level)
-    models = _resolve_models(weights, models)
+    models = _resolve_models(weights, models, bearoff_db)
     if not positions:
         return []
 

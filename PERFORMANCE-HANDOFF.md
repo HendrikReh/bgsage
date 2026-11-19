@@ -19,7 +19,7 @@ Notes on #30:
   - the batch took its probs from the cubeless tree;
   - it routed the cube tree per node, not from the root;
   - it searched match positions at cube value 1.
-- The batch now returns the analyzer's list field for field (bearoff database off).
+- The batch now returns the analyzer's list field for field (since the side observation below was fixed, with the bearoff database too).
 - With mixed cube states, the best move had differed on 4 of 40 positions at 2-ply.
 - The line anchors below point at `f164c92`; every section has moved code since.
 
@@ -147,7 +147,7 @@ The historical spot check used nine fixed money positions, with one warmed analy
 
 ## Side observations (not checked further)
 
-- The batch entry points never attach the bearoff database, while `BgBotAnalyzer` loads it by default (`bearoff_db=True`). Batch and analyzer can therefore disagree on bearoff positions.
+- **Fixed:** the batch entry points never attached the bearoff database, while `BgBotAnalyzer` loads it by default (`bearoff_db=True`), so batch and analyzer disagreed on bearoff positions. `BatchModels` now attaches it by default; see `CHANGELOG.md`.
 - `batch_evaluate` and `batch_post_move_evaluate` pass `contact_x` only at 1-ply; at 2-ply they keep the 0.68 contact cube life. `CLAUDE.md` lists them under "at the matching levels". These batch paths use Janowski on N-ply cubeless probs rather than the cube tree, so whether the 2-ply value should apply there is a separate question.
 
 ## Test commands
