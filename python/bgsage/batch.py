@@ -29,11 +29,20 @@ Typical usage::
     results = batch_post_move_evaluate(post_positions, eval_level="1ply")
     for r in results:
         print(f"CL={r.cubeless_equity:+.3f}  CF={r.cubeful_equity:+.3f}")
+
+Each call loads the model's weights (~15 ms for Stage 11, twice for N-ply
+checker play before the base was shared). Callers that submit many small
+batches load them once instead by passing a :class:`BatchModels`::
+
+    models = BatchModels()            # production model; loads lazily
+    for chunk in chunks:
+        batch_checker_play(chunk, eval_level="2ply", models=models)
 """
 
 from __future__ import annotations
 
 import os
+import threading
 from dataclasses import dataclass
 
 import bgbot_cpp
@@ -43,6 +52,75 @@ from .analyzer import (
 )
 from .types import CheckerPlayResult, CubeActionResult, MoveAnalysis, PostMoveAnalysis, Probabilities
 from .weights import WeightConfig, WeightConfigPair, default_weights
+
+_LEVELS = ("1ply", "2ply", "3ply", "4ply")
+
+
+def _check_level(eval_level: str) -> int:
+    """The depth of a batch evaluation level; raises ValueError for any other."""
+    if eval_level not in _LEVELS:
+        raise ValueError(
+            f"Unsupported eval_level for batch: {eval_level!r}. "
+            f"Use '1ply', '2ply', '3ply', or '4ply'."
+        )
+    return int(eval_level[0])
+
+
+class BatchModels:
+    """Loaded strategies for the batch functions, owned by the caller.
+
+    Every batch function builds the strategies it needs from ``weights``
+    unless it is given a ``BatchModels``; then it takes them from here, and
+    they stay loaded for the next call. The base (1-ply) strategy is loaded
+    once, on first use, and every N-ply strategy is built around it, so no
+    weights are loaded twice. Results are the same either way.
+
+    Strategies are immutable once built and safe to share between threads
+    and between concurrent batch calls; their N-ply caches are per thread.
+    """
+
+    def __init__(self, weights: WeightConfig | WeightConfigPair | None = None):
+        self.weights = default_weights() if weights is None else weights
+        self._lock = threading.Lock()
+        self._base = None
+        self._multipy: dict[tuple, object] = {}
+
+    def base(self):
+        """The 1-ply strategy, loaded on first use."""
+        with self._lock:
+            if self._base is None:
+                w = self.weights
+                self._base = bgbot_cpp.create_strategy(
+                    w.strategy_type, w.weight_paths_list, w.hidden_sizes_list)
+            return self._base
+
+    def multipy(self, n_plies: int, filter_max_moves: int = 5,
+                filter_threshold: float = 0.08):
+        """The N-ply strategy for these settings, built around :meth:`base`.
+
+        Serial (``parallel_evaluate=False``): the batch functions parallelise
+        across positions.
+        """
+        key = (n_plies, filter_max_moves, float(filter_threshold))
+        base = self.base()
+        with self._lock:
+            strategy = self._multipy.get(key)
+            if strategy is None:
+                strategy = bgbot_cpp.create_multipy_from_base(
+                    base, n_plies=n_plies,
+                    filter_max_moves=filter_max_moves,
+                    filter_threshold=filter_threshold,
+                    parallel_evaluate=False, parallel_threads=0)
+                self._multipy[key] = strategy
+            return strategy
+
+
+def _resolve_models(weights, models) -> BatchModels:
+    if models is None:
+        return BatchModels(weights)
+    if weights is not None and weights is not models.weights:
+        raise ValueError("pass weights or models, not both")
+    return models
 
 
 @dataclass
@@ -71,6 +149,7 @@ def batch_evaluate(
     filter_threshold: float = 0.08,
     jacoby: bool = True,
     beaver: bool = True,
+    models: BatchModels | None = None,
 ) -> list[PositionEval]:
     """Evaluate a batch of pre-roll positions in parallel.
 
@@ -96,13 +175,16 @@ def batch_evaluate(
             centered (money games only). Ignored for match play positions.
         beaver: If True, opponent can beaver after being doubled
             (money games only). Ignored for match play positions.
+        models: Loaded strategies to use and keep (see :class:`BatchModels`);
+            give this or ``weights``.
 
     Returns:
         List of :class:`PositionEval`, one per input position.
     """
-    if weights is None:
-        weights = default_weights()
-    is_pair = isinstance(weights, WeightConfigPair)
+    n_plies = _check_level(eval_level)
+    models = _resolve_models(weights, models)
+    if not positions:
+        return []
 
     # Build (board, cube_value, CubeOwner[, away1, away2, is_crawford]) tuples for C++
     cpp_positions = []
@@ -124,54 +206,20 @@ def batch_evaluate(
     # is_money(), and the beaver lives on the money paths), so match rows in
     # the same batch ignore the flags and money rows keep them.
 
-    if eval_level == "1ply":
-        if is_pair:
-            # Same dispatch bug as batch_checker_play had: hardcoding
-            # GamePlanPairStrategy rejects every backgame-aware model.
-            paths, hiddens = weights.weight_args
-            strategy = bgbot_cpp.create_strategy(
-                getattr(weights, "strategy_type", "pair"), paths, hiddens)
-        else:
-            strategy = bgbot_cpp.GamePlanStrategy(*weights.weight_args)
+    if n_plies == 1:
         # The money cube life of BgBotAnalyzer at the same depth (the C++
         # side applies contact_x to money positions only), here and below.
         raw_results = bgbot_cpp.batch_evaluate_positions(
-            cpp_positions, strategy, n_threads,
+            cpp_positions, models.base(), n_threads,
             jacoby=jacoby, beaver=beaver,
             contact_x=_contact_cube_life(1),
             contact_x_pip_slope=_contact_cube_slope(1),
         )
-    elif eval_level in ("2ply", "3ply", "4ply"):
-        n_plies = int(eval_level[0])
-        # parallel_evaluate=False so each N-ply eval is serial;
-        # parallelism is across positions in the C++ batch function.
-        if is_pair:
-            paths, hiddens = weights.weight_args
-            strategy = bgbot_cpp.create_multipy(
-                getattr(weights, "strategy_type", "pair"), paths, hiddens,
-                n_plies=n_plies,
-                filter_max_moves=filter_max_moves,
-                filter_threshold=filter_threshold,
-                parallel_evaluate=False,
-                parallel_threads=0,
-            )
-        else:
-            strategy = bgbot_cpp.create_multipy_5nn(
-                *weights.weight_args,
-                n_plies=n_plies,
-                filter_max_moves=filter_max_moves,
-                filter_threshold=filter_threshold,
-                parallel_evaluate=False,
-                parallel_threads=0,
-            )
-        raw_results = bgbot_cpp.batch_evaluate_positions(
-            cpp_positions, strategy, n_threads,
-            jacoby=jacoby, beaver=beaver,
-        )
     else:
-        raise ValueError(
-            f"Unsupported eval_level for batch: {eval_level!r}. "
-            f"Use '1ply', '2ply', '3ply', or '4ply'."
+        raw_results = bgbot_cpp.batch_evaluate_positions(
+            cpp_positions,
+            models.multipy(n_plies, filter_max_moves, filter_threshold),
+            n_threads, jacoby=jacoby, beaver=beaver,
         )
 
     return [
@@ -200,6 +248,7 @@ def batch_post_move_evaluate(
     filter_max_moves: int = 5,
     filter_threshold: float = 0.08,
     jacoby: bool = True,
+    models: BatchModels | None = None,
 ) -> list[PostMoveAnalysis]:
     """Evaluate a batch of post-move positions in parallel.
 
@@ -227,12 +276,16 @@ def batch_post_move_evaluate(
         filter_threshold: Equity threshold for N-ply move filter.
         jacoby: If True, gammons/backgammons don't count when cube is
             centered (money games only). Ignored for match play positions.
+        models: Loaded strategies to use and keep (see :class:`BatchModels`);
+            give this or ``weights``.
 
     Returns:
         List of :class:`~bgsage.types.PostMoveAnalysis`, one per input position.
     """
-    if weights is None:
-        weights = default_weights()
+    n_plies = _check_level(eval_level)
+    models = _resolve_models(weights, models)
+    if not positions:
+        return []
 
     # Build (board, CubeOwner[, cube_value, away1, away2, is_crawford]) tuples for C++
     cpp_positions = []
@@ -253,47 +306,20 @@ def batch_post_move_evaluate(
     # each position's match state, so a match row never switches it off for
     # the money rows of the same batch.
 
-    # Strategy construction goes through the unified ``create_strategy`` /
-    # ``create_multipy`` factories — same path BgBotAnalyzer uses — so all
-    # registered model types (5nn, pair, 19-NN backgame_pair) work
-    # transparently against the production model.
-    if eval_level == "1ply":
-        strategy = bgbot_cpp.create_strategy(
-            weights.strategy_type,
-            weights.weight_paths_list,
-            weights.hidden_sizes_list,
-        )
+    if n_plies == 1:
         raw_results = bgbot_cpp.batch_evaluate_post_move(
-            cpp_positions, strategy, n_threads,
+            cpp_positions, models.base(), n_threads,
             jacoby=jacoby,
             contact_x=_contact_cube_life(1),
             contact_x_pip_slope=_contact_cube_slope(1),
         )
-        level_label = "1-ply"
-    elif eval_level in ("2ply", "3ply", "4ply"):
-        n_plies = int(eval_level[0])
-        # parallel_evaluate=False so each N-ply eval is serial;
-        # parallelism is across positions in the C++ batch function.
-        strategy = bgbot_cpp.create_multipy(
-            weights.strategy_type,
-            weights.weight_paths_list,
-            weights.hidden_sizes_list,
-            n_plies=n_plies,
-            filter_max_moves=filter_max_moves,
-            filter_threshold=filter_threshold,
-            parallel_evaluate=False,
-            parallel_threads=0,
-        )
-        raw_results = bgbot_cpp.batch_evaluate_post_move(
-            cpp_positions, strategy, n_threads,
-            jacoby=jacoby,
-        )
-        level_label = f"{n_plies}-ply"
     else:
-        raise ValueError(
-            f"Unsupported eval_level for batch: {eval_level!r}. "
-            f"Use '1ply', '2ply', '3ply', or '4ply'."
+        raw_results = bgbot_cpp.batch_evaluate_post_move(
+            cpp_positions,
+            models.multipy(n_plies, filter_max_moves, filter_threshold),
+            n_threads, jacoby=jacoby,
         )
+    level_label = f"{n_plies}-ply"
 
     return [
         PostMoveAnalysis(
@@ -316,6 +342,7 @@ def batch_cube_action(
     filter_threshold: float = 0.08,
     jacoby: bool = True,
     beaver: bool = True,
+    models: BatchModels | None = None,
 ) -> list[CubeActionResult]:
     """Evaluate cube decisions for a batch of pre-roll positions in parallel.
 
@@ -346,6 +373,8 @@ def batch_cube_action(
             (0 = auto-detect all cores).
         filter_max_moves: Max moves for N-ply move filter.
         filter_threshold: Equity threshold for N-ply move filter.
+        models: Loaded strategies to use and keep (see :class:`BatchModels`);
+            give this or ``weights``.
 
     Returns:
         List of :class:`~bgsage.types.CubeActionResult`, one per input position.
@@ -359,10 +388,10 @@ def batch_cube_action(
         filter_threshold=filter_threshold,
         jacoby=jacoby,
         beaver=beaver,
+        models=models,
     )
 
-    n_plies = int(eval_level[0])
-    level_label = f"{n_plies}-ply"
+    level_label = f"{_check_level(eval_level)}-ply"
 
     return [
         CubeActionResult(
@@ -395,6 +424,7 @@ def batch_checker_play(
     filter_max_moves: int = 5,
     filter_threshold: float = 0.08,
     jacoby: bool = True,
+    models: BatchModels | None = None,
 ) -> list[CheckerPlayResult]:
     """Evaluate checker play for a batch of positions in parallel.
 
@@ -422,6 +452,11 @@ def batch_checker_play(
             (0 = auto-detect all cores).
         filter_max_moves: Max moves for N-ply move filter.
         filter_threshold: Equity threshold for N-ply move filter.
+        jacoby: If True, gammons/backgammons don't count when cube is
+            centered (money games only). Ignored for match play positions.
+        models: Loaded strategies to use and keep (see :class:`BatchModels`);
+            give this or ``weights``. The N-ply search is built around the
+            same base as the 1-ply scoring, so one set of weights is loaded.
 
     Returns:
         List of :class:`~bgsage.types.CheckerPlayResult`, one per input
@@ -432,9 +467,10 @@ def batch_checker_play(
         promotions are evaluated at the requested ply and the rest at 1-ply;
         at 3-ply and deeper every move is.
     """
-    if weights is None:
-        weights = default_weights()
-    is_pair = isinstance(weights, WeightConfigPair)
+    n_plies = _check_level(eval_level)
+    models = _resolve_models(weights, models)
+    if not positions:
+        return []
 
     # Build input dicts with CubeOwner enum for C++
     cpp_inputs = []
@@ -455,22 +491,13 @@ def batch_checker_play(
             d["is_crawford"] = is_crawford
         cpp_inputs.append(d)
 
-    if is_pair:
-        # Dispatch on the config's own strategy type. Hardcoding
-        # GamePlanPairStrategy here rejected every backgame-aware model
-        # ("requires exactly 17 weight paths, got 19"), which silently pushed
-        # the production model off the batch path onto the serial one.
-        paths, hiddens = weights.weight_args
-        strategy_1ply = bgbot_cpp.create_strategy(
-            getattr(weights, "strategy_type", "pair"), paths, hiddens)
-    else:
-        strategy_1ply = bgbot_cpp.GamePlanStrategy(*weights.weight_args)
+    strategy_1ply = models.base()
 
     # Jacoby applies to the money positions only; the native side checks
     # each position's match state, so a match row never switches it off for
     # the money rows of the same batch.
 
-    if eval_level == "1ply":
+    if n_plies == 1:
         raw_results = bgbot_cpp.batch_checker_play(
             cpp_inputs, strategy_1ply,
             filter_max_moves, filter_threshold, n_threads,
@@ -478,30 +505,10 @@ def batch_checker_play(
             contact_x_1ply=_contact_cube_life(1),
             contact_x_pip_slope_1ply=_contact_cube_slope(1),
         )
-        level_label = "1-ply"
-    elif eval_level in ("2ply", "3ply", "4ply"):
-        n_plies = int(eval_level[0])
-        if is_pair:
-            paths, hiddens = weights.weight_args
-            strategy_nply = bgbot_cpp.create_multipy(
-                getattr(weights, "strategy_type", "pair"), paths, hiddens,
-                n_plies=n_plies,
-                filter_max_moves=filter_max_moves,
-                filter_threshold=filter_threshold,
-                parallel_evaluate=False,
-                parallel_threads=0,
-            )
-        else:
-            strategy_nply = bgbot_cpp.create_multipy_5nn(
-                *weights.weight_args,
-                n_plies=n_plies,
-                filter_max_moves=filter_max_moves,
-                filter_threshold=filter_threshold,
-                parallel_evaluate=False,
-                parallel_threads=0,
-            )
+    else:
         raw_results = bgbot_cpp.batch_checker_play(
-            cpp_inputs, strategy_1ply, strategy_nply,
+            cpp_inputs, strategy_1ply,
+            models.multipy(n_plies, filter_max_moves, filter_threshold),
             filter_max_moves, filter_threshold, n_threads,
             jacoby=jacoby,
             contact_x_1ply=_contact_cube_life(1),
@@ -510,12 +517,7 @@ def batch_checker_play(
             contact_x_pip_slope_nply=_contact_cube_slope(n_plies),
             cubeful_filtered_plies=sorted(CUBEFUL_FILTERED_PLIES),
         )
-        level_label = f"{n_plies}-ply"
-    else:
-        raise ValueError(
-            f"Unsupported eval_level: {eval_level!r}. "
-            f"Use '1ply', '2ply', '3ply', or '4ply'."
-        )
+    level_label = f"{n_plies}-ply"
 
     results = []
     for i, raw in enumerate(raw_results):

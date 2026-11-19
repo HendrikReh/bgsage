@@ -266,6 +266,23 @@ static std::shared_ptr<Strategy> make_strategy_from_type(
         ". Valid types: 5nn, pair, backgame_pair, backgame_pair_phased");
 }
 
+// The N-ply strategy the create_multipy* factories return: `base` under the
+// move filter, with the PubEval prefilter that narrows opponent candidates
+// before 1-ply scoring when a roll has more than 20.
+static std::shared_ptr<MultiPlyStrategy> make_multipy(
+    std::shared_ptr<Strategy> base, int n_plies,
+    int filter_max_moves, float filter_threshold, bool full_depth_opponent,
+    bool parallel_evaluate, int parallel_threads)
+{
+    MoveFilter filter{filter_max_moves, filter_threshold};
+    auto strat = std::make_shared<MultiPlyStrategy>(
+        std::move(base), n_plies, filter, full_depth_opponent,
+        parallel_evaluate, parallel_threads);
+    static auto pubeval = std::make_shared<PubEval>();
+    strat->set_move_prefilter(pubeval);
+    return strat;
+}
+
 // N-ply batch checker play, shared by the two N-ply batch_checker_play
 // overloads (they differ only in the 1-ply strategy's static type). Each
 // position goes through the same steps as _CubefulAnalyzer.checker_play_analytics
@@ -2082,13 +2099,9 @@ PYBIND11_MODULE(bgbot_cpp, m) {
         auto base = std::make_shared<GamePlanStrategy>(
             purerace_w, racing_w, attacking_w, priming_w, anchoring_w,
             n_h_purerace, n_h_racing, n_h_attacking, n_h_priming, n_h_anchoring);
-        MoveFilter filter{filter_max_moves, filter_threshold};
-        auto strat = std::make_shared<MultiPlyStrategy>(
-            base, n_plies, filter, full_depth_opponent,
-            parallel_evaluate, parallel_threads);
-        static auto pubeval = std::make_shared<PubEval>();
-        strat->set_move_prefilter(pubeval);
-        return strat;
+        return make_multipy(std::move(base), n_plies, filter_max_moves,
+                            filter_threshold, full_depth_opponent,
+                            parallel_evaluate, parallel_threads);
     }, "Create N-ply strategy wrapping 5-NN GamePlanStrategy",
        py::arg("purerace_weights"),
        py::arg("racing_weights"),
@@ -5412,20 +5425,34 @@ PYBIND11_MODULE(bgbot_cpp, m) {
                                               int filter_max_moves, float filter_threshold,
                                               bool full_depth_opponent,
                                               bool parallel_evaluate, int parallel_threads) {
-        auto base = make_strategy_from_type(strategy_type, weight_paths, hidden_sizes);
-        MoveFilter filter{filter_max_moves, filter_threshold};
-        auto strat = std::make_shared<MultiPlyStrategy>(
-            base, n_plies, filter, full_depth_opponent,
+        return make_multipy(
+            make_strategy_from_type(strategy_type, weight_paths, hidden_sizes),
+            n_plies, filter_max_moves, filter_threshold, full_depth_opponent,
             parallel_evaluate, parallel_threads);
-        // PubEval prefilter for opponent candidate pruning in N-ply evaluation.
-        // Narrows opponent moves before full 1-ply scoring when > 20 candidates.
-        static auto pubeval = std::make_shared<PubEval>();
-        strat->set_move_prefilter(pubeval);
-        return strat;
     }, "Create MultiPlyStrategy from any base strategy type",
        py::arg("strategy_type"),
        py::arg("weight_paths"),
        py::arg("hidden_sizes"),
+       py::arg("n_plies") = 2,
+       py::arg("filter_max_moves") = 5,
+       py::arg("filter_threshold") = 0.08f,
+       py::arg("full_depth_opponent") = false,
+       py::arg("parallel_evaluate") = false,
+       py::arg("parallel_threads") = 0);
+
+    m.def("create_multipy_from_base", [](std::shared_ptr<Strategy> base,
+                                          int n_plies,
+                                          int filter_max_moves, float filter_threshold,
+                                          bool full_depth_opponent,
+                                          bool parallel_evaluate, int parallel_threads) {
+        if (!base) throw std::invalid_argument("base strategy is None");
+        return make_multipy(std::move(base), n_plies, filter_max_moves,
+                            filter_threshold, full_depth_opponent,
+                            parallel_evaluate, parallel_threads);
+    }, "Create MultiPlyStrategy around an already loaded base strategy (e.g.\n"
+       "from create_strategy), so no weights are loaded again. The result is\n"
+       "what create_multipy returns for the same weights.",
+       py::arg("base"),
        py::arg("n_plies") = 2,
        py::arg("filter_max_moves") = 5,
        py::arg("filter_threshold") = 0.08f,
