@@ -402,12 +402,18 @@ private:
         static std::atomic<std::size_t> global_hits;
         static std::atomic<std::size_t> global_misses;
 
-        PosCache() : entries(CAPACITY) {
-            clear();
-        }
+        // The table (CAPACITY entries of 136 bytes, ~36 MB) is allocated on
+        // the first insert, not with the thread: only the legacy recursion
+        // (hybrid evaluator, full-depth opponent) inserts, while every
+        // thread that runs clear_cache() -- each rollout worker, each
+        // analyzer call -- used to allocate and zero it.
+        PosCache() = default;
 
+        // Zeroes the table only when something was inserted since the last
+        // clear: count == 0 means every slot is still empty.
         void clear() {
-            std::memset(entries.data(), 0, CAPACITY * sizeof(CacheEntry));
+            if (count != 0)
+                std::memset(entries.data(), 0, CAPACITY * sizeof(CacheEntry));
             count = 0;
             hits = 0;
             misses = 0;
@@ -418,6 +424,10 @@ private:
         // protect against hash collisions (different positions with same hash).
         const std::array<float, NUM_OUTPUTS>* lookup(std::size_t h, int plies,
                                                       const Board& board) const {
+            if (entries.empty()) {   // nothing inserted on this thread yet
+                global_misses.fetch_add(1, std::memory_order_relaxed);
+                return nullptr;
+            }
             // Ensure hash is never 0 (our empty marker)
             std::size_t key = h | 1;
             std::size_t idx = key & MASK;
@@ -439,6 +449,7 @@ private:
 
         void insert(std::size_t h, int plies, const Board& board,
                     const std::array<float, NUM_OUTPUTS>& probs) {
+            if (entries.empty()) entries.resize(CAPACITY);   // value-initialised: all empty
             // Clear if too full (>75% load factor)
             if (count >= (CAPACITY * 3) / 4) {
                 clear();

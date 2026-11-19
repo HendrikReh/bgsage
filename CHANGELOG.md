@@ -54,6 +54,35 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
 ### Changed
 
+- **The legacy N-ply position cache is allocated on first use.**
+  - `MultiPlyStrategy`'s thread-local `PosCache` has 262,144 entries of
+    136 bytes, about 36 MB per thread. Only the old cubeless recursion
+    fills it: the hybrid evaluator and full-depth-opponent mode. The
+    default tree goes through the cubeful engine and never does.
+  - Even so, every thread that called `clear_cache()` allocated the table
+    and zeroed it on each clear. That includes every rollout worker, which
+    clears it at the start of its trials.
+  - Now the table is allocated on its first insert, and a clear zeroes it
+    only when something was inserted since the last one.
+  - Results are byte-identical between the two builds on:
+    - the hybrid and full-depth evaluators, which do use the cache;
+    - 3-ply checker play;
+    - truncated-rollout cube analysis.
+
+    `tests/test_legacy_pos_cache.py` checks that the cache still fills,
+    hits and clears.
+  - Peak memory, Stage 11, two positions (cube action plus checker play):
+
+    | Level | before | after |
+    |---|---|---|
+    | `truncated1`, 10 threads | 1,013-1,026 MB | 503-509 MB |
+    | `truncated1`, 2 threads | 706-710 MB | 436-438 MB |
+    | `3ply`, 10 threads | 349-351 MB | 312-320 MB |
+
+  - A warm `clear_cache()` takes 0.03-0.10 ms instead of 0.20 ms.
+  - Elapsed times are unchanged within noise. They were measured under
+    load from another job (load average ~32).
+
 - **Batch calls load each model once, and can keep it loaded**
   (`BatchModels`).
   - Every batch function used to build its strategies from the weight
