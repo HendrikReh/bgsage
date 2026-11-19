@@ -432,6 +432,19 @@ results = batch_checker_play(positions, eval_level="3ply", n_threads=0)
 # results: list[CheckerPlayResult], each with .moves sorted best-first
 ```
 
+**Keeping models loaded across batch calls** — `BatchModels` (`python/bgsage/batch.py`).
+Each batch call loads the model's weights (~15 ms for Stage 11). Callers that submit many
+small batches pass one `BatchModels` instead, which loads the base strategy once and builds
+every N-ply strategy around it (`bgbot_cpp.create_multipy_from_base`). Results are identical.
+An empty batch loads nothing.
+```python
+from bgsage import BatchModels, batch_checker_play, batch_evaluate
+models = BatchModels()          # or BatchModels(WeightConfig.from_model("stage5"))
+for chunk in chunks:
+    batch_checker_play(chunk, eval_level="2ply", models=models)
+    batch_evaluate(chunk, eval_level="1ply", models=models)
+```
+
 ### 4. Game Plan Classification
 
 Given a board position, return the game plan for the player on roll and the
