@@ -3156,9 +3156,39 @@ the 795 snake checker decisions the pick was a move the filter had pruned:
 
 Not the cause: the cube life (0.68 to 1.0 changes ~25 picks, the gap
 stays), the Jacoby rule, and cubeful versus cubeless conversion at 1-ply
-(the two pick alike). Switching root routing off moves 2-ply in opposite
-directions under the two kinds of reference (XG -5.6, both rollouts +10).
-That is a separate disagreement, still open.
+(the two pick alike).
+
+Root routing is not the cause either, and switching it off makes 2-ply
+worse under XG too. At first XG seemed to disagree with the rollouts here
+(XG -5.6, both rollouts +10), but that was a selection effect, measured
+2026-11-19 with the filtered 2-ply:
+- Switching root routing off changes 384 of the 795 snake checker picks.
+- XG takes only its leading moves to full depth. In 166 of the 384, it
+  never took the no-pin pick there. In most of those the pick is not in
+  XG's move list at all; where it is, it ranks third or lower, 0.22 behind
+  the pinned pick.
+- An XG grading that needs a full-depth value for both picks drops those
+  decisions, so only the rollouts saw them.
+
+No-pin minus pin, contribution to snake checker PR over all 795
+decisions (S9-play / S11-play twin; XG has no value for the second row):
+
+| Decisions | ply | n | vs XG | vs rollout |
+|---|---|---|---|---|
+| graded by all four references | 2 | 192 | -4.8 / -5.4 (+- 1.6) | -0.3 / +0.5 (+- 1.2 / 0.9) |
+| no-pin pick not at XG's full depth | 2 | 166 | — | +8.8 / +7.6 (+- 1.2 / 0.9) |
+| graded by all four references | 3 | 196 | -2.3 / -2.1 (+- 1.6) | -5.2 / -1.6 (+- 1.4 / 0.6) |
+| no-pin pick not at XG's full depth | 3 | 92 | — | +4.0 / +3.1 (+- 1.2 / 0.8) |
+
+So at 2-ply root routing is worth ~8 PR in snakes. At 3-ply it is about
+neutral. The XG-only edge for no-pin on the shared decisions comes mostly
+from a handful of 0.5-1.1 swings that the rollouts don't see: trimming the
+ten largest on each side takes it from -4.8 to -2.7. That is within the usual spread
+between XG and the rollouts in snakes. To compare two configurations
+against XG, run a completion pass for both sets of picks
+(`score_folder_vs_xg.py complete`). Grading only where XG has both values
+is biased towards the configuration whose picks XG considers too poor to
+search.
 
 At 2-ply, cubeful checker play now searches only the filter's survivors.
 The pruned moves keep 1-ply Janowski values and enter the search only
