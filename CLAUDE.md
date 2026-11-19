@@ -3081,6 +3081,58 @@ or an XG pass, would arbitrate. (3) `sl_snake2_warm` is the best snake net
 at 1-ply on both references. (4) The widened rule's retrained containment
 nets are the stronger snake mechanism at 2-ply and 3-ply, by about 1 PR.
 
+The table is stale. It predates both the rebuild of the snake references on
+2026-09-07 (`99e6701`) and the money cube-life change of 2026-11-18. With
+today's engine and references, the installed `stage11` scores
+20.58 / 20.38 / 21.47 on the S9-play reference and 18.21 / 21.69 / 16.87 on
+the twin.
+
+*XG as referee (2026-11-19).* XG "World Class" settles point (2): 3-ply is
+the best level and 2-ply the worst.
+
+How the run worked:
+- `scripts/export_folder_benchmark_xg.py` wrote both references' decisions
+  as one-decision `.xg` games, which XG Batch-Analyzed.
+- `scripts/score_folder_vs_xg.py` scores the picks (`picks` computes them,
+  `score` grades them). It grades a pick only against values at XG's top
+  level for that decision. The top level was Roller+ for 447 decisions,
+  4-ply for 380, 3-ply for 47 and 2-ply for 77 (S9-play reference; the
+  twin is within 4 of each).
+- XG takes its leading candidates to full depth and leaves the rest
+  shallower. In snakes those shallow values are off the leaders' scale:
+  graded against them, XG's own #1 cost PR 61 against XG.
+- XG always analyses the played move at full depth. So
+  `score_folder_vs_xg.py complete` writes a second set of games that play
+  each of Sage's picks XG had left shallower (1,244 games). With that pass,
+  every decision is graded.
+
+Results, PR (paired differences +- 1 SE). The twin row covers 959 decisions,
+the S9-play row 951:
+
+| Reference | 1P / 2P / 3P vs XG | 3P - 2P | 3P - 1P | 2P - 1P | same, vs the rollout |
+|---|---|---|---|---|---|
+| S9-play | 35.83 / 38.85 / 32.52 | -6.33 +- 1.65 | -3.31 +- 1.88 | +3.02 +- 1.94 | +1.08 / +0.89 / -0.20, all within 1 SE |
+| S11-play twin | 33.98 / 37.58 / 31.30 | -6.28 +- 1.73 | -2.68 +- 1.80 | +3.59 +- 1.79 | -4.82 +- 1.31 / -1.34 +- 0.95 / +3.48 +- 1.26 |
+
+What it shows:
+- XG agrees with the twin on all three level differences.
+- On the rebuilt S9-play reference, 3-ply is no longer worst: the three
+  levels are level within noise. The split of the table above is gone.
+- Cube PR against XG falls with depth on both references: 25.2 / 19.9 /
+  17.5 and 28.7 / 24.1 / 21.7.
+- 2-ply is still worse than 1-ply in snakes, by ~3 PR under XG and the
+  twin. So the "2-ply anomaly is gone" of point (1) holds only on the
+  S9-play reference. Picks from before the cube-life change show the same
+  gap (+3.3 / +3.8 vs XG), so it is not caused by that change.
+
+Read only the ranking of the levels. In absolute terms XG and the rollouts
+disagree widely here:
+- XG's #1 costs 25.9 / 38.8 against the two rollouts (checker play 26.9 /
+  46.3).
+- Sage costs 31-39 against XG.
+- XG's own figures are a mix of 4-ply and Roller+.
+- `XG Roller++` would be the stronger referee if a closer call needs one.
+
 Where the widened rule costs something. A control run (the arm disabled,
 same completed references) reproduces the widened-rule containment-folder
 numbers to the decimal — 6.72 / 5.67 / 3.62 on the S9-play reference and
