@@ -1943,6 +1943,19 @@ PYBIND11_MODULE(bgbot_cpp, m) {
         return out;
     }, "Generate all legal post-move boards");
 
+    m.def("possible_moves_unsorted", [](const std::vector<int>& board, int d1, int d2) {
+        auto b = list_to_board(board);
+        std::vector<Board> results;
+        possible_boards_unsorted(b, d1, d2, results);
+        std::vector<std::vector<int>> out;
+        for (const auto& r : results) {
+            out.emplace_back(r.begin(), r.end());
+        }
+        return out;
+    }, "The legal post-move boards in first-seen generation order, as the\n"
+       "evaluation hot paths see them (possible_moves sorts them). Same set\n"
+       "as possible_moves; exposed so tests can pin the order.");
+
     bgsage_python::bind_move_arrays(m);
 
     m.def("possible_single_die_moves", [](const std::vector<int>& board, int die) {
