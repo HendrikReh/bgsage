@@ -54,6 +54,22 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
 ### Changed
 
+- **Cubeful 2-ply checker play now searches only the 1-ply filter's
+  survivors** (`CUBEFUL_FILTERED_PLIES` in `analyzer.py`).
+  - It used to score every legal move in the cube-aware 2-ply tree. In
+    positions with many moves the pick then often fell on a move the filter
+    had pruned and the 2-ply search over-valued.
+  - Pruned moves keep 1-ply Janowski values and enter the search only
+    through the stale-top-two promotion, as in cubeless N-ply and
+    `batch_checker_play`.
+  - Snake folder, paired against the old 2-ply: checker PR -2.2 to -2.9
+    (+- 0.7) under XG and both rollout references.
+  - Neutral on the money benchmark (-0.016 +- 0.022), the 5-point match
+    benchmark (+0.001 +- 0.012) and the backgame folders. 2-ply checker
+    play runs 2.2-2.4x faster.
+  - 3-ply and deeper still score every move: with the filter, the money
+    benchmark's 3-ply checker PR rose 0.59 -> 0.64.
+
 - **The 2-ply money contact cube life now rises with the average pip count
   too**: x = 0.7625 + 0.00125 x (average pips - 120), about 0.71 at 75 pips
   and 0.80 at 150, instead of a flat 0.80. Every leaf of the 2-ply tree takes
