@@ -135,6 +135,48 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
 ### Fixed
 
+- **N-ply `batch_checker_play` returns the analyzer's list.**
+  - Both N-ply overloads ran the cube-aware tree for every legal move. At
+    2-ply the pick could then land on a move the analyzer's 1-ply filter
+    rejects: the filter that
+    [#26](https://github.com/HendrikReh/bgsage/pull/26) added for the
+    analyzer never reached the batch.
+    Three more differences, at every depth:
+    - the probs came from the cubeless tree;
+    - the cube tree was routed per node, not from the decision's root;
+    - match positions were searched at cube value 1.
+  - On 40 random positions with mixed cube states, the best move differed
+    on 4 at 2-ply, and equities differed by up to 0.71 at 2-ply and 0.33 at
+    3-ply.
+  - The two overloads now share one routine, `batch_checker_play_nply` in
+    `bindings.cpp`. It takes the analyzer's steps one by one:
+    1. the filter;
+    2. the cubeless search with its promotion;
+    3. the cube tree for the searched moves, with 1-ply Janowski for the
+       rest;
+    4. the cubeful promotion, one cube-tree call per promoted move.
+  - The filtered depths come from Python (`cubeful_filtered_plies`, set to
+    `CUBEFUL_FILTERED_PLIES`).
+  - `tests/test_batch_checker_play_parity.py` holds the batch to
+    `BgBotAnalyzer.checker_play` (bearoff database off; the batch attaches
+    none), field for field. It covers 39 positions at 2-ply and 15 at 3-ply,
+    including:
+    - money, match and Crawford positions;
+    - a cube on either side;
+    - a snake under root routing;
+    - promotions that end up best.
+  - Running the cube tree on fewer moves makes it faster. Measured under
+    load from another job (load average 8-15), Stage 11, 10 threads:
+
+    | Batch | before | after |
+    |---|---|---|
+    | 2-ply, 32 positions | 0.21-0.23 s | 0.067-0.069 s |
+    | 2-ply, 256 positions | 1.02-1.07 s | 0.20-0.21 s |
+    | 3-ply, 32 positions | 2.08-2.10 s | 1.91-1.93 s |
+
+    At 3-ply the cubeless search, whose values the cube tree replaced, no
+    longer runs.
+
 - **Batch functions apply Jacoby and the beaver per position.**
   - `batch_evaluate`, `batch_cube_action`, `batch_post_move_evaluate` and
     `batch_checker_play` used to switch Jacoby (and in `batch_evaluate`

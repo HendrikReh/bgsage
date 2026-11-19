@@ -4,9 +4,10 @@
 The cube-aware 2-ply tree used to score every legal move, so the pick could
 fall on a move the filter rejected (snake folder, 2026-11-19: 103 of 795
 cubeful 2-ply picks, 2.2-2.9 PR worse under XG and both rollout references).
-Now the pruned candidates keep 1-ply values, as in the cubeless path and in
-batch_checker_play, and only enter the search through the stale-top-two
-promotion. 3-ply keeps scoring every move (CUBEFUL_FILTERED_PLIES).
+Now the pruned candidates keep 1-ply values, as in the cubeless path, and
+only enter the search through the stale-top-two promotion. 3-ply keeps
+scoring every move (CUBEFUL_FILTERED_PLIES). batch_checker_play follows the
+same steps (tests/test_batch_checker_play_parity.py).
 """
 
 import os
