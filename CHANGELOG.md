@@ -16,6 +16,8 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
 ## [Unreleased]
 
+## [2.0.20261119] - 2026-11-19
+
 ### Added
 
 - **Head-to-head games against XG** (`scripts/xg_h2h.py`). XG has no API,
@@ -586,5 +588,6 @@ The fork's first release.
   module before copying it, because `cp` over a loaded `.so` makes macOS kill
   the next import ([#12](https://github.com/HendrikReh/bgsage/pull/12)).
 
-[Unreleased]: https://github.com/HendrikReh/bgsage/compare/v2.0.20261118...HEAD
+[Unreleased]: https://github.com/HendrikReh/bgsage/compare/v2.0.20261119...HEAD
+[2.0.20261119]: https://github.com/HendrikReh/bgsage/compare/v2.0.20261118...v2.0.20261119
 [2.0.20261118]: https://github.com/HendrikReh/bgsage/releases/tag/v2.0.20261118
