@@ -248,6 +248,27 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
 ### Fixed
 
+- **The batch functions use the bearoff database, as the analyzer does.**
+  - `BgBotAnalyzer` loads the one-sided bearoff database by default; the
+    batch functions never attached it, so the two disagreed on bearoff
+    positions.
+  - On 50 bearoff and near-bearoff positions, `batch_checker_play` picked a
+    different best move than the analyzer on 6-8 of them (1-, 2- and
+    3-ply), with equities up to 0.59 apart. The 1-ply `batch_evaluate` and
+    `batch_post_move_evaluate` were up to 0.20 and 0.11 off.
+  - `BatchModels` now attaches the database by default, as `BgBotAnalyzer`
+    does: `bearoff_db=True`, a path, or `False`. The batch functions take
+    `bearoff_db=` with `weights`.
+    - The 1-ply strategy is wrapped in `BearoffStrategy`.
+    - The N-ply strategies have the database attached to their search.
+    - The database is loaded once per process (1.1 ms); a batch call with
+      it costs about 0.35 ms more.
+  - Batch and analyzer now agree exactly on those positions.
+    `tests/test_batch_checker_play_parity.py` holds the full move lists to
+    the analyzer's with the database and without, now with bearoff fixtures.
+  - Contact positions are unaffected. Bearoff positions get the database's
+    exact values unless `bearoff_db=False` is passed.
+
 - **N-ply `batch_checker_play` returns the analyzer's list.**
   - Both N-ply overloads ran the cube-aware tree for every legal move. At
     2-ply the pick could then land on a move the analyzer's 1-ply filter

@@ -427,7 +427,7 @@ filter_max_moves, filter_threshold, n_threads)` via pybind11; takes `list[dict]`
 sorted by cubeful equity desc. Overloads for 1-ply and for N-ply (1-ply strategy +
 MultiPlyStrategy). The N-ply ones (`batch_checker_play_nply` in `bindings.cpp`) take the
 analyzer's steps, so the Python wrapper returns `BgBotAnalyzer.checker_play`'s list field
-for field (bearoff database off: the batch attaches none). At the depths in
+for field, with the bearoff database as with it off. At the depths in
 `cubeful_filtered_plies` (the wrapper passes `CUBEFUL_FILTERED_PLIES`, i.e. 2-ply) only the
 filter's survivors and promotions go through the cube-aware tree, the rest keep 1-ply
 values; at other depths every move does. `tests/test_batch_checker_play_parity.py`.
@@ -447,7 +447,11 @@ results = batch_checker_play(positions, eval_level="3ply", n_threads=0)
 Each batch call loads the model's weights (~15 ms for Stage 11). Callers that submit many
 small batches pass one `BatchModels` instead, which loads the base strategy once and builds
 every N-ply strategy around it (`bgbot_cpp.create_multipy_from_base`). Results are identical.
-An empty batch loads nothing.
+An empty batch loads nothing. Like `BgBotAnalyzer`, it attaches the one-sided bearoff
+database by default (`bearoff_db=True`, a path, or `False`; loaded once per process): the
+1-ply strategy is wrapped in `BearoffStrategy` and the N-ply strategies stop their search at
+bearoff positions, so batch and analyzer agree there too. The batch functions take
+`bearoff_db=` when they are given `weights` rather than `models`.
 ```python
 from bgsage import BatchModels, batch_checker_play, batch_evaluate
 models = BatchModels()          # or BatchModels(WeightConfig.from_model("stage5"))

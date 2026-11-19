@@ -8,8 +8,7 @@ the cube tree per node instead of from the decision's root, and searched match
 positions at cube value 1. They now go through the analyzer's steps one for
 one (filter, cubeless search and promotion, cube tree for the searched moves,
 1-ply Janowski for the rest, cubeful promotion), so the two lists are equal
-field for field. The batch attaches no bearoff database, so the analyzer here
-runs with ``bearoff_db=False``.
+field for field: with the bearoff database (both default to it) and without.
 """
 
 import os
@@ -32,8 +31,10 @@ from bgsage.board import check_game_over  # noqa: E402
 
 # A snake: the 24-NN layout pins every contact node of its tree to NN 22.
 SNAKE = [0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 2, 3, 3, 2, 2, 1, -7, -7, 0]
-# Both sides home (no bearoff database on either side here).
+# Both sides home: candidates and leaves come from the bearoff database.
 BEAROFF = [0, 3, 3, 2, 3, 2, 2] + [0] * 12 + [-2, -3, -2, -3, -2, -2] + [0]
+# Two checkers still outside: some candidates are bearoff positions, some not.
+NEAR_BEAROFF = [0, 2, 3, 0, 2, 3, 1, 0, 1, 1] + [0] * 9 + [-3, -2, -2, -3, -3, -2] + [0]
 
 CUBES = [
     dict(cube_value=1, cube_owner="centered"),
@@ -67,14 +68,17 @@ def _random_positions(n, seed):
 
 FIXED = [dict(board=SNAKE, die1=6, die2=5, **CUBES[0]),
          dict(board=SNAKE, die1=2, die2=1, **CUBES[4]),
-         dict(board=BEAROFF, die1=4, die2=2, **CUBES[3])]
+         dict(board=BEAROFF, die1=4, die2=2, **CUBES[3]),
+         dict(board=BEAROFF, die1=6, die2=1, **CUBES[0]),
+         dict(board=NEAR_BEAROFF, die1=5, die2=3, **CUBES[0]),
+         dict(board=NEAR_BEAROFF, die1=6, die2=6, **CUBES[1])]
 POSITIONS = {"2ply": _random_positions(36, seed=7) + FIXED,
              "3ply": _random_positions(12, seed=7) + FIXED}
 
 
-def _analyzer_moves(level, positions):
+def _analyzer_moves(level, positions, bearoff_db=True):
     analyzer = BgBotAnalyzer(eval_level=level, cubeful=True, parallel_threads=2,
-                             bearoff_db=False)
+                             bearoff_db=bearoff_db)
     out = []
     for p in positions:
         kw = {k: v for k, v in p.items() if k not in ("board", "die1", "die2")}
@@ -83,9 +87,10 @@ def _analyzer_moves(level, positions):
     return out
 
 
-def _batch_moves(level, positions, n_threads=4):
+def _batch_moves(level, positions, n_threads=4, bearoff_db=None):
     return [[asdict(m) for m in r.moves]
-            for r in batch_checker_play(positions, eval_level=level, n_threads=n_threads)]
+            for r in batch_checker_play(positions, eval_level=level, n_threads=n_threads,
+                                        bearoff_db=bearoff_db)]
 
 
 @pytest.fixture(scope="module", params=["2ply", "3ply"])
@@ -117,8 +122,7 @@ def test_the_fixture_exercises_promotion(lists):
     level, batch, _ = lists
     if level != "2ply":
         pytest.skip("3-ply searches every move")
-    inner = BgBotAnalyzer(eval_level="2ply", cubeful=True, parallel_threads=2,
-                          bearoff_db=False)._analyzer._inner
+    inner = BgBotAnalyzer(eval_level="2ply", cubeful=True, parallel_threads=2)._analyzer._inner
     promoted_best = promoted_any = 0
     for p, moves in zip(POSITIONS["2ply"], batch):
         kw = {k: p[k] for k in ("cube_value", "away1", "away2", "is_crawford") if k in p}
@@ -144,6 +148,24 @@ def test_the_filtered_depths_come_from_python():
         analyzer = _analyzer_moves("2ply", positions)
     assert batch == analyzer
     assert all(m["eval_level"] == "2-ply" for moves in batch for m in moves)
+
+
+def _without_diff(lists):
+    # The 1-ply batch overload computes equity_diff in float: last-digit noise.
+    return [[{k: v for k, v in m.items() if k != "equity_diff"} for m in moves]
+            for moves in lists]
+
+
+def test_without_the_bearoff_database():
+    positions = FIXED[2:]
+    assert _batch_moves("2ply", positions, bearoff_db=False) == \
+        _analyzer_moves("2ply", positions, bearoff_db=False)
+    for db in (False, True):
+        assert _without_diff(_batch_moves("1ply", positions, bearoff_db=db)) == \
+            _without_diff(_analyzer_moves("1ply", positions, bearoff_db=db))
+    # And the database does change these positions.
+    assert _batch_moves("2ply", positions, bearoff_db=False) != \
+        _batch_moves("2ply", positions)
 
 
 def test_thread_count_does_not_change_the_result():
