@@ -16,6 +16,30 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Evaluations with and without the bearoff database no longer share cache
+  entries.**
+  - `BearoffStrategy` reported its base strategy's identity, which keys the
+    cubeful engine's per-thread cache and the rollout's shared cache derived
+    from it. So on one base strategy, a call with the database and one
+    without were served from the same entries, and whichever ran first
+    decided both.
+  - Example: a bearoff race at 2-ply, centered money cube. On a fresh
+    strategy the equity is +0.3049 without the database and +0.1085 with it.
+    On a warm thread the second call returned the first call's value.
+  - The legacy `MultiPlyStrategy` cache, salted by the base pointer alone,
+    had the same flaw for two N-ply strategies around one base.
+  - Now `BearoffDB` has a process-unique data identity, new on every load
+    or generate. The wrapper mixes it into the base's identity, a wrapper
+    over a wrapper of the same database shares that identity, and the
+    legacy cache key folds it in too.
+  - Normal analyzer and batch calls use one configuration per strategy and
+    are unchanged. `tests/test_bearoff_cache_identity.py` covers both call
+    orders against fresh-strategy references, distinct database instances,
+    nested wrappers and the legacy cache. Four of its tests fail on the
+    previous build.
+
 ### Documentation
 
 - `CLAUDE.md` records a paired comparison of the N-ply cube tree's interior
