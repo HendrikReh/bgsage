@@ -37,6 +37,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#include <memory>
+#include <stdexcept>
 #include <vector>
 
 namespace bgbot {
@@ -450,6 +452,27 @@ void accumulate_terminal(
     }
 }
 
+// What one tree node did on each of its 21 rolls, for
+// cube_decision_nply_with_details: the board each roll chose and the value
+// and probs its child returned, plus the node's values before the cube
+// collapse. Filled only at the captured top levels; capturing bypasses the
+// cache lookups of those nodes (a cached node has no per-roll record) but
+// changes no arithmetic, so the values equal an uncaptured evaluation.
+struct NodeCapture;
+struct RollCapture {
+    Board chosen{};                          // post-move board, mover's POV
+    bool terminal = false;                   // the chosen move ends the game
+    float cf[EVAL_MAX_CCI * 2] = {};         // child value per expanded cube state, unweighted
+    std::array<float, NUM_OUTPUTS> probs{};  // child's pre-roll probs (the next mover's POV)
+    NodeCapture* child = nullptr;            // when set, the child node is captured too
+};
+struct NodeCapture {
+    std::array<RollCapture, 21> rolls;
+    int expanded_cci = 0;
+    float arCf[EVAL_MAX_CCI * 2] = {};       // after the perspective flip, before the collapse
+    CubeInfo aci[EVAL_MAX_CCI * 2];          // expanded cube states, this node's perspective
+};
+
 struct DiceRoll21 { int d1, d2, weight; };
 constexpr std::array<DiceRoll21, 21> ALL_ROLLS_21 = {{
     {1,1,1}, {2,2,1}, {3,3,1}, {4,4,1}, {5,5,1}, {6,6,1},
@@ -469,7 +492,8 @@ void cubeful_eval_recursive(
     bool fTop,
     float arCubeful[],
     std::array<float, NUM_OUTPUTS>* arProbsOut,
-    bool allow_parallel = false)
+    bool allow_parallel = false,
+    NodeCapture* capture = nullptr)
 {
     bool is_money = (cci > 0 && aciCubePos[0].cube_value > 0)
                     ? aciCubePos[0].is_money() : true;
@@ -502,8 +526,8 @@ void cubeful_eval_recursive(
                     : 0);
         for (int i = 0; i < cci; ++i) fp = cube_fp_one(fp, aciCubePos[i]);
         key = make_cache_key(board, fp, plies, cci, fTop);
-        if (g_cubeful_eval_cache.get(key, fp, board, plies, cci, fTop,
-                             arCubeful, arProbsOut)) {
+        if (!capture && g_cubeful_eval_cache.get(key, fp, board, plies, cci, fTop,
+                                                 arCubeful, arProbsOut)) {
             return;
         }
     }
@@ -564,7 +588,7 @@ void cubeful_eval_recursive(
     // salted so tree-produced entries can never be confused with entries
     // produced by MultiPlyStrategy::evaluate_probs_nply (same cache,
     // different evaluator => not bit-identical values).
-    bool all_dead = can_cache && !fTop;
+    bool all_dead = can_cache && !fTop && !capture;
     if (all_dead) {
         for (int i = 0; i < cci; ++i) {
             if (aciCubePos[i].cube_value <= 0) continue;   // invalidated slot
@@ -654,6 +678,8 @@ void cubeful_eval_recursive(
         const auto& roll = ALL_ROLLS_21[r];
         const float w = static_cast<float>(roll.weight);
         float arCfLocal[EVAL_MAX_CCI * 2];
+        RollCapture* rc = capture ? &capture->rolls[r] : nullptr;
+        NodeCapture* child_capture = rc ? rc->child : nullptr;
 
         candidates.clear();
         if (candidates.capacity() < 32) candidates.reserve(32);
@@ -673,11 +699,17 @@ void cubeful_eval_recursive(
                                      arCfLocal, &probsTmp);
             } else {
                 cubeful_eval_recursive(opp_board, aci, expanded_cci, ctx, plies - 1,
-                               false, arCfLocal, &probsTmp, child_parallel);
+                               false, arCfLocal, &probsTmp, child_parallel,
+                               child_capture);
             }
             for (int i = 0; i < expanded_cci; i++) rollCf[i] = w * arCfLocal[i];
             for (int k = 0; k < NUM_OUTPUTS; k++)
                 rollProbs[k] = w * probsTmp[k];
+            if (rc) {
+                rc->chosen = board;
+                std::copy(arCfLocal, arCfLocal + expanded_cci, rc->cf);
+                rc->probs = probsTmp;
+            }
             return;
         }
 
@@ -762,6 +794,12 @@ void cubeful_eval_recursive(
             accumulate_terminal(tp, aci, expanded_cci, roll.weight, rollCf);
             for (int k = 0; k < NUM_OUTPUTS; k++)
                 rollProbs[k] = w * tp[k];
+            if (rc) {
+                rc->chosen = chosen;
+                rc->terminal = true;
+                accumulate_terminal(tp, aci, expanded_cci, 1, rc->cf);
+                rc->probs = tp;
+            }
             return;
         }
 
@@ -778,11 +816,17 @@ void cubeful_eval_recursive(
                                  chosen_post_probs, arCfLocal, &probsTmp);
         } else {
             cubeful_eval_recursive(opp_pre_roll, aci, expanded_cci, ctx, plies - 1,
-                           false, arCfLocal, &probsTmp, child_parallel);
+                           false, arCfLocal, &probsTmp, child_parallel,
+                           child_capture);
         }
         for (int i = 0; i < expanded_cci; i++) rollCf[i] = w * arCfLocal[i];
         for (int k = 0; k < NUM_OUTPUTS; k++)
             rollProbs[k] = w * probsTmp[k];
+        if (rc) {
+            rc->chosen = chosen;
+            std::copy(arCfLocal, arCfLocal + expanded_cci, rc->cf);
+            rc->probs = probsTmp;
+        }
     };
 
     // Execute the 21 rolls (serial inside rollout trials; parallel at the
@@ -831,6 +875,12 @@ void cubeful_eval_recursive(
         if (aci[i].cube_value > 0) {
             aci[i] = flip_cube_perspective(aci[i]);
         }
+    }
+
+    if (capture) {
+        capture->expanded_cci = expanded_cci;
+        std::copy(arCf, arCf + expanded_cci, capture->arCf);
+        std::copy(aci, aci + expanded_cci, capture->aci);
     }
 
     get_ecf3_local(arCubeful, cci, arCf, aci);
@@ -969,6 +1019,75 @@ void cubeful_equity_nply_multi(
     }
 }
 
+// The cube decision from the collapsed root values of a cube's ND and DT
+// states (money equity or match MWC, per the cube's own cube value).
+static CubeDecision decision_from_root_values(const CubeInfo& cube, float nd_raw, float dt_raw)
+{
+    bool is_money = cube.is_money();
+
+    CubeDecision result = {};
+
+    if (is_money) {
+        result.equity_nd = nd_raw;
+        float actual_dt = 2.0f * dt_raw;
+        result.equity_dp = 1.0f;
+
+        if (cube.beaver && actual_dt < 0.0f) {
+            result.equity_dt = 2.0f * actual_dt;
+            result.is_beaver = true;
+        } else {
+            result.equity_dt = actual_dt;
+        }
+    } else {
+        int away1 = cube.match.away1;
+        int away2 = cube.match.away2;
+        int cv = cube.cube_value;
+        bool craw = cube.match.is_crawford;
+        float dp_m = dp_mwc(away1, away2, cv, craw);
+        result.equity_nd = mwc2eq(nd_raw, away1, away2, cv, craw);
+        result.equity_dt = mwc2eq(dt_raw, away1, away2, cv, craw);
+        result.equity_dp = mwc2eq(dp_m,   away1, away2, cv, craw);
+    }
+
+    bool player_can_double = can_double(cube);
+    bool auto_double = (!is_money && !cube.match.is_crawford &&
+                        player_can_double &&
+                        cube.match.away1 > 1 && cube.match.away2 == 1);
+
+    if (!player_can_double) {
+        result.should_double = false;
+        result.should_take = true;
+        result.optimal_equity = result.equity_nd;
+    } else if (is_money) {
+        float best_double = std::min(result.equity_dt, result.equity_dp);
+        result.should_double = (best_double > result.equity_nd);
+        result.should_take = (result.equity_dt <= result.equity_dp);
+        result.optimal_equity = result.should_double
+            ? std::min(result.equity_dt, result.equity_dp)
+            : result.equity_nd;
+    } else if (auto_double) {
+        float dt_m = dt_raw;
+        float dp_m_val = dp_mwc(cube.match.away1, cube.match.away2,
+                                cube.cube_value, cube.match.is_crawford);
+        result.should_double = true;
+        result.should_take = (dt_m <= dp_m_val);
+        result.optimal_equity = std::min(result.equity_dt, result.equity_dp);
+    } else {
+        float nd_m = nd_raw;
+        float dt_m = dt_raw;
+        float dp_m_val = dp_mwc(cube.match.away1, cube.match.away2,
+                                cube.cube_value, cube.match.is_crawford);
+        float best_double = std::min(dt_m, dp_m_val);
+        result.should_double = (best_double > nd_m);
+        result.should_take = (dt_m <= dp_m_val);
+        result.optimal_equity = result.should_double
+            ? std::min(result.equity_dt, result.equity_dp)
+            : result.equity_nd;
+    }
+
+    return result;
+}
+
 void cube_decision_nply_multi(
     const Board& board,
     const CubeInfo* cubes,
@@ -1016,75 +1135,138 @@ void cube_decision_nply_multi(
     cubeful_eval_recursive(board, aciCubePos, n_states, ctx, n_plies, /*fTop=*/true,
                    arCubeful, nullptr, allow_parallel);
 
-    // Unpack per-branch decisions — identical to cube_decision_nply_multi.
+    // Unpack per-branch decisions.
     for (int i = 0; i < n_cubes; ++i) {
-        const CubeInfo& cube = cubes[i];
-        float nd_raw = arCubeful[2 * i];
-        float dt_raw = arCubeful[2 * i + 1];
-        bool is_money = cube.is_money();
-
-        CubeDecision result = {};
-
-        if (is_money) {
-            result.equity_nd = nd_raw;
-            float actual_dt = 2.0f * dt_raw;
-            result.equity_dp = 1.0f;
-
-            if (cube.beaver && actual_dt < 0.0f) {
-                result.equity_dt = 2.0f * actual_dt;
-                result.is_beaver = true;
-            } else {
-                result.equity_dt = actual_dt;
-            }
-        } else {
-            int away1 = cube.match.away1;
-            int away2 = cube.match.away2;
-            int cv = cube.cube_value;
-            bool craw = cube.match.is_crawford;
-            float dp_m = dp_mwc(away1, away2, cv, craw);
-            result.equity_nd = mwc2eq(nd_raw, away1, away2, cv, craw);
-            result.equity_dt = mwc2eq(dt_raw, away1, away2, cv, craw);
-            result.equity_dp = mwc2eq(dp_m,   away1, away2, cv, craw);
-        }
-
-        bool player_can_double = can_double(cube);
-        bool auto_double = (!is_money && !cube.match.is_crawford &&
-                            player_can_double &&
-                            cube.match.away1 > 1 && cube.match.away2 == 1);
-
-        if (!player_can_double) {
-            result.should_double = false;
-            result.should_take = true;
-            result.optimal_equity = result.equity_nd;
-        } else if (is_money) {
-            float best_double = std::min(result.equity_dt, result.equity_dp);
-            result.should_double = (best_double > result.equity_nd);
-            result.should_take = (result.equity_dt <= result.equity_dp);
-            result.optimal_equity = result.should_double
-                ? std::min(result.equity_dt, result.equity_dp)
-                : result.equity_nd;
-        } else if (auto_double) {
-            float dt_m = dt_raw;
-            float dp_m_val = dp_mwc(cube.match.away1, cube.match.away2,
-                                    cube.cube_value, cube.match.is_crawford);
-            result.should_double = true;
-            result.should_take = (dt_m <= dp_m_val);
-            result.optimal_equity = std::min(result.equity_dt, result.equity_dp);
-        } else {
-            float nd_m = nd_raw;
-            float dt_m = dt_raw;
-            float dp_m_val = dp_mwc(cube.match.away1, cube.match.away2,
-                                    cube.cube_value, cube.match.is_crawford);
-            float best_double = std::min(dt_m, dp_m_val);
-            result.should_double = (best_double > nd_m);
-            result.should_take = (dt_m <= dp_m_val);
-            result.optimal_equity = result.should_double
-                ? std::min(result.equity_dt, result.equity_dp)
-                : result.equity_nd;
-        }
-
-        out[i] = result;
+        out[i] = decision_from_root_values(cubes[i], arCubeful[2 * i],
+                                           arCubeful[2 * i + 1]);
     }
+}
+
+// ======================== Cube decision with per-roll details ========================
+
+// Opponent-roll equities of one captured player roll, for one cube scenario
+// (ND: states nd_idx/dt_idx = 0/1, DT: 4/5 of the opponent node). The
+// opponent's own cube decision in that scenario picks which branch the
+// per-roll values come from: D/P ends the game (no opponent rolls), D/T
+// takes the redoubled branch, otherwise the branch as it stands. Values are
+// scaled to per-initial-cube units, player's perspective.
+static void opponent_roll_equities(
+    PlayerRollDetail& detail, const NodeCapture& opp,
+    int nd_idx, int dt_idx, int branch_cv, int redouble_cv, int initial_cv,
+    int away1, int away2, bool is_crawford, bool is_money)
+{
+    int idx = nd_idx, cv = branch_cv;
+    if (opp.aci[dt_idx].cube_value > 0) {
+        const CubeInfo& nd = opp.aci[nd_idx];
+        float rND = opp.arCf[nd_idx];
+        float rDT = is_money ? 2.0f * opp.arCf[dt_idx] : opp.arCf[dt_idx];
+        float rDP = is_money ? 1.0f
+                             : dp_mwc(nd.match.away1, nd.match.away2,
+                                      nd.cube_value, nd.match.is_crawford);
+        if (is_money && nd.beaver && rDT < 0.0f) rDT = 2.0f * rDT;
+        const bool doubles = (rDT >= rND && rDP >= rND);
+        if (doubles && rDT > rDP) {
+            detail.opponent_dp = true;
+            detail.opponent_rolls.clear();
+            return;
+        }
+        if (doubles) { idx = dt_idx; cv = redouble_cv; }
+    }
+    const float scale = static_cast<float>(cv) / static_cast<float>(initial_cv);
+    for (int o = 0; o < 21; ++o) {
+        const float raw = opp.rolls[o].cf[idx];
+        detail.opponent_rolls[o].cubeful_equity = is_money
+            ? scale * raw : mwc2eq(raw, away1, away2, cv, is_crawford);
+    }
+}
+
+CubeDecision cube_decision_nply_with_details(
+    const Board& board,
+    const CubeInfo& cube,
+    const Strategy& strategy,
+    int n_plies,
+    const MoveFilter& filter,
+    int n_threads,
+    TwoPlyDetails& details,
+    const Strategy* move_filter)
+{
+    (void)filter;  // candidate selection inside the tree is single-pick
+    if (n_plies < 2) {
+        throw std::invalid_argument("cube_decision_nply_with_details requires n_plies >= 2");
+    }
+
+    // The tree cube_decision_nply_multi walks for one cube, with the player
+    // rolls (and, from 3-ply, the opponent rolls below them) captured.
+    CubeInfo aciCubePos[2] = {cube, cube};
+    aciCubePos[1].cube_value = 2 * cube.cube_value;
+    aciCubePos[1].owner = CubeOwner::OPPONENT;
+
+    auto root = std::make_unique<NodeCapture>();
+    std::vector<std::unique_ptr<NodeCapture>> children;
+    if (n_plies >= 3) {
+        for (int r = 0; r < 21; ++r) {
+            children.push_back(std::make_unique<NodeCapture>());
+            root->rolls[r].child = children.back().get();
+        }
+    }
+
+    EvalCtx ctx{&strategy, move_filter, n_plies, n_threads, /*deep_prefilter=*/false};
+    ctx.pinned_nn = strategy.root_pin_for(board);
+    const bool allow_parallel = (n_threads > 1 && n_plies > 2);
+    float arCubeful[EVAL_MAX_CCI];
+    cubeful_eval_recursive(board, aciCubePos, 2, ctx, n_plies, /*fTop=*/true,
+                           arCubeful, nullptr, allow_parallel, root.get());
+    CubeDecision cd = decision_from_root_values(cube, arCubeful[0], arCubeful[1]);
+
+    // Root states after the fTop expansion: 0 = ND, 2 = DT (1 and 3 unused).
+    // A roll's child value in those slots is the opponent's collapsed value
+    // (opponent's perspective), which already includes the opponent's own
+    // cube decision.
+    const bool is_money = cube.is_money();
+    const int cv = cube.cube_value;
+    const int a1 = cube.match.away1, a2 = cube.match.away2;
+    const bool craw = cube.match.is_crawford;
+
+    details.nd_player_rolls.assign(21, PlayerRollDetail{});
+    details.dt_player_rolls.assign(21, PlayerRollDetail{});
+    for (int r = 0; r < 21; ++r) {
+        const RollCapture& rc = root->rolls[r];
+        auto& nd = details.nd_player_rolls[r];
+        auto& dt = details.dt_player_rolls[r];
+        for (auto* d : {&nd, &dt}) {
+            d->die1 = ALL_ROLLS_21[r].d1;
+            d->die2 = ALL_ROLLS_21[r].d2;
+            d->post_move_board = rc.chosen;
+            d->is_terminal = rc.terminal;
+            // Player's perspective: the terminal probs of the player's own
+            // winning move, else the opponent node's pre-roll probs inverted.
+            d->probs = rc.terminal ? terminal_probs(check_game_over(rc.chosen))
+                                   : invert_probs(rc.probs);
+        }
+        if (is_money) {
+            nd.cubeful_equity = -rc.cf[0];
+            dt.cubeful_equity = -2.0f * rc.cf[2];
+        } else {
+            nd.cubeful_equity = mwc2eq(1.0f - rc.cf[0], a1, a2, cv, craw);
+            dt.cubeful_equity = mwc2eq(1.0f - rc.cf[2], a1, a2, 2 * cv, craw);
+        }
+
+        if (rc.terminal || !rc.child) continue;   // no opponent-roll level
+        const NodeCapture& opp = *rc.child;
+        for (auto* d : {&nd, &dt}) {
+            d->opponent_rolls.resize(21);
+            for (int o = 0; o < 21; ++o) {
+                auto& od = d->opponent_rolls[o];
+                od.die1 = ALL_ROLLS_21[o].d1;
+                od.die2 = ALL_ROLLS_21[o].d2;
+                od.post_move_board = flip(opp.rolls[o].chosen);
+                od.probs = opp.rolls[o].probs;   // player's pre-roll POV
+            }
+        }
+        opponent_roll_equities(nd, opp, 0, 1, cv, 2 * cv, cv, a1, a2, craw, is_money);
+        opponent_roll_equities(dt, opp, 4, 5, 2 * cv, 4 * cv, cv, a1, a2, craw, is_money);
+    }
+    return cd;
 }
 
 } // namespace bgbot
