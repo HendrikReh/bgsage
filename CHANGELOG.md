@@ -7,13 +7,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 The fork branched from upstream at `139427d` (2026-10-17, "Add compact
 all-roll legal move arrays for video reconstruction"). Everything before that
 commit is upstream's history; see `git log 139427d`. The fork targets macOS
-on Apple Silicon only (see "Platform Scope" in `CLAUDE.md`). Releases keep upstream's `2.0.YYYYMMDD` version scheme, dated by the fork's
-release. They are published as GitHub releases with Apple Silicon wheels,
-not on PyPI.
+on Apple Silicon only (see "Platform Scope" in `CLAUDE.md`). Releases are
+published as GitHub releases with Apple Silicon wheels, not on PyPI.
+
+From 3.0.0 on, versions follow [Semantic Versioning](https://semver.org/):
+a major version for breaking changes, a minor one for new features, a patch
+for fixes. The earlier releases used upstream's `MAJOR.MINOR.YYYYMMDD` scheme
+(`2.0.20261118`, `2.0.20261119`).
 
 Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
 ## [Unreleased]
+
+## [3.0.0] - 2026-11-20
 
 ### Added
 
@@ -45,6 +51,9 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
 ### Changed
 
+- **Versions follow Semantic Versioning**, starting with this release (3.0.0),
+  instead of upstream's date-based `2.0.YYYYMMDD`. The major version marks the
+  breaking rename and the removal of every platform but Apple Silicon.
 - **The project is now NeonGammon** (it was `bgsage`). Breaking for imports.
   - Repository: `HendrikReh/bgsage` -> `HendrikReh/neongammon`. GitHub
     redirects the old URLs, clones and remotes; `git remote set-url origin
@@ -792,6 +801,7 @@ The fork's first release.
   module before copying it, because `cp` over a loaded `.so` makes macOS kill
   the next import ([#12](https://github.com/HendrikReh/neongammon/pull/12)).
 
-[Unreleased]: https://github.com/HendrikReh/neongammon/compare/v2.0.20261119...HEAD
+[Unreleased]: https://github.com/HendrikReh/neongammon/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/HendrikReh/neongammon/compare/v2.0.20261119...v3.0.0
 [2.0.20261119]: https://github.com/HendrikReh/neongammon/compare/v2.0.20261118...v2.0.20261119
 [2.0.20261118]: https://github.com/HendrikReh/neongammon/releases/tag/v2.0.20261118

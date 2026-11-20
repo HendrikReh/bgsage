@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "neongammon"
-version = "2.0.20261119"
+version = "3.0.0"
 description = "Neongammon — a neural-network backgammon engine for Apple Silicon (fork of Open Sage / markbgsage/bgsage)"
 readme = "README.md"
 license = "MPL-2.0"
