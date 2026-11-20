@@ -2,7 +2,7 @@
 
 The public package exports `simulate_game`, `simulate_match`, `GameConfig`,
 `SimulationCancelled` and `SimulationLimitExceeded`. The package contains the
-implementation; no repository scripts, Neongammon Pro installation, account or network
+implementation; no repository scripts, Sage Pro installation, account or network
 are needed. Python orchestrates rules and records; the native engine generates
 legal moves, detects game results, and evaluates decisions.
 
@@ -72,5 +72,5 @@ queried from the responder's policy with the **doubler's perspective**, because
 the public cube API's `should_take` describes the opponent's action. Do not flip
 that board before returning `should_take`. The API never runs arbitrary code
 received over a network. For batches, use processes and independent seeds;
-avoid sharing mutable analyzers concurrently. In Neongammon Pro use Research's paced
+avoid sharing mutable analyzers concurrently. In Sage Pro use Research's paced
 worker jobs rather than running large batches inside the API process.

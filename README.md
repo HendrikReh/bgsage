@@ -1,12 +1,12 @@
-# Neongammon
+# NeonGammon
 
 A fork of [markbgsage/bgsage](https://github.com/markbgsage/bgsage) (the Open Sage bot engine), focused on Apple Silicon.
 
-Neongammon is a "backgammon bot engine" - that is, a library that you can ask questions like "what's the best
+NeonGammon is a "backgammon bot engine" - that is, a library that you can ask questions like "what's the best
 move in this situation, with all the analytics to back it up", or "is this a double, and if so, is it a take or a pass 
 (including analytics)?".
 
-> **This is an Apple Silicon fork.** Neongammon ([HendrikReh/neongammon](https://github.com/HendrikReh/neongammon),
+> **This is an Apple Silicon fork.** NeonGammon ([HendrikReh/neongammon](https://github.com/HendrikReh/neongammon),
 > formerly `HendrikReh/bgsage`) is a fork of [markbgsage/bgsage](https://github.com/markbgsage/bgsage). It targets **macOS on Apple Silicon (arm64) only**, and is
 > optimised for it. Batched neural-network evaluation runs through Apple's Accelerate framework on the CPU's matrix unit
 > (SME on M4, AMX on M1-M3). Upstream's Windows, Linux and NVIDIA/CUDA code has been removed; the one build for
@@ -81,7 +81,7 @@ on the Mac, XG runs under CrossOver, and its Batch Analyze reads the files this 
 
 ## License
 
-Neongammon is released under the **Mozilla Public License 2.0** — see [LICENSE](LICENSE).
+NeonGammon is released under the **Mozilla Public License 2.0** — see [LICENSE](LICENSE).
 Files that came from upstream keep their original copyright notices (Mark Higgins).
 
 That covers everything in this repository, including the **trained model weights** in
@@ -91,9 +91,9 @@ use them in a commercial product.
 
 In plain English:
 
-* **You can use Neongammon in a commercial, closed-source product.** Import it, link it,
+* **You can use NeonGammon in a commercial, closed-source product.** Import it, link it,
   bundle the weights, ship it. Your own code stays yours, under whatever license you choose.
-* **If you modify a file that came from Neongammon and distribute it, publish that file's
+* **If you modify a file that came from NeonGammon and distribute it, publish that file's
   source** under the MPL, so the improvement comes back to everyone. Files *you* write remain
   entirely yours, even when they sit right alongside ours.
 * **Private use carries no obligations at all.** Experiment, retrain, tinker — if you aren't
