@@ -12,7 +12,7 @@
 | 4. Thread budget of one, work per worker | done in [#44](https://github.com/HendrikReh/bgsage/pull/44) |
 | 5. One scoring routine for single and batch checker play | done in [#45](https://github.com/HendrikReh/bgsage/pull/45) (`score_checker_position`) |
 
-Found along the way, not done: `MultiPlyStrategy`'s default N-ply tree hands the engine its raw base, so its bearoff database applies at the root only, not to bearoff positions inside the tree (affects the N-ply `batch_evaluate` / `batch_post_move_evaluate` and the analyzer's cubeless N-ply path). Fixing it changes results.
+A suspected gap noted during section 1 turned out not to exist: `MultiPlyStrategy`'s default N-ply tree hands the engine `*base_`, but `set_bearoff_db` replaces `base_` itself with a `BearoffStrategy` over the database, so the database applies throughout the tree, not only at the root. Checked 2026-11-20 on a position whose roots are not bearoff positions but whose leaves are: 2-ply equities with `multipy_set_bearoff_db` equal those of an N-ply strategy built around an explicit `BearoffStrategy`, and differ from those without the database.
 
 The line anchors below point at `0dee4f3`; the sections above have moved code since.
 
