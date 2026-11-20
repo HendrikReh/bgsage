@@ -44,6 +44,31 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
     a bearoff position and a root-routed snake, and checks seeded
     simulation records.
 
+### Changed
+
+- **The analyzer loads each model once on its checker side and shares the
+  bearoff database.**
+  - A 3-ply `BgBotAnalyzer` loaded Stage 11 three times:
+    - for its 1-ply strategy;
+    - again inside `create_multipy` for the N-ply strategy;
+    - once more for the cube strategy on its first cube action.
+
+    Every analyzer also read the bearoff database from disk.
+  - Now the N-ply strategy is built around the 1-ply strategy's base
+    (`create_multipy_from_base`), as is the rollout analyzer's 2-ply
+    prefilter strategy. The cube strategy keeps its own base, so its
+    evaluator configuration stays separate.
+  - The database is loaded once per process (`analyzer.load_bearoff_db`) and
+    shared with `BatchModels`. `BatchModels` now loads it on first use, so
+    an empty batch loads neither a model nor the database.
+  - Constructing a 3-ply analyzer takes 17-20 ms instead of 35-41 ms
+    (median of 15). First and later analyses are unchanged.
+  - `tests/test_analyzer_model_reuse.py` counts the model and database loads
+    at each stage. It also compares whole results (checker play, cube
+    action, post-move) against the old construction at 2-ply and 3-ply for
+    Stage 11, Stage 5, a custom database path and no database, including a
+    root-routed snake and a bearoff position.
+
 ### Fixed
 
 - **Evaluations with and without the bearoff database no longer share cache

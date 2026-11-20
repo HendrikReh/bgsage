@@ -18,6 +18,7 @@ Typical usage::
 
 from __future__ import annotations
 
+import functools
 import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -96,6 +97,15 @@ def _default_parallel_threads() -> int:
     except ValueError:
         return 0
     return max(parsed, 0)
+
+
+@functools.lru_cache(maxsize=None)
+def load_bearoff_db(path: str):
+    """The one-sided bearoff database at ``path``, loaded once per process
+    and shared (it is immutable once loaded; its data identity keys the
+    evaluation caches), or None when it does not load."""
+    db = bgbot_cpp.BearoffDB()
+    return db if db.load(path) else None
 
 
 # ---------------------------------------------------------------------------
@@ -424,8 +434,11 @@ class _MultiPlyAnalyzer(_CubelessBase):
         elif n_plies > 1:
             requested_threads = max(2, parallel_threads)
         self._parallel_threads = requested_threads
-        self._strategy_nply = bgbot_cpp.create_multipy(
-            weights.strategy_type, weights.weight_paths_list, weights.hidden_sizes_list,
+        # Around the 1-ply strategy's loaded base: the weights are immutable,
+        # so the checker side loads them once (the cube strategy keeps its
+        # own, see _cube_strategy).
+        self._strategy_nply = bgbot_cpp.create_multipy_from_base(
+            self._strategy_1ply,
             n_plies=n_plies,
             parallel_evaluate=parallel_evaluate,
             parallel_threads=self._parallel_threads,
@@ -571,10 +584,8 @@ class _RolloutAnalyzer(_CubelessBase):
         self._prefilter_threshold = float(prefilter_threshold)
         self._strategy_2ply = None
         if self._prefilter_threshold > 0:
-            self._strategy_2ply = bgbot_cpp.create_multipy(
-                weights.strategy_type,
-                weights.weight_paths_list,
-                weights.hidden_sizes_list,
+            self._strategy_2ply = bgbot_cpp.create_multipy_from_base(
+                self._strategy_1ply,
                 n_plies=2,
                 parallel_evaluate=True,
                 parallel_threads=max(2, _default_parallel_threads()),
@@ -1394,9 +1405,7 @@ class BgBotAnalyzer:
         if bearoff_db:
             db_path = bearoff_db if isinstance(bearoff_db, str) else bearoff_db_path()
             if db_path:
-                self._bearoff_db = bgbot_cpp.BearoffDB()
-                if not self._bearoff_db.load(db_path):
-                    self._bearoff_db = None
+                self._bearoff_db = load_bearoff_db(db_path)
 
         if eval_level == "1ply":
             inner: _CubelessBase = _OnePlyAnalyzer(
