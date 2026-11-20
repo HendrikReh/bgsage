@@ -13,7 +13,7 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "build"))
 sys.path.insert(0, str(REPO / "python"))
 
-from bgsage import BgBotAnalyzer
+from neongammon import BgBotAnalyzer
 
 # Post-move position after 8/6 8/3 (from the analyzed conversation)
 POST = [0, 2, 2, 2, 2, 0, 3, 0, 0, 1, 0, 0, -4, 2, 0, 0, 0, -3, 0, -2, -4, 1, -2, 0, 0, 0]

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MPL-2.0
 # Copyright (C) 2026 Mark Higgins
-"""Benchmark PR scored against XG references instead of Sage references.
+"""Benchmark PR scored against XG references instead of Neongammon references.
 
-The normal benchmark scores a bot against Sage's own tiered reference (Sage 3T
-for 3T-tier decisions, Sage full rollout for rollout-tier decisions). This
+The normal benchmark scores a bot against Neongammon's own tiered reference (Neongammon 3T
+for 3T-tier decisions, Neongammon full rollout for rollout-tier decisions). This
 script swaps the reference to XG's data:
 
     3T-tier decision      -> XG Roller++ result (xg_results/rollerpp.jsonl)
@@ -12,20 +12,20 @@ script swaps the reference to XG's data:
 
 and scores two players against it:
 
-    Sage 3T      -- Sage's truncated-3 pick (argmax equity in build/stage2_3t.jsonl)
+    Neongammon 3T      -- Neongammon's truncated-3 pick (argmax equity in build/stage2_3t.jsonl)
     XG Roller++  -- XG's Roller++ pick (argmax equity in xg_results/rollerpp.jsonl)
 
 Only decisions from games that have XG *rollout* data (the seeds present in
 rollout.jsonl) are considered; 3P-tier decisions are excluded (no XG reference).
 
 Error formulas are the benchmark's own (bm._scored / bm._aggregate), so the PR
-numbers are directly comparable to the Sage-referenced benchmark PRs.
+numbers are directly comparable to the Neongammon-referenced benchmark PRs.
 
 Caveats surfaced in the report:
   * On 3T-tier decisions XG Roller++ IS the reference, so it scores ~0 there by
     construction. The only head-to-head where neither player is the reference is
     the rollout tier. The report breaks PR down by tier for exactly this reason.
-  * For rollout-tier decisions XG only rolled the moves within 0.02 of Sage's
+  * For rollout-tier decisions XG only rolled the moves within 0.02 of Neongammon's
     best, so a pick outside that set (a mismatch) is charged the biggest error
     among the rolled moves (best - worst rolled) -- a conservative penalty, not
     dropped, so weaker levels aren't flattered.
@@ -191,7 +191,7 @@ def _fmt(a: dict) -> str:
             f"[{a['n_checker']}c+{a['n_cube']}q] blunders={a['blunders']['total']}")
 
 
-NAMES = {"sage3t": "Sage 3T", "xgpp": "XG Roller++"}
+NAMES = {"sage3t": "Neongammon 3T", "xgpp": "XG Roller++"}
 
 
 def main(argv=None):

@@ -30,7 +30,7 @@ from .types import (
 
 
 def __getattr__(name):
-    # GNUBG_CLI reports the binary resolved by bgsage.settings (configure it
+    # GNUBG_CLI reports the binary resolved by neongammon.settings (configure it
     # there, not by assignment).
     if name == 'GNUBG_CLI':
         return settings.gnubg_path()
@@ -57,7 +57,7 @@ def _run_gnubg(cmd, timeout=60, gnubg_path=None):
     """Run the GNUbg CLI with the given command and return stdout.
 
     ``gnubg_path`` overrides the binary; by default it is resolved by
-    :func:`bgsage.settings.gnubg_path` on every call.
+    :func:`neongammon.settings.gnubg_path` on every call.
     """
     exe = gnubg_path or settings.gnubg_path()
     with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
@@ -292,7 +292,7 @@ def post_move_analytics(checkers, n_plies=0, timeout=60, jacoby=True, gnubg_path
         n_plies: evaluation depth (0, 1, 2, or 3)
         timeout: seconds before killing gnubg process
         jacoby: if True, enable Jacoby rule
-        gnubg_path: GNUbg binary to run (default: bgsage.settings.gnubg_path())
+        gnubg_path: GNUbg binary to run (default: neongammon.settings.gnubg_path())
 
     Returns:
         dict with:
@@ -414,7 +414,7 @@ class GnuBgAnalyzer:
 
     Usage::
 
-        from bgsage import GnuBgAnalyzer
+        from neongammon import GnuBgAnalyzer
         analyzer = GnuBgAnalyzer(eval_level="3ply")
         cube = analyzer.cube_action(board, cube_value=1, cube_owner="centered")
         print(cube.equity_nd, cube.equity_dt, cube.optimal_action)
@@ -422,7 +422,7 @@ class GnuBgAnalyzer:
 
     def __init__(self, eval_level="1ply", timeout=120, jacoby=True, gnubg_path=None):
         """``gnubg_path``: the GNUbg binary for this analyzer; ``None`` uses
-        :func:`bgsage.settings.gnubg_path` (code setting, ``BGSAGE_GNUBG``,
+        :func:`neongammon.settings.gnubg_path` (code setting, ``NEONGAMMON_GNUBG``,
         the user settings file, then auto-detection)."""
         self.gnubg_path = os.fspath(gnubg_path) if gnubg_path is not None else None
         if eval_level not in _EVAL_LEVELS:

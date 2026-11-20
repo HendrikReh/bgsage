@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MPL-2.0
 # Copyright (C) 2026 Mark Higgins
-"""High-level analysis interface for the Open Sage bot engine.
+"""High-level analysis interface for the Neongammon bot engine.
 
 This module provides :class:`BgBotAnalyzer`, the main entry point for
 checker play and cube action analysis at any evaluation level (1-ply
@@ -8,7 +8,7 @@ through N-ply and Monte Carlo rollout).
 
 Typical usage::
 
-    from bgsage import BgBotAnalyzer
+    from neongammon import BgBotAnalyzer
 
     analyzer = BgBotAnalyzer()                       # 1-ply, cubeful
     result = analyzer.checker_play(STARTING_BOARD, 3, 1)
@@ -160,7 +160,7 @@ MONEY_CONTACT_CUBE_LIFE: dict[int, float] = {1: 0.7375, 2: 0.7625}
 #: the money benchmark's cube positions, half the seeds at a time; scored on
 #: the other half against a flat cube life fitted the same way, cube PR
 #: 2.07 -> 1.68 (1-ply) and 1.09 -> 0.90 (2-ply) against XG, 2.49 -> 1.98
-#: and 1.44 -> 1.21 against the Sage reference, with fewer blunders
+#: and 1.44 -> 1.21 against the Neongammon reference, with fewer blunders
 #: (scripts/fit_contact_cube_life.py).
 MONEY_CONTACT_CUBE_LIFE_PIP_SLOPE: dict[int, float] = {1: 0.00175, 2: 0.00125}
 
@@ -1247,7 +1247,7 @@ def _optimal_action(should_double: bool, should_take: bool,
 
 
 class BgBotAnalyzer:
-    """High-level interface to the Open Sage bot engine.
+    """High-level interface to the Neongammon bot engine.
 
     Thread-safe: multiple threads can call methods concurrently.
 
@@ -1674,7 +1674,7 @@ class BgBotAnalyzer:
                     jacoby=jacoby,
                     bearoff_db=getattr(inner, '_bearoff_db', None),
                 )
-                # invert_probs from bgsage.board: [W, gW, bW, gL, bL] in opp's
+                # invert_probs from neongammon.board: [W, gW, bW, gL, bL] in opp's
                 # POV → [1-W, gL, bL, gW, bW] in our POV
                 probs = [1.0 - opp_probs[0],
                          opp_probs[3], opp_probs[4],
@@ -1885,11 +1885,11 @@ class BgBotAnalyzer:
         Convenience wrapper: runs the cube analysis this analyzer's eval level
         implies (with per-roll details) and computes luck from it. Callers that
         already hold a ``cube_action(incl_2ply_details=True)`` result should call
-        :func:`bgsage.roll_luck` on it directly to avoid a second evaluation.
+        :func:`neongammon.roll_luck` on it directly to avoid a second evaluation.
 
         ``is_opening_roll=True`` excludes doubles (an opening roll has 15 rolls,
         not 21). Returns ``None`` on a degenerate position. See
-        :func:`bgsage.luck.roll_luck` for the meaning of the result.
+        :func:`neongammon.luck.roll_luck` for the meaning of the result.
         """
         cube = self.cube_action(
             board, cube_value, cube_owner,

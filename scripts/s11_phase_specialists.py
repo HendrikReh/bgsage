@@ -56,7 +56,7 @@ for _p in (_PROJECT_ROOT / "python", _PROJECT_ROOT / "build", _SCRIPT_DIR):
         sys.path.insert(0, str(_p))
 
 import bgbot_cpp  # noqa: E402
-from bgsage import sl_train
+from neongammon import sl_train
 import numpy as np  # noqa: E402
 
 _DATA = _PROJECT_ROOT / "data"
@@ -205,9 +205,9 @@ def train_specialist(target: str) -> Path:
 # Scoring: phase slices of the ten folders, installed trio vs specialist trio
 # ---------------------------------------------------------------------------
 def score(specialists: dict[str, Path]) -> None:
-    from bgsage import BgBotAnalyzer
-    from bgsage import weights as W
-    from bgsage.weights import WeightConfigPair
+    from neongammon import BgBotAnalyzer
+    from neongammon import weights as W
+    from neongammon.weights import WeightConfigPair
     from benchmark_money import BLUNDER_THRESHOLD
 
     def trio(name: str, deep_file: str) -> WeightConfigPair:

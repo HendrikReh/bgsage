@@ -27,13 +27,13 @@ build_dirs = [
 for build_dir in reversed(build_dirs):
     if os.path.isdir(build_dir):
         sys.path.insert(0, build_dir)
-sys.path.insert(0, os.path.join(project_dir, 'bgsage', 'python'))
+sys.path.insert(0, os.path.join(project_dir, 'neongammon', 'python'))
 
 import bgbot_cpp
-from bgsage.data import load_benchmark_file, load_benchmark_scenarios_by_indices
-from bgsage.weights import WeightConfig, WeightConfigPair, MODELS
+from neongammon.data import load_benchmark_file, load_benchmark_scenarios_by_indices
+from neongammon.weights import WeightConfig, WeightConfigPair, MODELS
 
-DATA_DIR = os.path.join(project_dir, 'bgsage', 'data')
+DATA_DIR = os.path.join(project_dir, 'neongammon', 'data')
 
 
 def main():

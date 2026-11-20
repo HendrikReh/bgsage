@@ -3,26 +3,26 @@
 # Copyright (C) 2026 Mark Higgins
 """Multi-level PR against the XG full-rollout reference (rollout-tier only).
 
-Scores six evaluation levels -- Sage 1T/2T/3T and XG Roller/Roller+/Roller++ --
+Scores six evaluation levels -- Neongammon 1T/2T/3T and XG Roller/Roller+/Roller++ --
 against XG's full rollout on the rollout-tier positions we have XG rollout data
 for. Everything comes from existing caches; nothing is re-computed:
 
-  Sage 1T pick  <- recovered from scores/sage_1t_clean72.jsonl (error -> move)
-  Sage 2T pick  <- recovered from scores/sage_2t_clean.jsonl
-  Sage 3T pick  <- build/stage2_3t.jsonl (argmax equity)
+  Neongammon 1T pick  <- recovered from scores/sage_1t_clean72.jsonl (error -> move)
+  Neongammon 2T pick  <- recovered from scores/sage_2t_clean.jsonl
+  Neongammon 3T pick  <- build/stage2_3t.jsonl (argmax equity)
   XG Roller++   <- xg/seed_<N>_pp.xg     (batch-analyze #1 move / cube action)
   XG Roller+    <- xg/seed_<N>_p.xg
   XG Roller     <- xg/seed_<N>_roller.xg
   reference     <- xg_results/rollout.jsonl (XG full rollout)
 
-Pick recovery: the Sage score caches store each level's equity error vs the Sage
+Pick recovery: the Neongammon score caches store each level's equity error vs the Neongammon
 benchmark reference (best_eq - chosen_eq). The chosen move is the benchmark move
 whose equity equals best_eq - error; the cube action is the reference-optimal
 action, flipped when the error is non-zero. Ambiguous checker ties (two moves at
 the same equity) are left unscored for that level.
 
 Mismatches: a level's pick may not be among the moves XG rolled (the
-within-0.02-of-Sage's-best set). Such an off-book pick is charged the biggest
+within-0.02-of-Neongammon's-best set). Such an off-book pick is charged the biggest
 error among the rolled moves (best - worst rolled) -- a conservative penalty
 that avoids flattering weaker levels by dropping their bad picks. The mismatch
 column counts how many picks got this treatment per level.
@@ -38,13 +38,13 @@ from collections import defaultdict
 
 import benchmark_money as bm
 import xg_batch_common as xbc
-from bgsage import xg_file
+from neongammon import xg_file
 from benchmark_pr_xg_reference import _load_jsonl, _xg_checker_reference, _cube_action
 
 SAGE_LEVELS = [
-    ("Sage 1T", "sage_1t_clean72"),
-    ("Sage 2T", "sage_2t_clean"),
-    ("Sage 3T", "stage2_3t"),          # special-cased: direct choices, not error recovery
+    ("Neongammon 1T", "sage_1t_clean72"),
+    ("Neongammon 2T", "sage_2t_clean"),
+    ("Neongammon 3T", "stage2_3t"),          # special-cased: direct choices, not error recovery
 ]
 XG_LEVELS = [
     ("XG Roller", "roller"),
@@ -54,7 +54,7 @@ XG_LEVELS = [
 
 
 def _recover_cube_action(decision: dict, scored: list):
-    """Recover (should_double, should_take) from the cube errors + Sage reference."""
+    """Recover (should_double, should_take) from the cube errors + Neongammon reference."""
     nd, dt, dp = decision["equity_nd"], decision["equity_dt"], decision["equity_dp"]
     errs = {s["sub"]: s["error"] for s in scored if s["bucket"] == "cube"}
     opt_double = min(dt, dp) > nd
@@ -68,7 +68,7 @@ def score(benchmark: str, match_length: int = 5) -> dict:
     """A pick XG didn't roll (a mismatch) is charged the biggest error among the
     moves XG DID roll (best - worst rolled) rather than dropped, so off-book
     picks are penalised instead of flattering weaker levels. This is a
-    conservative lower bound: the pick sat outside Sage's within-0.02 candidate
+    conservative lower bound: the pick sat outside Neongammon's within-0.02 candidate
     set, so its true error is probably larger than the worst rolled move's."""
     paths = xbc.paths_for(benchmark, match_length)
     dataset = json.loads(paths.dataset.read_text(encoding="utf-8"))
@@ -111,11 +111,11 @@ def score(benchmark: str, match_length: int = 5) -> dict:
             worst_avail_err = max(0.0, best_eq - min(ref_by.values()))
 
             picks = {}
-            # Sage levels
+            # Neongammon levels
             s2 = stage2.get(key)
             if s2 and s2.get("moves"):
-                picks["Sage 3T"] = tuple(max(s2["moves"], key=lambda m: m["equity"])["board"])
-            for label, name in [("Sage 1T", "sage_1t_clean72"), ("Sage 2T", "sage_2t_clean")]:
+                picks["Neongammon 3T"] = tuple(max(s2["moves"], key=lambda m: m["equity"])["board"])
+            for label, name in [("Neongammon 1T", "sage_1t_clean72"), ("Neongammon 2T", "sage_2t_clean")]:
                 sc = sage_scores[name].get(key)
                 if not sc:
                     continue
@@ -151,8 +151,8 @@ def score(benchmark: str, match_length: int = 5) -> dict:
             actions = {}
             s2 = stage2.get(key)
             if s2:
-                actions["Sage 3T"] = _cube_action(s2["equity_nd"], s2["equity_dt"], s2["equity_dp"])
-            for label, name in [("Sage 1T", "sage_1t_clean72"), ("Sage 2T", "sage_2t_clean")]:
+                actions["Neongammon 3T"] = _cube_action(s2["equity_nd"], s2["equity_dt"], s2["equity_dp"])
+            for label, name in [("Neongammon 1T", "sage_1t_clean72"), ("Neongammon 2T", "sage_2t_clean")]:
                 sc = sage_scores[name].get(key)
                 if sc:
                     actions[label] = _recover_cube_action(d, sc["scored"])

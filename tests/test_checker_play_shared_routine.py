@@ -26,11 +26,11 @@ for _p in (os.path.join(_ROOT, "build"), os.path.join(_ROOT, "python")):
 
 import bgbot_cpp  # noqa: E402
 
-from bgsage import BgBotAnalyzer, STARTING_BOARD, flip_board, possible_moves  # noqa: E402
-from bgsage.analyzer import (  # noqa: E402
+from neongammon import BgBotAnalyzer, STARTING_BOARD, flip_board, possible_moves  # noqa: E402
+from neongammon.analyzer import (  # noqa: E402
     CUBEFUL_FILTERED_PLIES, _contact_cube_life, _contact_cube_slope, resolve_owner,
 )
-from bgsage.board import check_game_over  # noqa: E402
+from neongammon.board import check_game_over  # noqa: E402
 
 SNAKE = [0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 2, 3, 3, 2, 2, 1, -7, -7, 0]
 BEAROFF = [0, 3, 3, 2, 3, 2, 2] + [0] * 12 + [-2, -3, -2, -3, -2, -2] + [0]

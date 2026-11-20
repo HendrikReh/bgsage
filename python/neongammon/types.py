@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MPL-2.0
 # Copyright (C) 2026 Mark Higgins
-"""Typed data structures for the Open Sage bot engine."""
+"""Typed data structures for the Neongammon bot engine."""
 
 from __future__ import annotations
 

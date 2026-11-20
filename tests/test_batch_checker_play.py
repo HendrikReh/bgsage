@@ -8,8 +8,8 @@ BgBotAnalyzer.checker_play for both 0-ply and 1-ply, using random positions
 from contact.bm with random dice.
 
 Run with:
-    python -m pytest bgsage/tests/test_batch_checker_play.py -v
-    python -m unittest bgsage.tests.test_batch_checker_play -v
+    python -m pytest neongammon/tests/test_batch_checker_play.py -v
+    python -m unittest neongammon.tests.test_batch_checker_play -v
 """
 
 import os
@@ -20,7 +20,7 @@ import unittest
 # Setup paths
 script_dir = os.path.dirname(os.path.abspath(__file__))
 # Resolve INSIDE this repo. dirname(dirname(tests/)) is the HOST project when
-# bgsage is vendored as a submodule, so this used to load the host's stale
+# neongammon is vendored as a submodule, so this used to load the host's stale
 # bgbot_cpp instead of the one built here -- tests then silently exercised a
 # different binary than the developer just compiled.
 project_dir = os.path.dirname(script_dir)
@@ -29,10 +29,10 @@ build_dir = os.path.join(project_dir, "build")
 sys.path.insert(0, build_dir)
 sys.path.insert(0, os.path.join(project_dir, "python"))
 
-from bgsage import BgBotAnalyzer
-from bgsage.batch import batch_checker_play
-from bgsage.data import board_from_gnubg_position_string
-from bgsage.weights import default_weights
+from neongammon import BgBotAnalyzer
+from neongammon.batch import batch_checker_play
+from neongammon.data import board_from_gnubg_position_string
+from neongammon.weights import default_weights
 
 DATA_DIR = os.path.join(project_dir, "data")
 CONTACT_BM = os.path.join(DATA_DIR, "contact.bm")
@@ -82,7 +82,7 @@ class TestBatchCheckerPlay(unittest.TestCase):
     # ------------------------------------------------------------------
 
     def test_invalid_eval_level_rejected(self):
-        """bgsage uses the XG convention: 1-ply IS the raw NN, there is no 0-ply.
+        """neongammon uses the XG convention: 1-ply IS the raw NN, there is no 0-ply.
 
         These used to be test_0ply_* and failed permanently against a level the
         API has never accepted; the real 0-ply-equivalent coverage is the

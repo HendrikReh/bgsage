@@ -25,12 +25,12 @@ for _p in (os.path.join(_ROOT, "build"), os.path.join(_ROOT, "python")):
 
 import bgbot_cpp  # noqa: E402
 
-import bgsage.analyzer as A  # noqa: E402
-from bgsage import (  # noqa: E402
+import neongammon.analyzer as A  # noqa: E402
+from neongammon import (  # noqa: E402
     BatchModels, BgBotAnalyzer, STARTING_BOARD, batch_checker_play, batch_evaluate,
     batch_post_move_evaluate,
 )
-from bgsage.weights import WeightConfig, bearoff_db_path  # noqa: E402
+from neongammon.weights import WeightConfig, bearoff_db_path  # noqa: E402
 
 FACTORIES = ("create_strategy", "create_multipy", "create_multipy_from_base",
              "create_multipy_5nn", "GamePlanStrategy", "BearoffDB")

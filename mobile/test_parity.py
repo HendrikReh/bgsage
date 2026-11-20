@@ -1,6 +1,6 @@
 """Compare the standalone C ABI with the Python analyzer built from this tree.
 
-Build mobile/CMakeLists.txt with BGSAGE_MOBILE_REFERENCE_PYTHON=ON and run with
+Build mobile/CMakeLists.txt with NEONGAMMON_MOBILE_REFERENCE_PYTHON=ON and run with
 the matching Python version. No app/backend dependencies or network access.
 """
 from __future__ import annotations
@@ -27,25 +27,25 @@ def main():
     build = args.build.resolve()
     sys.path[:0] = [str(build), str(root / "python")]
     import bgbot_cpp as cpp
-    from bgsage import BgBotAnalyzer, STARTING_BOARD
-    from bgsage.weights import default_weights, bearoff_db_path
+    from neongammon import BgBotAnalyzer, STARTING_BOARD
+    from neongammon.weights import default_weights, bearoff_db_path
     assert Path(cpp.__file__).parent.resolve() == build, "Reference extension came from a different build"
-    binary = build / "libbgsage_mobile.dylib"
+    binary = build / "libneongammon_mobile.dylib"
     lib = C.CDLL(str(binary))
-    lib.bgsage_mobile_create.argtypes = [C.c_char_p, C.POINTER(C.c_char_p), C.POINTER(C.c_int), C.c_int, C.c_char_p]
-    lib.bgsage_mobile_create.restype = C.c_void_p
-    lib.bgsage_mobile_analyze.argtypes = [C.c_void_p, C.c_int, C.POINTER(Request)]
-    lib.bgsage_mobile_analyze.restype = C.c_void_p
-    lib.bgsage_mobile_free.argtypes = [C.c_void_p]
-    lib.bgsage_mobile_destroy.argtypes = [C.c_void_p]
-    lib.bgsage_mobile_last_error.restype = C.c_char_p
+    lib.neongammon_mobile_create.argtypes = [C.c_char_p, C.POINTER(C.c_char_p), C.POINTER(C.c_int), C.c_int, C.c_char_p]
+    lib.neongammon_mobile_create.restype = C.c_void_p
+    lib.neongammon_mobile_analyze.argtypes = [C.c_void_p, C.c_int, C.POINTER(Request)]
+    lib.neongammon_mobile_analyze.restype = C.c_void_p
+    lib.neongammon_mobile_free.argtypes = [C.c_void_p]
+    lib.neongammon_mobile_destroy.argtypes = [C.c_void_p]
+    lib.neongammon_mobile_last_error.restype = C.c_char_p
     weights = default_weights()
     paths = (C.c_char_p * len(weights.weight_paths_list))(*[str(p).encode() for p in weights.weight_paths_list])
     hidden = (C.c_int * len(weights.hidden_sizes_list))(*weights.hidden_sizes_list)
     initialization_started = time.perf_counter()
-    handle = lib.bgsage_mobile_create(weights.strategy_type.encode(), paths, hidden, len(paths), str(bearoff_db_path()).encode())
+    handle = lib.neongammon_mobile_create(weights.strategy_type.encode(), paths, hidden, len(paths), str(bearoff_db_path()).encode())
     initialization_ms = (time.perf_counter() - initialization_started) * 1000
-    assert handle, lib.bgsage_mobile_last_error()
+    assert handle, lib.neongammon_mobile_last_error()
     boards = [list(STARTING_BOARD)]
     rng = random.Random(471)
     board = boards[0]
@@ -74,11 +74,11 @@ def main():
                     settings["away1"], settings["away2"], int(settings["is_crawford"]), int(settings["jacoby"]), int(settings["beaver"]), 1000)
                 for operation in (0, 1):
                     started = time.perf_counter()
-                    value = lib.bgsage_mobile_analyze(handle, operation, C.byref(request))
+                    value = lib.neongammon_mobile_analyze(handle, operation, C.byref(request))
                     timings.append((time.perf_counter() - started) * 1000)
-                    assert value, (index, ply, operation, lib.bgsage_mobile_last_error())
+                    assert value, (index, ply, operation, lib.neongammon_mobile_last_error())
                     try: actual = json.loads(C.string_at(value))
-                    finally: lib.bgsage_mobile_free(value)
+                    finally: lib.neongammon_mobile_free(value)
                     if operation == 0:
                         expected = reference._analyzer.checker_play_analytics(board, 3, 1, **settings)
                         actual_moves = {tuple(m["board"]): m for m in actual["moves"]}
@@ -102,11 +102,11 @@ def main():
                         assert max(errors) < 1e-5, (index, ply, operation, errors)
                     cases += 1
         request.ply = 3
-        assert not lib.bgsage_mobile_analyze(handle, 0, C.byref(request))
+        assert not lib.neongammon_mobile_analyze(handle, 0, C.byref(request))
         request.ply = 1; request.board[1] = 500
-        assert not lib.bgsage_mobile_analyze(handle, 0, C.byref(request))
+        assert not lib.neongammon_mobile_analyze(handle, 0, C.byref(request))
     finally:
-        lib.bgsage_mobile_destroy(handle)
+        lib.neongammon_mobile_destroy(handle)
     print(json.dumps({"cases": cases, "max_absolute_error": max_error, "max_native_ms": max(timings),
         "median_native_ms": sorted(timings)[len(timings)//2], "model_initialization_ms": initialization_ms,
         "reference": str(cpp.__file__), "binary": str(binary)}, indent=2))

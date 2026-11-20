@@ -34,7 +34,7 @@ Positions are stored exactly as encountered (on-roll perspective for the
 detected orientation, its flip for the mirror), one per line as 26
 space-separated ints — the same convention as generate_backgame_data.py.
 
-Output, in bgsage/data/:
+Output, in neongammon/data/:
   pasko-player-backgame-train-data        pasko-player-backgame-benchmark-data
   pasko-opponent-backgame-train-data      pasko-opponent-backgame-benchmark-data
 
@@ -43,10 +43,10 @@ Roll these out next (from the PARENT repo, via Parallelizor):
 
 Usage:
   # Benchmark sets only (20k per category):
-  python bgsage/scripts/generate_pasko_data.py --train-target 0 --benchmark-target 20000
+  python neongammon/scripts/generate_pasko_data.py --train-target 0 --benchmark-target 20000
 
   # Training sets only (100k per category), disjoint from the benchmark sets:
-  python bgsage/scripts/generate_pasko_data.py --train-target 100000 --benchmark-target 0 \
+  python neongammon/scripts/generate_pasko_data.py --train-target 100000 --benchmark-target 0 \
       --exclude-file pasko-player-backgame-benchmark-data \
       --exclude-file pasko-opponent-backgame-benchmark-data
 """
@@ -60,15 +60,15 @@ import multiprocessing as mp
 
 # --- Path setup (runs in the main process AND every spawned worker) -------
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-_BGSAGE_ROOT = os.path.dirname(_SCRIPT_DIR)                 # .../bgbot/bgsage
-_PARENT_ROOT = os.path.dirname(_BGSAGE_ROOT)               # .../bgbot
+_NEONGAMMON_ROOT = os.path.dirname(_SCRIPT_DIR)                 # .../bgbot/neongammon
+_PARENT_ROOT = os.path.dirname(_NEONGAMMON_ROOT)               # .../bgbot
 
-# Prefer bgsage/build; the parent build/ is only a fallback.
+# Prefer neongammon/build; the parent build/ is only a fallback.
 sys.path.insert(0, os.path.join(_PARENT_ROOT, 'build'))
-sys.path.insert(0, os.path.join(_BGSAGE_ROOT, 'build'))
-sys.path.insert(0, os.path.join(_BGSAGE_ROOT, 'python'))
+sys.path.insert(0, os.path.join(_NEONGAMMON_ROOT, 'build'))
+sys.path.insert(0, os.path.join(_NEONGAMMON_ROOT, 'python'))
 
-DATA_DIR = os.path.join(_BGSAGE_ROOT, 'data')
+DATA_DIR = os.path.join(_NEONGAMMON_ROOT, 'data')
 
 # Paskogammon starting position (positive player on roll). 15 checkers each side.
 PASKO_START = [0, -2, -2, 0, 0, -1, 5, -1, 3, 0, 0, 0, -2,
@@ -274,14 +274,14 @@ def main():
                              "'pasko-gated' to write a new dataset without clobbering "
                              "the existing pasko-* files.")
     parser.add_argument('--exclude-file', action='append', default=[],
-                        help='Positions file (name in bgsage/data/, or an absolute path) '
+                        help='Positions file (name in neongammon/data/, or an absolute path) '
                              'whose positions — in BOTH orientations — are excluded from '
                              'all generated sets. Repeatable. Pass the benchmark files '
                              'when generating training sets to keep them disjoint.')
     args = parser.parse_args()
 
     import bgbot_cpp
-    from bgsage.weights import WeightConfigPair
+    from neongammon.weights import WeightConfigPair
     w = WeightConfigPair.from_model('stage9')  # production model
     w.validate()
     weight_paths, hidden_sizes = w.weight_args

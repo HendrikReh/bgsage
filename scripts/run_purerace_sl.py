@@ -43,7 +43,7 @@ for _p in (_PROJECT_ROOT / "python", _PROJECT_ROOT / "build"):
         sys.path.insert(0, str(_p))
 
 import bgbot_cpp  # noqa: E402
-from bgsage import sl_train  # noqa: E402
+from neongammon import sl_train  # noqa: E402
 
 N_INPUTS = 196
 BATCH = 4096

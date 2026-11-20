@@ -53,7 +53,7 @@ for _p in (_PROJECT_ROOT / "python", _PROJECT_ROOT / "build", _SCRIPT_DIR):
         sys.path.insert(0, str(_p))
 
 import bgbot_cpp  # noqa: E402
-from bgsage.weights import WeightConfigPair  # noqa: E402
+from neongammon.weights import WeightConfigPair  # noqa: E402
 import snake_rule as sr  # noqa: E402
 
 DATA = _PROJECT_ROOT / "data"

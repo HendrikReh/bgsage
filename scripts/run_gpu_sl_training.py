@@ -3,7 +3,7 @@
 """
 Run GPU-accelerated supervised learning training for backgammon neural networks.
 
-Trains on the Apple GPU through MLX (bgsage.sl_train); benchmarking runs on
+Trains on the Apple GPU through MLX (neongammon.sl_train); benchmarking runs on
 the CPU after every epoch.
 
 Usage:
@@ -26,11 +26,11 @@ project_dir = os.path.dirname(os.path.dirname(script_dir))
 build_dir = os.path.join(project_dir, 'build')
 
 sys.path.insert(0, build_dir)
-sys.path.insert(0, os.path.join(project_dir, 'bgsage', 'python'))
+sys.path.insert(0, os.path.join(project_dir, 'neongammon', 'python'))
 
 import bgbot_cpp
-from bgsage import sl_train
-from bgsage.data import load_benchmark_file, load_gnubg_training_data
+from neongammon import sl_train
+from neongammon.data import load_benchmark_file, load_gnubg_training_data
 
 DATA_DIR = os.path.join(project_dir, 'data')
 MODELS_DIR = os.path.join(project_dir, 'models')

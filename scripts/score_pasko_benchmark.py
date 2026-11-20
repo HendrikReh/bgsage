@@ -2,7 +2,7 @@
 # Copyright (C) 2026 Mark Higgins
 """Score model benchmark PR against the Paskogammon rollout benchmark.
 
-Reads bgsage/data/pasko-benchmark-rollout (positions + cubeless rolled-out probs)
+Reads neongammon/data/pasko-benchmark-rollout (positions + cubeless rolled-out probs)
 and, for each model, evaluates every position at 1-ply cubeless and reports the
 equity error rate (ER = mean |equity - rollout_equity| * 1000 millipips) and the
 Performance Rating (PR = ER / 2) against the rollout targets.
@@ -16,8 +16,8 @@ Models scored:
   * Paskogammon TD net (single 400h / 244-input extended-contact net), 1-ply cubeless.
 
 Usage:
-    python bgsage/scripts/score_pasko_benchmark.py
-    python bgsage/scripts/score_pasko_benchmark.py --pasko-weights models/td_pasko.weights
+    python neongammon/scripts/score_pasko_benchmark.py
+    python neongammon/scripts/score_pasko_benchmark.py --pasko-weights models/td_pasko.weights
 """
 
 import argparse
@@ -25,19 +25,19 @@ import os
 import sys
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-_BGSAGE_ROOT = os.path.dirname(_SCRIPT_DIR)
-_PARENT_ROOT = os.path.dirname(_BGSAGE_ROOT)
+_NEONGAMMON_ROOT = os.path.dirname(_SCRIPT_DIR)
+_PARENT_ROOT = os.path.dirname(_NEONGAMMON_ROOT)
 
-# Prefer bgsage/build (kept fresh); parent build/ is a fallback.
+# Prefer neongammon/build (kept fresh); parent build/ is a fallback.
 sys.path.insert(0, os.path.join(_PARENT_ROOT, 'build'))
-sys.path.insert(0, os.path.join(_BGSAGE_ROOT, 'build'))
-sys.path.insert(0, os.path.join(_BGSAGE_ROOT, 'python'))
+sys.path.insert(0, os.path.join(_NEONGAMMON_ROOT, 'build'))
+sys.path.insert(0, os.path.join(_NEONGAMMON_ROOT, 'python'))
 
 import bgbot_cpp
-from bgsage.weights import WeightConfigPair
+from neongammon.weights import WeightConfigPair
 
-DATA_DIR = os.path.join(_BGSAGE_ROOT, 'data')
-MODELS_DIR = os.path.join(_BGSAGE_ROOT, 'models')
+DATA_DIR = os.path.join(_NEONGAMMON_ROOT, 'data')
+MODELS_DIR = os.path.join(_NEONGAMMON_ROOT, 'models')
 PASKO_HIDDEN = 400
 PASKO_INPUTS = 244
 
@@ -76,15 +76,15 @@ def main():
     parser = argparse.ArgumentParser(
         description="Score model benchmark PR vs the Paskogammon rollout benchmark")
     parser.add_argument("--rollout", default="pasko-benchmark-rollout",
-                        help="Rollout file name in bgsage/data (default: pasko-benchmark-rollout)")
+                        help="Rollout file name in neongammon/data (default: pasko-benchmark-rollout)")
     parser.add_argument("--pasko-weights", default="models/td_pasko.weights.best",
-                        help="Paskogammon net weights, abs or relative to bgsage/ "
+                        help="Paskogammon net weights, abs or relative to neongammon/ "
                              "(default: models/td_pasko.weights.best)")
     args = parser.parse_args()
 
     rollout_path = args.rollout if os.path.isabs(args.rollout) else os.path.join(DATA_DIR, args.rollout)
     pasko_path = args.pasko_weights if os.path.isabs(args.pasko_weights) \
-        else os.path.join(_BGSAGE_ROOT, args.pasko_weights)
+        else os.path.join(_NEONGAMMON_ROOT, args.pasko_weights)
 
     boards, targets = load_rollout(rollout_path)
     n = len(boards)

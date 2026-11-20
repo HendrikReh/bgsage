@@ -53,7 +53,7 @@ def main():
         extension_spec.loader.exec_module(probe)
     else:
         sys.path.insert(0, str(ROOT / 'build/video_move_batch'))
-        import _bgsage_move_array_probe as probe
+        import _neongammon_move_array_probe as probe
     baseline = probe
     dll_handles = []
     if args.reference_engine:
@@ -63,7 +63,7 @@ def main():
         reference_spec = importlib.util.spec_from_file_location('bgbot_cpp', reference_path)
         baseline = importlib.util.module_from_spec(reference_spec)
         reference_spec.loader.exec_module(baseline)
-    spec = importlib.util.spec_from_file_location('move_arrays_benchmark', ROOT / 'python/bgsage/move_arrays.py')
+    spec = importlib.util.spec_from_file_location('move_arrays_benchmark', ROOT / 'python/neongammon/move_arrays.py')
     arrays = importlib.util.module_from_spec(spec)
     previous = sys.modules.get('bgbot_cpp')
     try:
@@ -78,7 +78,7 @@ def main():
         'cpp/pybind/move_arrays.h', 'cpp/move_array_probe/bindings.cpp',
         'cpp/move_array_probe/CMakeLists.txt', 'cpp/src/moves.cpp',
         'cpp/src/board.cpp', 'cpp/include/bgbot/types.h', 'cpp/include/bgbot/moves.h',
-        'python/bgsage/move_arrays.py')]
+        'python/neongammon/move_arrays.py')]
     if args.reference_engine:
         paths.append(reference_path)
     if args.extension:

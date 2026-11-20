@@ -20,8 +20,8 @@ for _p in (os.path.join(_ROOT, "build"), os.path.join(_ROOT, "python")):
 
 import bgbot_cpp  # noqa: E402
 
-from bgsage import STARTING_BOARD, possible_moves  # noqa: E402
-from bgsage.weights import WeightConfig, default_weights  # noqa: E402
+from neongammon import STARTING_BOARD, possible_moves  # noqa: E402
+from neongammon.weights import WeightConfig, default_weights  # noqa: E402
 
 CANDIDATES = [list(c) for c in possible_moves(STARTING_BOARD, 3, 1)[:4]]
 

@@ -24,9 +24,9 @@ Default schedule matches the regular TD training LR schedule:
     Phase 2: 1M   games @ alpha=0.02   (resumes from Phase 1)
 
 Usage:
-    python bgsage/scripts/run_pasko_training.py
-    python bgsage/scripts/run_pasko_training.py --games 200000 --games2 1000000
-    python bgsage/scripts/run_pasko_training.py --games 5000 --games2 0   # quick smoke test
+    python neongammon/scripts/run_pasko_training.py
+    python neongammon/scripts/run_pasko_training.py --games 200000 --games2 1000000
+    python neongammon/scripts/run_pasko_training.py --games 5000 --games2 0   # quick smoke test
 """
 
 import os
@@ -38,20 +38,20 @@ from datetime import datetime
 
 # ---- Import paths -----------------------------------------------------------
 # The compiled bgbot_cpp lives in the parent project's build/ (same convention
-# as run_td_training.py); back-game data + models live inside the bgsage repo.
+# as run_td_training.py); back-game data + models live inside the neongammon repo.
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-_BGSAGE_ROOT = os.path.dirname(_SCRIPT_DIR)                 # .../bgbot/bgsage
-_PARENT_ROOT = os.path.dirname(_BGSAGE_ROOT)               # .../bgbot
+_NEONGAMMON_ROOT = os.path.dirname(_SCRIPT_DIR)                 # .../bgbot/neongammon
+_PARENT_ROOT = os.path.dirname(_NEONGAMMON_ROOT)               # .../bgbot
 
-# Prefer bgsage/build; the parent build/ is only a fallback.
+# Prefer neongammon/build; the parent build/ is only a fallback.
 sys.path.insert(0, os.path.join(_PARENT_ROOT, 'build'))
-sys.path.insert(0, os.path.join(_BGSAGE_ROOT, 'build'))
-sys.path.insert(0, os.path.join(_BGSAGE_ROOT, 'python'))
+sys.path.insert(0, os.path.join(_NEONGAMMON_ROOT, 'build'))
+sys.path.insert(0, os.path.join(_NEONGAMMON_ROOT, 'python'))
 
 import bgbot_cpp
 
-DATA_DIR = os.path.join(_BGSAGE_ROOT, 'data')
-MODELS_DIR = os.path.join(_BGSAGE_ROOT, 'models')
+DATA_DIR = os.path.join(_NEONGAMMON_ROOT, 'data')
+MODELS_DIR = os.path.join(_NEONGAMMON_ROOT, 'models')
 
 # Paskogammon starting position (positive player on roll). 15 checkers each side.
 PASKO_START = [0, -2, -2, 0, 0, -1, 5, -1, 3, 0, 0, 0, -2,
@@ -123,13 +123,13 @@ def main():
     parser.add_argument('--resume-from', type=str, default='', help='Resume Phase 1 from this .weights file')
     parser.add_argument('--benchmark-side', choices=['player', 'opponent'], default='player',
                         help='Which back-game benchmark to report (default: player)')
-    parser.add_argument('--log-dir', type=str, default='', help='Directory for log file (default: <bgsage>/logs)')
+    parser.add_argument('--log-dir', type=str, default='', help='Directory for log file (default: <neongammon>/logs)')
     args = parser.parse_args()
 
     os.makedirs(MODELS_DIR, exist_ok=True)
 
     # ---- Tee all output (incl. C++ std::cout) to console + log file ----------
-    log_dir = args.log_dir if args.log_dir else os.path.join(_BGSAGE_ROOT, 'logs')
+    log_dir = args.log_dir if args.log_dir else os.path.join(_NEONGAMMON_ROOT, 'logs')
     os.makedirs(log_dir, exist_ok=True)
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     total_k = (args.games + args.games2) // 1000

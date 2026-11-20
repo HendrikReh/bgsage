@@ -3,8 +3,8 @@
 """SL training for backgame NNs (Stage 9).
 
 Usage:
-    python bgsage/scripts/run_backgame_sl_training.py --side player
-    python bgsage/scripts/run_backgame_sl_training.py --side opponent
+    python neongammon/scripts/run_backgame_sl_training.py --side player
+    python neongammon/scripts/run_backgame_sl_training.py --side opponent
 """
 import argparse
 import gc
@@ -19,7 +19,7 @@ sys.path.insert(0, "build")
 
 
 import bgbot_cpp
-from bgsage import sl_train
+from neongammon import sl_train
 
 
 def benchmark_er(bench_boards, bench_eq, weights_path):

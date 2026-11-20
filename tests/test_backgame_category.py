@@ -18,7 +18,7 @@ detection (plan pair (anchoring, racing), backgame side behind on pips,
 before asserting the category.
 
 Run with:
-    python -m pytest bgsage/tests/test_backgame_category.py -v
+    python -m pytest neongammon/tests/test_backgame_category.py -v
 """
 
 import os
@@ -118,7 +118,7 @@ class TestBackgameCategory(unittest.TestCase):
         self.assertEqual(bgbot_cpp.backgame_category(board), "none")
 
     def test_no_backgame_positions(self):
-        from bgsage.board import STARTING_BOARD
+        from neongammon.board import STARTING_BOARD
         self.assertEqual(bgbot_cpp.backgame_category(STARTING_BOARD), "none")
         # A pure race: no contact, no backgame.
         race = [0] * 26
@@ -134,7 +134,7 @@ class TestStage11Selection(unittest.TestCase):
     def setUpClass(cls):
         import tempfile
 
-        from bgsage.weights import WeightConfigPair
+        from neongammon.weights import WeightConfigPair
 
         cls.s9 = WeightConfigPair.from_model("stage9")
         try:
@@ -230,7 +230,7 @@ class TestStage11Selection(unittest.TestCase):
         self.assertEqual(bgbot_cpp.backgame_phase(lamford), "late_containment")
         # backgame_board() parks the racer's 14 checkers at home: bear-in.
         self.assertEqual(bgbot_cpp.backgame_phase(seed_board), "bear_in")
-        from bgsage.board import STARTING_BOARD
+        from neongammon.board import STARTING_BOARD
         self.assertEqual(bgbot_cpp.backgame_phase(STARTING_BOARD), "none")
         self.assertEqual(bgbot_cpp.backgame_phase(
             bgbot_cpp.flip_board(snake)), "early_containment")
@@ -327,7 +327,7 @@ class TestStage11Selection(unittest.TestCase):
             bgbot_cpp.BackgameAwarePairStrategy(
                 self.paths + extras + extras[:2], self.hiddens + [400] * 5, True)
 
-        from bgsage.board import STARTING_BOARD
+        from neongammon.board import STARTING_BOARD
         snake = [0,0,0,-1,0,0,0,0,0,0,0,0,0,1,0,1,0,2,3,3,2,2,1,-7,-7,0]
         self.assertTrue(bgbot_cpp.snake_category(snake))
         self.assertTrue(bgbot_cpp.snake_category(bgbot_cpp.flip_board(snake)))
@@ -410,7 +410,7 @@ class TestStage11Selection(unittest.TestCase):
         snake = [0,0,0,-1,0,0,0,0,0,0,0,0,0,1,0,1,0,2,3,3,2,2,1,-7,-7,0]
         self.assertFalse(bgbot_cpp.massive_category(snake))
         self.assertEqual(massive.select_nn_idx(snake), 22)
-        from bgsage.board import STARTING_BOARD
+        from neongammon.board import STARTING_BOARD
         self.assertFalse(bgbot_cpp.massive_category(STARTING_BOARD))
         n_total = n_massive = 0
         for cat in ("massive backgame", "massive backgame s11play", "containment"):
@@ -447,7 +447,7 @@ class TestStage11Selection(unittest.TestCase):
         from the cubeful eval cache by an unpinned evaluation of the same
         board, or the other way round."""
         from concurrent.futures import ThreadPoolExecutor
-        from bgsage.board import flip_board, possible_moves
+        from neongammon.board import flip_board, possible_moves
         db_path = os.path.join(repo_dir, "data", "bearoff_1sided.db")
         if not os.path.exists(db_path):
             raise unittest.SkipTest("bearoff DB not present")
@@ -510,7 +510,7 @@ class TestStage11Selection(unittest.TestCase):
         self.assertEqual(on_fresh_thread(pinned_then_unpinned), unpinned)
 
     def test_non_backgame_matches_stage9(self):
-        from bgsage.board import STARTING_BOARD
+        from neongammon.board import STARTING_BOARD
 
         boards = [list(STARTING_BOARD)]
         # A few random playouts' worth of early positions.

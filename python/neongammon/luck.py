@@ -14,7 +14,7 @@ unlucky. Averaged over many rolls, luck tends to zero, so summed luck over a gam
 separates dice fortune from decision quality.
 
 The per-roll equities are the ND (No Double) per-roll cubeful equities already
-produced by :meth:`bgsage.BgBotAnalyzer.cube_action` with
+produced by :meth:`neongammon.BgBotAnalyzer.cube_action` with
 ``incl_2ply_details=True``. Luck is therefore a *pure function over analytics the
 engine has already computed* — :func:`luck_from_equities` and :func:`roll_luck`
 run no additional neural-network evaluation.
@@ -57,7 +57,7 @@ def luck_from_equities(
 ) -> LuckResult | None:
     """Compute luck from pre-computed per-roll equities (pure, no evaluation).
 
-    ``per_roll`` holds one :class:`~bgsage.types.RollEquity` per possible roll
+    ``per_roll`` holds one :class:`~neongammon.types.RollEquity` per possible roll
     (21 rolls, or the 15 non-doubles for an opening roll). ``die1``/``die2`` are
     the roll that actually happened; die order does not matter.
 
@@ -100,7 +100,7 @@ def roll_luck(
     """Compute luck from a cube analysis — the bot analytics for a position.
 
     ``cube`` must have been produced by
-    :meth:`bgsage.BgBotAnalyzer.cube_action` with ``incl_2ply_details=True``; its
+    :meth:`neongammon.BgBotAnalyzer.cube_action` with ``incl_2ply_details=True``; its
     ``details["nd"]`` per-roll cubeful equities are the input. ``die1``/``die2``
     are the roll that actually happened.
 

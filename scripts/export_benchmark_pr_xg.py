@@ -6,8 +6,8 @@ The Benchmark PR reference (``data/benchmark_pr/rollouts.jsonl``) is Stage 5's
 own rollout, and only the candidates Stage 5's 2-ply filter kept were rolled
 out, so it leans towards Stage 5 (CLAUDE.md, "Benchmark PR rollout sample").
 This script hands the same decisions to XG, the strongest engine there is, and
-reads XG's analysis back, so a Sage change can be checked against a referee
-that is not Sage.
+reads XG's analysis back, so a Neongammon change can be checked against a referee
+that is not Neongammon.
 
 XG has no API, so every selected decision is written as a ONE-DECISION GAME in
 a native ``.xg`` archive (the layout of ``export_folder_benchmark_xg.py``,
@@ -32,7 +32,7 @@ Steps
    reference (per subset: bearoff / outside the bearoff DB) and writes
    ``<xg-dir>/xg_reference.jsonl``: per decision, XG's stored moves with their
    cubeless equity (from XG's probabilities) and the level XG evaluated each
-   at. That file is the XG reference Sage's picks are scored against.
+   at. That file is the XG reference Neongammon's picks are scored against.
 4. ``python scripts/export_benchmark_pr_xg.py sage --xg-dir <same> [--gnubg]``
    scores the production model at 1-ply / 2-ply (bearoff DB on), with its own
    and with Stage 5's 200h pure-race net, plus XG's #1, the Stage 5
@@ -71,8 +71,8 @@ for _p in (_SCRIPT_DIR, _PROJECT_ROOT / "build", _PROJECT_ROOT / "python"):
 
 import bgbot_cpp  # noqa: E402
 import export_folder_benchmark_xg as fx  # noqa: E402
-from bgsage import possible_moves, xg_file as xf  # noqa: E402
-from bgsage.weights import bearoff_db_path  # noqa: E402
+from neongammon import possible_moves, xg_file as xf  # noqa: E402
+from neongammon.weights import bearoff_db_path  # noqa: E402
 from export_pasko_benchmark_xg import _templates, derive_half_moves, write_xg  # noqa: E402
 
 BENCHMARK_DIR = _PROJECT_ROOT / "data" / "benchmark_pr"
@@ -283,7 +283,7 @@ def cmd_score(args) -> None:
 
 
 # ---------------------------------------------------------------------------
-# sage: Sage (and GNUbg) scored against the XG reference
+# sage: Neongammon (and GNUbg) scored against the XG reference
 # ---------------------------------------------------------------------------
 
 #: Pure-race nets to score in place of the model's own (``race_net_swap.py``).
@@ -322,7 +322,7 @@ def _gnubg_err(args):
 def cmd_sage(args) -> None:
     from concurrent.futures import ProcessPoolExecutor
 
-    from bgsage.weights import PRODUCTION_MODEL, WeightConfig
+    from neongammon.weights import PRODUCTION_MODEL, WeightConfig
 
     rows = [json.loads(line) for line in open(args.xg_dir / "xg_reference.jsonl")]
     rows = [r for r in rows if xg_decision(r) is not None]
@@ -426,7 +426,7 @@ def main() -> None:
     s.add_argument("--xg-dir", type=Path, required=True)
     s.add_argument("--subset", choices=SUBSETS, default="race")
     s.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
-    v = sub.add_parser("sage", help="score Sage (and GNUbg) against XG's analysis "
+    v = sub.add_parser("sage", help="score Neongammon (and GNUbg) against XG's analysis "
                                     "and against the Stage 5 rollout reference")
     v.add_argument("--xg-dir", type=Path, required=True)
     v.add_argument("--model", default=None, help="default: the production model")

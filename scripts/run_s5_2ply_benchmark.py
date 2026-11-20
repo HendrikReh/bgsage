@@ -3,7 +3,7 @@
 """Run Stage 5 3-ply contact + race benchmarks, output to stdout."""
 import bgbot_cpp, os, sys, time
 sys.path.insert(0, 'python')
-from bgsage.data import load_benchmark_file
+from neongammon.data import load_benchmark_file
 
 models = 'models'
 w5 = {

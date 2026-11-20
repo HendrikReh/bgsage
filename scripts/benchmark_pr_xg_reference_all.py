@@ -3,7 +3,7 @@
 # Copyright (C) 2026 Mark Higgins
 """Every evaluator's PR against XG's OWN tiered reference on the money benchmark.
 
-The benchmark grades against Sage's tiered reference (3-ply, 3T or a full
+The benchmark grades against Neongammon's tiered reference (3-ply, 3T or a full
 rollout per decision, by closeness). This mirrors it with XG's analysis as the
 truth at every tier, so the ranking can be judged by XG's numbers as well:
 
@@ -12,15 +12,15 @@ truth at every tier, so the ranking can be judged by XG's numbers as well:
     3T-tier decision      -> XG Roller++ (xg_results/rollerpp.jsonl)
     rollout-tier decision -> XG rollout  (xg_results/rollout.jsonl)
 
-and scores every evaluator over the same decisions -- Sage at each level from
+and scores every evaluator over the same decisions -- Neongammon at each level from
 its recorded picks (``scores/sage_<level>_<suffix>.picks.jsonl``, written by
 the parent repo's distributed scorer or any scorer that records picks) and XG
 at each batch level from ``scores/xg_<level>.picks.jsonl``
 (``benchmark_pr_xg_levels_all.py``). Error formulas are the benchmark's own, so
-the PRs are directly comparable with the Sage-referenced table.
+the PRs are directly comparable with the Neongammon-referenced table.
 
 A pick outside the moves XG evaluated at that tier (XG rolls / re-evaluates
-only the moves within 0.02 of Sage's best) is charged the biggest error among
+only the moves within 0.02 of Neongammon's best) is charged the biggest error among
 the moves it did evaluate -- a conservative penalty rather than a dropped
 decision, so weaker levels are not flattered. The mismatch count is reported.
 
@@ -38,14 +38,14 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(_SCRIPT_DIR))
 import benchmark_money as bm  # noqa: E402
 import xg_batch_common as xbc  # noqa: E402
-from bgsage import xg_file  # noqa: E402
+from neongammon import xg_file  # noqa: E402
 
-SAGE_LEVELS = [("truncated3", "Sage 3T"), ("truncated2", "Sage 2T"), ("truncated1", "Sage 1T"),
-               ("4ply", "Sage 4P"), ("3ply", "Sage 3P"), ("2ply", "Sage 2P"), ("1ply", "Sage 1P")]
+SAGE_LEVELS = [("truncated3", "Neongammon 3T"), ("truncated2", "Neongammon 2T"), ("truncated1", "Neongammon 1T"),
+               ("4ply", "Neongammon 4P"), ("3ply", "Neongammon 3P"), ("2ply", "Neongammon 2P"), ("1ply", "Neongammon 1P")]
 XG_LEVELS = [("rollerpp", "XG Roller++"), ("rollerplus", "XG Roller+"), ("roller", "XG Roller"),
              ("ply4", "XG 4-ply"), ("ply3", "XG 3-ply")]
-ROW_ORDER = ["Sage 3T", "XG Roller++", "Sage 2T", "XG Roller+", "Sage 1T", "XG Roller",
-             "Sage 4P", "XG 4-ply", "Sage 3P", "XG 3-ply", "Sage 2P", "Sage 1P"]
+ROW_ORDER = ["Neongammon 3T", "XG Roller++", "Neongammon 2T", "XG Roller+", "Neongammon 1T", "XG Roller",
+             "Neongammon 4P", "XG 4-ply", "Neongammon 3P", "XG 3-ply", "Neongammon 2P", "Neongammon 1P"]
 
 
 def _load_jsonl(path: Path) -> dict[str, dict]:
@@ -166,7 +166,7 @@ def score(sage_suffix: str, match_length: int = 5, tiers: tuple = ("3P", "3T", "
 
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--sage-suffix", default="stage11", help="Sage picks label suffix (sage_<level>_<suffix>.picks.jsonl)")
+    ap.add_argument("--sage-suffix", default="stage11", help="Neongammon picks label suffix (sage_<level>_<suffix>.picks.jsonl)")
     ap.add_argument("--tiers", nargs="+", default=["3P", "3T", "rollout"], help="which reference tiers to include")
     ap.add_argument("--json", type=Path, default=None)
     args = ap.parse_args(argv)

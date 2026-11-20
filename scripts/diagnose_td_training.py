@@ -25,13 +25,13 @@ build_dirs = [
 for d in reversed(build_dirs):
     if os.path.isdir(d):
         sys.path.insert(0, d)
-sys.path.insert(0, os.path.join(project_dir, 'bgsage', 'python'))
+sys.path.insert(0, os.path.join(project_dir, 'neongammon', 'python'))
 
 import bgbot_cpp
-from bgsage.data import load_benchmark_file
+from neongammon.data import load_benchmark_file
 
-DATA_DIR = os.path.join(project_dir, 'bgsage', 'data')
-MODELS_DIR = os.path.join(project_dir, 'bgsage', 'models')
+DATA_DIR = os.path.join(project_dir, 'neongammon', 'data')
+MODELS_DIR = os.path.join(project_dir, 'neongammon', 'models')
 
 N_GAMES = 20000
 BENCHMARK_INTERVAL = 1000

@@ -10,7 +10,7 @@ limited to the in-flight rollout at death time.
 Run it detached (nohup ... &). Each restart appends a banner
 to the same log so you can see when restarts happened.
 
-Usage (from the bgsage repo root):
+Usage (from the neongammon repo root):
     python scripts/rollout_watchdog.py --rollout-threads 32
 
 All args after the script name are forwarded to aggregate_xg_pr.py.

@@ -8,7 +8,7 @@ at every depth: N-ply probs from 2-ply on, no cube tree. This script plays the
 money benchmark's cube decisions through that path at a fixed depth with
 several contact cube lives and scores them against XG's verdicts
 (``data/money_cube_xg/xg_reference.jsonl``, written by
-``export_money_cube_xg.py score``) and against the Sage reference, by seed half,
+``export_money_cube_xg.py score``) and against the Neongammon reference, by seed half,
 with paired differences against the engine's default (0.68).
 
 Candidates: the engine default, the analyzer's 1-ply and 2-ply money values
@@ -38,8 +38,8 @@ for _p in (_SCRIPT_DIR, _PROJECT_ROOT / "build", _PROJECT_ROOT / "python"):
 
 import bgbot_cpp  # noqa: E402
 import export_money_cube_xg as mx  # noqa: E402
-from bgsage import BatchModels  # noqa: E402
-from bgsage.analyzer import (  # noqa: E402
+from neongammon import BatchModels  # noqa: E402
+from neongammon.analyzer import (  # noqa: E402
     MONEY_CONTACT_CUBE_LIFE, MONEY_CONTACT_CUBE_LIFE_PIP_SLOPE, resolve_owner,
 )
 
@@ -97,7 +97,7 @@ class Scorer:
             if base is not None:
                 cell += "  d {:+5.2f} +- {:4.2f}".format(*self.paired(base, picks, ref))
             cells.append(cell)
-        print(f"{name:34s} | vs XG {cells[0]} | vs Sage {cells[1]}", flush=True)
+        print(f"{name:34s} | vs XG {cells[0]} | vs Neongammon {cells[1]}", flush=True)
 
 
 def main() -> None:

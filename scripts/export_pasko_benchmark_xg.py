@@ -34,7 +34,7 @@ anything is written, so the .xg files are guaranteed to encode exactly the games
 benchmark captured. Every written archive is then re-parsed and its positions,
 dice, and cube actions verified against the replay.
 
-The match header (player names "Sage", unlimited length, Jacoby + Beaver on) and
+The match header (player names "Neongammon", unlimited length, Jacoby + Beaver on) and
 all record templates are cloned from an XG-batch-analyzed money benchmark game.
 
 Usage::
@@ -56,10 +56,10 @@ from pathlib import Path
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _PROJECT_ROOT = _SCRIPT_DIR.parent
-_BGSAGE_PYTHON = _PROJECT_ROOT / "python"
+_NEONGAMMON_PYTHON = _PROJECT_ROOT / "python"
 _BUILD_DIR = _PROJECT_ROOT / "build"
 
-for _p in (_SCRIPT_DIR, _BGSAGE_PYTHON, _BUILD_DIR):
+for _p in (_SCRIPT_DIR, _NEONGAMMON_PYTHON, _BUILD_DIR):
     _sp = str(_p)
     if _sp not in sys.path:
         sys.path.insert(0, _sp)
@@ -68,7 +68,7 @@ for _p in (_SCRIPT_DIR, _BGSAGE_PYTHON, _BUILD_DIR):
 import benchmark_pasko as bp  # noqa: E402  (pasko paths + deterministic simulator)
 
 #: Default record-template archive: an XG-batch-analyzed money benchmark game --
-#: its match header already carries "Sage"/"Sage", unlimited length, Jacoby+Beaver.
+#: its match header already carries "Neongammon"/"Neongammon", unlimited length, Jacoby+Beaver.
 DEFAULT_TEMPLATE = _PROJECT_ROOT / "data" / "money_benchmark" / "xg" / "seed_2.xg"
 
 #: Output directory -- kept SEPARATE from the .txt dir so an XG Batch Analyze of
@@ -90,12 +90,12 @@ def _cube_code(cube_value: int, owner: int) -> int:
 
 
 def derive_half_moves(pre, post, d1, d2):
-    """Exact per-die (from, to) half-move sequence (bgsage points) for pre -> post.
+    """Exact per-die (from, to) half-move sequence (neongammon points) for pre -> post.
 
     XG replays half-moves, so each must use a single die. Same DFS as
     ``score_xg_pasko_benchmark.derive_half_moves``.
     """
-    from bgsage import possible_single_die_moves
+    from neongammon import possible_single_die_moves
 
     target = tuple(post)
     orders = [[d1] * k for k in (4, 3, 2, 1)] if d1 == d2 else [[d1, d2], [d2, d1]]
@@ -128,8 +128,8 @@ def _replay_turns(move_history: list[dict]) -> list[dict]:
     notation against ``possible_moves`` -- the same function that generated the
     notation -- and the match is asserted unique.
     """
-    from bgsage import flip_board, possible_moves
-    from bgsage.text_export import compute_move_notation
+    from neongammon import flip_board, possible_moves
+    from neongammon.text_export import compute_move_notation
 
     board = list(bp.PASKO_STARTING_BOARD)
     turns: list[dict] = []
@@ -173,7 +173,7 @@ def _replay_turns(move_history: list[dict]) -> list[dict]:
 
 def _templates(template_path: Path) -> dict:
     """One record of each type from a real .xg, to clone (as in score_xg_pasko_benchmark)."""
-    from bgsage import xg_file as xf
+    from neongammon import xg_file as xf
 
     tempxg = xf.XgArchive.load(template_path).get("temp.xg")
     tpl = {}
@@ -189,7 +189,7 @@ def _build_cube_rec(tpl: dict, board_mover, actif: int,
     For full games those must reflect the actual cube history or XG
     mis-reconstructs the game state.
     """
-    from bgsage import xg_file as xf
+    from neongammon import xg_file as xf
 
     return xf.build_cube_record(tpl[xf.TS_CUBE], board_mover, actif=actif,
                                 double=double, take=take, cube_b=cube_b)
@@ -198,7 +198,7 @@ def _build_cube_rec(tpl: dict, board_mover, actif: int,
 def _build_move_rec(tpl: dict, pre_mover, post_mover, d1: int, d2: int,
                     half_moves, actif: int, cube_a: int) -> bytes:
     """A tsMove record with the cube-state field set (build_move_record leaves it)."""
-    from bgsage import xg_file as xf
+    from neongammon import xg_file as xf
 
     rec = bytearray(xf.build_move_record(
         tpl[xf.TS_MOVE], pre_mover, post_mover, d1, d2, half_moves, actif=actif))
@@ -212,7 +212,7 @@ def build_game_stream(tpl: dict, turns: list[dict], result: dict) -> bytes:
     ``turns`` from :func:`_replay_turns`; ``result`` carries ``winner`` (+1/-1),
     ``win_type`` ("drop"/"single"/"gammon"/"backgammon"), ``points``.
     """
-    from bgsage import xg_file as xf  # noqa: F811 (used throughout)
+    from neongammon import xg_file as xf  # noqa: F811 (used throughout)
 
     stream = bytearray(tpl[xf.TS_HEADER_MATCH])
     xf.set_header_timedelay_totals(stream, 0, 0, 0)
@@ -252,7 +252,7 @@ def build_game_stream(tpl: dict, turns: list[dict], result: dict) -> bytes:
 
 
 def write_xg(template_path: Path, stream: bytes, out_path: Path) -> None:
-    from bgsage import xg_file as xf
+    from neongammon import xg_file as xf
 
     arch = xf.XgArchive.load(template_path)
     arch.set("temp.xg", stream)
@@ -276,7 +276,7 @@ def _strip_timestamps(txt: bytes) -> bytes:
 def _verify_txt_roundtrip(seed: int, xg_record: dict) -> None:
     """The re-simulated game must reproduce the stored transcript byte-for-byte
     (up to the write-time EventDate/EventTime header stamps)."""
-    from bgsage.text_export import export_history_to_txt
+    from neongammon.text_export import export_history_to_txt
 
     txt_path = bp._XG_DIR / f"seed_{seed}.txt"
     if not txt_path.exists():
@@ -290,7 +290,7 @@ def _verify_txt_roundtrip(seed: int, xg_record: dict) -> None:
 
 def _verify_archive(out_path: Path, turns: list[dict], result: dict) -> None:
     """Re-load the written .xg and check records against the replay."""
-    from bgsage import xg_file as xf
+    from neongammon import xg_file as xf
 
     tx = xf.XgArchive.load(out_path).get("temp.xg")
     recs = list(xf.iter_records(tx))

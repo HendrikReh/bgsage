@@ -6,7 +6,7 @@ Compares wall-clock time, cubeful equities, cubeless probabilities, and standard
 errors across rollout configurations with separate checker/cube strengths.
 
 Usage:
-    python bgsage/scripts/benchmark_rollout_cube_configs.py
+    python neongammon/scripts/benchmark_rollout_cube_configs.py
 """
 
 from __future__ import annotations
@@ -85,7 +85,7 @@ def main():
     _setup_paths()
 
     import bgbot_cpp
-    from bgsage.weights import WeightConfig
+    from neongammon.weights import WeightConfig
 
     weights = WeightConfig.default()
     weights.validate()

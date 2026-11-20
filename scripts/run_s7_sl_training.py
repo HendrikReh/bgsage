@@ -25,7 +25,7 @@ from datetime import datetime
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
-# Walk up from script dir to find project root (parent of bgsage/)
+# Walk up from script dir to find project root (parent of neongammon/)
 project_dir = script_dir
 while project_dir != os.path.dirname(project_dir):
     if os.path.isdir(os.path.join(project_dir, 'backend')):
@@ -37,14 +37,14 @@ if not os.path.isdir(build_dir):
     build_dir = os.path.join(project_dir, 'build')
 
 sys.path.insert(0, build_dir)
-sys.path.insert(0, os.path.join(project_dir, 'bgsage', 'python'))
+sys.path.insert(0, os.path.join(project_dir, 'neongammon', 'python'))
 
 import bgbot_cpp
-from bgsage import sl_train
-from bgsage.data import load_benchmark_file, load_gnubg_training_data
+from neongammon import sl_train
+from neongammon.data import load_benchmark_file, load_gnubg_training_data
 
-DATA_DIR = os.path.join(project_dir, 'bgsage', 'data')
-MODELS_DIR = os.path.join(project_dir, 'bgsage', 'models')
+DATA_DIR = os.path.join(project_dir, 'neongammon', 'data')
+MODELS_DIR = os.path.join(project_dir, 'neongammon', 'models')
 
 # Stage 7 config
 N_INPUTS = 244
@@ -212,7 +212,7 @@ def load_pair_filtered_benchmarks(step=10):
     For the shared group (prim_prim, prim_anch, anch_prim, anch_anch),
     combines matching positions from both priming.bm and anchoring.bm.
     """
-    from bgsage.data import load_benchmark_scenarios_by_indices, board_from_gnubg_position_string
+    from neongammon.data import load_benchmark_scenarios_by_indices, board_from_gnubg_position_string
 
     pair_benchmarks = {}
 

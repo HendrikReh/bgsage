@@ -44,7 +44,7 @@ _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _SCRIPT_DIR)
 
 # benchmark_pasko sets up the pasko on-disk paths; benchmark_pr_xg supplies the
-# parse/match/score machinery. Both defer their bgsage imports, so importing them
+# parse/match/score machinery. Both defer their neongammon imports, so importing them
 # here does not load the engine (this script is pure parse + match + score).
 import benchmark_pasko as bp        # noqa: E402
 import benchmark_pr_xg as xgm       # noqa: E402

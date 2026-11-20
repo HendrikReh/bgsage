@@ -29,8 +29,8 @@ _REFPOS_DEFAULT = _REPO_ROOT.parent / "refpos.txt"
 sys.path.insert(0, str(_BUILD_DIR))
 sys.path.insert(0, str(_PY_PKG))
 
-from bgsage import BgBotAnalyzer              # noqa: E402
-from bgsage.weights import PRODUCTION_MODEL   # noqa: E402
+from neongammon import BgBotAnalyzer              # noqa: E402
+from neongammon.weights import PRODUCTION_MODEL   # noqa: E402
 
 N_THREADS = 16
 EQUITY_BAND = 0.01

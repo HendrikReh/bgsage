@@ -1,27 +1,27 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MPL-2.0
 # Copyright (C) 2026 Mark Higgins
-"""Dispute analysis: Sage 3T vs XG Roller++ on positions where they disagree.
+"""Dispute analysis: Neongammon 3T vs XG Roller++ on positions where they disagree.
 
-For every rollout-tier position we have BOTH a Sage full rollout (the benchmark
+For every rollout-tier position we have BOTH a Neongammon full rollout (the benchmark
 reference) and an XG full rollout (xg_results/rollout.jsonl), find the ones where
-Sage 3T and XG Roller++ make DIFFERENT decisions, and ask: which bot is closer to
-each rollout? Reported separately for the Sage rollout and the XG rollout.
+Neongammon 3T and XG Roller++ make DIFFERENT decisions, and ask: which bot is closer to
+each rollout? Reported separately for the Neongammon rollout and the XG rollout.
 
 Per rollout benchmark, over the disputed positions:
-  - fraction where Sage 3T's decision matches the rollout's best,
+  - fraction where Neongammon 3T's decision matches the rollout's best,
   - fraction where XG Roller++'s decision matches the rollout's best,
   - fraction where neither does (rollout prefers a third option),
   - average equity error of each bot vs that rollout.
 
 Decisions: checker = the chosen move; cube = the action (ND / Double-Take /
-Double-Pass). Sage 3T pick from build/stage2_3t.jsonl; XG Roller++ pick from the
+Double-Pass). Neongammon 3T pick from build/stage2_3t.jsonl; XG Roller++ pick from the
 seed_<N>_pp.xg batch-analyze file. Cube actions from each side's nd/dt/dp.
 
 Coverage: a bot's pick can only be scored against a rollout if that rollout
 actually rolled it. The XG rollout rolled both bots' picks (forced via the flag
-policy); the Sage rollout only rolled Sage's own filter survivors, so XG
-Roller++'s pick is sometimes absent (Sage's filter pruned it). To keep the two
+policy); the Neongammon rollout only rolled Neongammon's own filter survivors, so XG
+Roller++'s pick is sometimes absent (Neongammon's filter pruned it). To keep the two
 comparisons cleanly comparable, both run on the SAME common set: disputed
 positions where both bots' picks were rolled by BOTH rollouts. Disputes failing
 that (a pick -- usually XG's -- missing from a rolled set) are excluded from both
@@ -87,17 +87,17 @@ class Tally:
             return
         n = self.n
         print(f"  {label}: n={n}")
-        print(f"    Sage 3T correct:  {self.sage_correct/n:5.1%}   "
+        print(f"    Neongammon 3T correct:  {self.sage_correct/n:5.1%}   "
               f"XG Roller++ correct: {self.xg_correct/n:5.1%}   "
               f"neither: {self.neither/n:5.1%}")
-        print(f"    avg error:  Sage 3T {self.sage_err/n:.4f}   "
+        print(f"    avg error:  Neongammon 3T {self.sage_err/n:.4f}   "
               f"XG Roller++ {self.xg_err/n:.4f}   "
               f"(PR: {self.sage_err/n*500:.2f} vs {self.xg_err/n*500:.2f})")
 
 
 def score(benchmark: str, match_length: int = 5, sage_picks: str | None = None) -> dict:
     """``sage_picks``: a ``scores/<label>.picks.jsonl`` ({key, kind, pick}) giving
-    Sage 3T's choices directly (a recorded checker board / double-take pair);
+    Neongammon 3T's choices directly (a recorded checker board / double-take pair);
     without it the picks come from the build's stage2_3t.jsonl."""
     paths = xbc.paths_for(benchmark, match_length)
     dataset = json.loads(paths.dataset.read_text(encoding="utf-8"))
@@ -150,11 +150,11 @@ def score(benchmark: str, match_length: int = 5, sage_picks: str | None = None) 
             chk["disputed"] += 1
 
             # Common set: both bots' picks must be rolled by BOTH rollouts, so the
-            # XG-rollout and Sage-rollout comparisons run on the identical set of
+            # XG-rollout and Neongammon-rollout comparisons run on the identical set of
             # positions (same n) and are directly comparable. The XG rollout rolled
-            # both picks by design; the Sage rollout only rolled its own filter
+            # both picks by design; the Neongammon rollout only rolled its own filter
             # survivors, so this drops disputes where a pick (usually XG's) wasn't
-            # a Sage rollout candidate.
+            # a Neongammon rollout candidate.
             xg_rolled = _rolled_map(r["moves"], "rollout")
             sage_rolled = _rolled_map(d["moves"], "Rollout")
             if not (sage_pick in xg_rolled and xg_pick in xg_rolled
@@ -192,27 +192,27 @@ def score(benchmark: str, match_length: int = 5, sage_picks: str | None = None) 
 def print_report(data: dict, benchmark: str) -> None:
     """Print the dispute report. Shared by main() and xg_benchmark_report."""
     chk, cube = data["checker"], data["cube"]
-    print(f"Dispute analysis: Sage 3T vs XG Roller++ ({benchmark})")
-    print(f"  {data['n_positions']} positions with both a Sage and an XG full rollout.")
+    print(f"Dispute analysis: Neongammon 3T vs XG Roller++ ({benchmark})")
+    print(f"  {data['n_positions']} positions with both a Neongammon and an XG full rollout.")
     print("  On positions where the two bots pick DIFFERENT decisions, which bot is")
-    print("  closer to each rollout? (Sage rollout vs XG rollout scored separately.)\n")
+    print("  closer to each rollout? (Neongammon rollout vs XG rollout scored separately.)\n")
     scored = chk["xg"].n
     print(f"CHECKER: {chk['disputed']} disputed positions "
           f"({scored} scored on the common set where both picks were rolled by both "
           f"rollouts; {chk['excluded']} excluded)")
     chk["xg"].report("vs XG rollout")
-    chk["sage"].report("vs Sage rollout")
+    chk["sage"].report("vs Neongammon rollout")
     print()
     print(f"CUBE: {cube['disputed']} disputed positions (bots pick different cube actions)")
     cube["xg"].report("vs XG rollout")
-    cube["sage"].report("vs Sage rollout")
+    cube["sage"].report("vs Neongammon rollout")
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--benchmark", choices=["money", "match"], default="money")
     ap.add_argument("--match-length", type=int, default=5)
-    ap.add_argument("--sage-picks", default=None, help="scores/<label>.picks.jsonl with Sage 3T's recorded picks")
+    ap.add_argument("--sage-picks", default=None, help="scores/<label>.picks.jsonl with Neongammon 3T's recorded picks")
     args = ap.parse_args(argv)
     print_report(score(args.benchmark, args.match_length, args.sage_picks), args.benchmark)
 

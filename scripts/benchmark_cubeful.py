@@ -14,7 +14,7 @@ import statistics
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'build'))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'python'))
 
-from bgsage import BgBotAnalyzer
+from neongammon import BgBotAnalyzer
 
 BOARD = [0, 0, 1, 2, 2, -2, 3, 0, 3, 0, 0, 0, -4, 4, 0, 0, 0, -3, 0, -3, -1, -2, 0, 0, 0, 0]
 N_RUNS = 5

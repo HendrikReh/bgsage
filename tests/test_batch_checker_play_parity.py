@@ -24,10 +24,10 @@ for _p in (os.path.join(_ROOT, "build"), os.path.join(_ROOT, "python")):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from bgsage import (  # noqa: E402
+from neongammon import (  # noqa: E402
     BgBotAnalyzer, STARTING_BOARD, batch_checker_play, flip_board, possible_moves,
 )
-from bgsage.board import check_game_over  # noqa: E402
+from neongammon.board import check_game_over  # noqa: E402
 
 # A snake: the 24-NN layout pins every contact node of its tree to NN 22.
 SNAKE = [0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 2, 3, 3, 2, 2, 1, -7, -7, 0]
@@ -143,8 +143,8 @@ def test_the_fixture_exercises_promotion(lists):
 def test_the_filtered_depths_come_from_python():
     # With no filtered depth, 2-ply searches every move, in the analyzer too.
     positions = POSITIONS["2ply"][:6]
-    with patch("bgsage.batch.CUBEFUL_FILTERED_PLIES", frozenset()), \
-            patch("bgsage.analyzer.CUBEFUL_FILTERED_PLIES", frozenset()):
+    with patch("neongammon.batch.CUBEFUL_FILTERED_PLIES", frozenset()), \
+            patch("neongammon.analyzer.CUBEFUL_FILTERED_PLIES", frozenset()):
         batch = _batch_moves("2ply", positions)
         analyzer = _analyzer_moves("2ply", positions)
     assert batch == analyzer

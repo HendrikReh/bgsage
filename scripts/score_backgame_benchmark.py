@@ -6,9 +6,9 @@ Evaluates each position with the full 19-NN BackgameAwarePairStrategy at 1-ply,
 compares cubeless equity against the rollout target equity.
 
 Usage:
-    python bgsage/scripts/score_backgame_benchmark.py
-    python bgsage/scripts/score_backgame_benchmark.py --side player
-    python bgsage/scripts/score_backgame_benchmark.py --side opponent
+    python neongammon/scripts/score_backgame_benchmark.py
+    python neongammon/scripts/score_backgame_benchmark.py --side player
+    python neongammon/scripts/score_backgame_benchmark.py --side opponent
 """
 
 import argparse
@@ -19,7 +19,7 @@ sys.path.insert(0, "build")
 import bgbot_cpp
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "python"))
-from bgsage.weights import WeightConfigPair
+from neongammon.weights import WeightConfigPair
 
 
 def load_rollout(filepath):

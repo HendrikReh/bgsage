@@ -10,9 +10,9 @@ Writes a JSON baseline file that can be compared against after each
 optimization attempt.
 
 Usage:
-    python bgsage/scripts/benchmark_cube_optimizations.py --out baseline.json
-    python bgsage/scripts/benchmark_cube_optimizations.py --out current.json
-    python bgsage/scripts/benchmark_cube_optimizations.py --compare baseline.json current.json
+    python neongammon/scripts/benchmark_cube_optimizations.py --out baseline.json
+    python neongammon/scripts/benchmark_cube_optimizations.py --out current.json
+    python neongammon/scripts/benchmark_cube_optimizations.py --compare baseline.json current.json
 """
 
 from __future__ import annotations
@@ -26,10 +26,10 @@ from pathlib import Path
 # Setup paths
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(_REPO_ROOT / "build"))
-sys.path.insert(0, str(_REPO_ROOT / "bgsage" / "python"))
+sys.path.insert(0, str(_REPO_ROOT / "neongammon" / "python"))
 
 import bgbot_cpp  # noqa: E402
-from bgsage import BgBotAnalyzer  # noqa: E402
+from neongammon import BgBotAnalyzer  # noqa: E402
 
 
 REFPOS_PATH = _REPO_ROOT / "refpos.txt"

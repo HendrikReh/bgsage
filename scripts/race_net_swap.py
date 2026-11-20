@@ -23,7 +23,7 @@ for _p in (_PROJECT_ROOT / "build", _PROJECT_ROOT / "python"):
         sys.path.insert(0, str(_p))
 
 import bgbot_cpp  # noqa: E402
-from bgsage.weights import PRODUCTION_MODEL, WeightConfig, bearoff_db_path  # noqa: E402
+from neongammon.weights import PRODUCTION_MODEL, WeightConfig, bearoff_db_path  # noqa: E402
 
 DEFAULT_IN = _PROJECT_ROOT / "logs" / "race_gap" / "race_gap.json"
 KEYS = ("board", "dice", "candidates", "rollout_equities")

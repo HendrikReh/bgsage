@@ -1,4 +1,4 @@
-# bgsage performance review handoff 2
+# neongammon performance review handoff 2
 
 **Baseline** · `0dee4f3` on `main`, 2026-11-19. The [first handoff](PERFORMANCE-HANDOFF.md) records the completed work. This handoff covers five follow-up findings.
 
@@ -6,11 +6,11 @@
 
 | Section | State |
 | --- | --- |
-| 1. Bearoff configuration in the cache identity | done in [#41](https://github.com/HendrikReh/bgsage/pull/41) |
-| 2. Decision-only N-ply cube path | done in [#42](https://github.com/HendrikReh/bgsage/pull/42) (`BgBotAnalyzer.cube_decision`) |
-| 3. Model reuse in the single-position analyzer | done in [#43](https://github.com/HendrikReh/bgsage/pull/43) |
-| 4. Thread budget of one, work per worker | done in [#44](https://github.com/HendrikReh/bgsage/pull/44) |
-| 5. One scoring routine for single and batch checker play | done in [#45](https://github.com/HendrikReh/bgsage/pull/45) (`score_checker_position`) |
+| 1. Bearoff configuration in the cache identity | done in [#41](https://github.com/HendrikReh/neongammon/pull/41) |
+| 2. Decision-only N-ply cube path | done in [#42](https://github.com/HendrikReh/neongammon/pull/42) (`BgBotAnalyzer.cube_decision`) |
+| 3. Model reuse in the single-position analyzer | done in [#43](https://github.com/HendrikReh/neongammon/pull/43) |
+| 4. Thread budget of one, work per worker | done in [#44](https://github.com/HendrikReh/neongammon/pull/44) |
+| 5. One scoring routine for single and batch checker play | done in [#45](https://github.com/HendrikReh/neongammon/pull/45) (`score_checker_position`) |
 
 A suspected gap noted during section 1 turned out not to exist: `MultiPlyStrategy`'s default N-ply tree hands the engine `*base_`, but `set_bearoff_db` replaces `base_` itself with a `BearoffStrategy` over the database, so the database applies throughout the tree, not only at the root. Checked 2026-11-20 on a position whose roots are not bearoff positions but whose leaves are: 2-ply equities with `multipy_set_bearoff_db` equal those of an N-ply strategy built around an explicit `BearoffStrategy`, and differ from those without the database.
 
@@ -18,7 +18,7 @@ The line anchors below point at `0dee4f3`; the sections above have moved code si
 
 Fix the bearoff cache identity first. Model and worker reuse increase the number of evaluations that can encounter the same cache entries. Next, add the decision-only cube path for steady-state speed, or tackle model reuse first if analyzer startup is the main cost.
 
-Local measurements used Stage 11, an Apple M4 Pro, and the Release build with Accelerate. They are spot checks. For before-and-after measurements, keep the positions, model, build settings, and thread count fixed, and alternate the call order. [Build instructions](CLAUDE.md#L1068) · [Stage 11 configuration](python/bgsage/weights.py#L123)
+Local measurements used Stage 11, an Apple M4 Pro, and the Release build with Accelerate. They are spot checks. For before-and-after measurements, keep the positions, model, build settings, and thread count fixed, and alternate the call order. [Build instructions](CLAUDE.md#L1068) · [Stage 11 configuration](python/neongammon/weights.py#L123)
 
 ## 1. Include bearoff configuration in the evaluation cache identity
 
@@ -38,7 +38,7 @@ Local measurements used Stage 11, an Apple M4 Pro, and the Release build with Ac
 
 ## 2. Add a decision-only path for N-ply cube calls
 
-**Finding.** The unified binding evaluates ND and DT in the cubeful tree, then runs a separate cubeless search for the probability fields. `simulate_game` reads the offer and take flags. A decision-only call can return the original decision and equities directly after the first pass. [Two searches in the binding](cpp/pybind/bindings.cpp#L5780) · [Simulation cube calls](python/bgsage/simulation.py#L160)
+**Finding.** The unified binding evaluates ND and DT in the cubeful tree, then runs a separate cubeless search for the probability fields. `simulate_game` reads the offer and take flags. A decision-only call can return the original decision and equities directly after the first pass. [Two searches in the binding](cpp/pybind/bindings.cpp#L5780) · [Simulation cube calls](python/neongammon/simulation.py#L160)
 
 | Depth | Both native passes | Decision pass only | Separate probability pass |
 | --- | ---: | ---: | ---: |
@@ -53,7 +53,7 @@ These are separate medians from a serial C++ probe on 20 fixed money contact pos
 
 ## 3. Extend model reuse to the single-position analyzer
 
-**Finding.** A 3-ply analyzer loads Stage 11 for its 1-ply strategy, loads it again when creating `MultiPlyStrategy`, and loads it a third time when the cached cube strategy is first requested. The batch implementation already builds N-ply strategies around a loaded base. [Analyzer base and cube strategy](python/bgsage/analyzer.py#L186) · [N-ply analyzer construction](python/bgsage/analyzer.py#L416) · [Factory that accepts a loaded base](cpp/pybind/bindings.cpp#L5456) · [Batch ownership](python/bgsage/batch.py#L126)
+**Finding.** A 3-ply analyzer loads Stage 11 for its 1-ply strategy, loads it again when creating `MultiPlyStrategy`, and loads it a third time when the cached cube strategy is first requested. The batch implementation already builds N-ply strategies around a loaded base. [Analyzer base and cube strategy](python/neongammon/analyzer.py#L186) · [N-ply analyzer construction](python/neongammon/analyzer.py#L416) · [Factory that accepts a loaded base](cpp/pybind/bindings.cpp#L5456) · [Batch ownership](python/neongammon/batch.py#L126)
 
 | Startup probe | Observed time |
 | --- | ---: |
@@ -61,7 +61,7 @@ These are separate medians from a serial C++ probe on 20 fixed money contact pos
 | Construct a 3-ply analyzer with the default database, median of 15 calls | 46.3 ms |
 | First empty default batch with a cold database-loader cache, one call | 2.4 ms |
 
-The empty batch case was a single runtime check. The database loader registered one miss even though the wrapper returned an empty list. All three batch wrappers resolve models before checking for rows. [Database loading and model resolution](python/bgsage/batch.py#L87) · [Empty pre-roll batch](python/bgsage/batch.py#L234) · [Empty post-move batch](python/bgsage/batch.py#L329) · [Empty checker batch](python/bgsage/batch.py#L516)
+The empty batch case was a single runtime check. The database loader registered one miss even though the wrapper returned an empty list. All three batch wrappers resolve models before checking for rows. [Database loading and model resolution](python/neongammon/batch.py#L87) · [Empty pre-roll batch](python/neongammon/batch.py#L234) · [Empty post-move batch](python/neongammon/batch.py#L329) · [Empty checker batch](python/neongammon/batch.py#L516)
 
 **Fix.** Use `create_multipy_from_base` and reuse the immutable model weights for checker and cube analysis. Preserve independent evaluator configuration where root routing can differ. After fixing cache identity, share the default database where its lifetime and ownership are clear. Keep batch argument validation and load resources only when there are positions to evaluate.
 
@@ -69,7 +69,7 @@ The empty batch case was a single runtime check. The database loader registered 
 
 ## 4. Tune thread selection and honor an explicit budget of one
 
-**Finding.** The 1-ply native batch path starts and joins workers for each call. Separately, the N-ply analyzer clamps `parallel_threads=1` to two. A 3-ply checker-play probe with an explicit budget of one observed a two-worker Python pool. The money benchmark requests one internal thread because it can already run decisions concurrently. [Batch worker loop](cpp/pybind/bindings.cpp#L4091) · [Analyzer thread selection](python/bgsage/analyzer.py#L420) · [Checker executor](python/bgsage/analyzer.py#L1134) · [Benchmark caller](scripts/benchmark_money.py#L1550)
+**Finding.** The 1-ply native batch path starts and joins workers for each call. Separately, the N-ply analyzer clamps `parallel_threads=1` to two. A 3-ply checker-play probe with an explicit budget of one observed a two-worker Python pool. The money benchmark requests one internal thread because it can already run decisions concurrently. [Batch worker loop](cpp/pybind/bindings.cpp#L4091) · [Analyzer thread selection](python/neongammon/analyzer.py#L420) · [Checker executor](python/neongammon/analyzer.py#L1134) · [Benchmark caller](scripts/benchmark_money.py#L1550)
 
 | Warm 1-ply batch size | One thread | Auto |
 | ---: | ---: | ---: |
@@ -87,7 +87,7 @@ The probe reused one `BatchModels`, checked that serial and auto produced equal 
 
 ## 5. Share one scoring implementation between single and batch checker play
 
-**Finding.** Python and C++ separately implement the 2-ply candidate filter, the cubeless survivor search and promotions, cube-aware rescoring, and the final top-two promotions. Both paths also have their own full-width orchestration at deeper levels. This finding is based on source inspection. No speedup was measured. [Analyzer path](python/bgsage/analyzer.py#L946) · [Python promotion](python/bgsage/analyzer.py#L1177) · [Native path](cpp/pybind/bindings.cpp#L305) · [Native survivor selection](cpp/pybind/bindings.cpp#L432)
+**Finding.** Python and C++ separately implement the 2-ply candidate filter, the cubeless survivor search and promotions, cube-aware rescoring, and the final top-two promotions. Both paths also have their own full-width orchestration at deeper levels. This finding is based on source inspection. No speedup was measured. [Analyzer path](python/neongammon/analyzer.py#L946) · [Python promotion](python/neongammon/analyzer.py#L1177) · [Native path](cpp/pybind/bindings.cpp#L305) · [Native survivor selection](cpp/pybind/bindings.cpp#L432)
 
 **Fix.** Extract a native per-position scoring routine and route both entry points through it after it supports the single-position contract, including forced boards, cube caps, and cube rules. Keep the public result types and use each caller's thread budget. Preserve the exact searched set at 2-ply and full-width search at deeper levels. The cubeless promotions at 2-ply help determine which candidates enter the cube-aware search.
 

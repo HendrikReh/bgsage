@@ -27,18 +27,18 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Setup import paths
 script_dir = os.path.dirname(os.path.abspath(__file__))
-project_dir = os.path.dirname(script_dir)  # the bgsage repo root
+project_dir = os.path.dirname(script_dir)  # the neongammon repo root
 build_dir = os.path.join(project_dir, 'build')
 
 sys.path.insert(0, build_dir)
 sys.path.insert(0, os.path.join(project_dir, 'python'))
 
 import bgbot_cpp
-from bgsage.settings import gnubg_path
+from neongammon.settings import gnubg_path
 
 DATA_DIR = os.path.join(project_dir, 'data')
 BENCHMARK_DIR = os.path.join(DATA_DIR, 'benchmark_pr')
-# BGSAGE_GNUBG, the user settings file, or auto-detection (CLAUDE.md "GNUbg Path")
+# NEONGAMMON_GNUBG, the user settings file, or auto-detection (CLAUDE.md "GNUbg Path")
 GNUBG_CLI = gnubg_path()
 
 GAME_PLANS = ['purerace', 'racing', 'attacking', 'priming', 'anchoring']

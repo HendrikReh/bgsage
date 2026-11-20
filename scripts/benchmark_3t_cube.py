@@ -8,7 +8,7 @@ late_threshold=2), prints cubeful equities, cubeless probabilities, standard
 errors, and wall-clock time.  Caps CPU usage at 16 threads.
 
 Usage:
-    python bgsage/scripts/benchmark_3t_cube.py
+    python neongammon/scripts/benchmark_3t_cube.py
 """
 
 from __future__ import annotations
@@ -18,10 +18,10 @@ import sys
 import time
 
 sys.path.insert(0, "build")
-sys.path.insert(0, "bgsage/python")
+sys.path.insert(0, "neongammon/python")
 
-from bgsage import BgBotAnalyzer
-from bgsage.weights import PRODUCTION_MODEL
+from neongammon import BgBotAnalyzer
+from neongammon.weights import PRODUCTION_MODEL
 
 N_THREADS = 16
 
@@ -74,7 +74,7 @@ def parse_refpos(path: str) -> list[dict]:
 
 
 def main():
-    # Find refpos.txt one level up from bgsage/
+    # Find refpos.txt one level up from neongammon/
     refpos_path = os.path.join(os.path.dirname(__file__), "..", "..", "refpos.txt")
     refpos_path = os.path.normpath(refpos_path)
     if not os.path.exists(refpos_path):

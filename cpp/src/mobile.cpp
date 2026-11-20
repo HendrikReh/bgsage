@@ -19,7 +19,7 @@
 #include <stdexcept>
 
 using namespace bgbot;
-struct BgsageMobileEngine {
+struct NeongammonMobileEngine {
     BearoffDB db;
     std::shared_ptr<Strategy> base;
     std::shared_ptr<Strategy> strategy;
@@ -39,7 +39,7 @@ template<typename T, size_t N> void array(std::ostringstream& s, const std::arra
     for(size_t i=0;i<N;++i) { if(i) s << ','; s << a[i]; }
     s << ']';
 }
-void validate(const BgsageMobileRequest& r, int operation) {
+void validate(const NeongammonMobileRequest& r, int operation) {
     if(operation<0 || operation>1 || r.ply<1 || r.ply>2 || r.cube_owner<0 || r.cube_owner>2 ||
        r.cube_value<1 || r.cube_value>32768 || (r.cube_value & (r.cube_value-1)) ||
        r.away1<0 || r.away2<0 || r.away1>25 || r.away2>25 ||
@@ -56,12 +56,12 @@ void validate(const BgsageMobileRequest& r, int operation) {
         throw std::invalid_argument("invalid or terminal board");
 }
 }
-extern "C" BgsageMobileEngine* bgsage_mobile_create(const char* type,
+extern "C" NeongammonMobileEngine* neongammon_mobile_create(const char* type,
     const char* const* paths, const int* hidden, int count, const char* bearoff) {
     try {
         if(!type || !paths || !hidden || !bearoff || count<5 || count>32)
             throw std::invalid_argument("invalid model configuration");
-        auto e=std::make_unique<BgsageMobileEngine>();
+        auto e=std::make_unique<NeongammonMobileEngine>();
         std::vector<std::string> p; std::vector<int> h;
         for(int i=0;i<count;++i) { if(!paths[i] || hidden[i]<1 || hidden[i]>4096) throw std::invalid_argument("invalid model asset"); p.emplace_back(paths[i]); h.push_back(hidden[i]); }
         const std::string t(type);
@@ -76,12 +76,12 @@ extern "C" BgsageMobileEngine* bgsage_mobile_create(const char* type,
     } catch(const std::exception& ex) { last_error=ex.what(); return nullptr; }
     catch(...) { last_error="engine initialization failed"; return nullptr; }
 }
-extern "C" void bgsage_mobile_destroy(BgsageMobileEngine* e) { delete e; }
-extern "C" void bgsage_mobile_free(char* p) { std::free(p); }
-extern "C" const char* bgsage_mobile_last_error() { return last_error.c_str(); }
+extern "C" void neongammon_mobile_destroy(NeongammonMobileEngine* e) { delete e; }
+extern "C" void neongammon_mobile_free(char* p) { std::free(p); }
+extern "C" const char* neongammon_mobile_last_error() { return last_error.c_str(); }
 
-extern "C" char* bgsage_mobile_analyze(BgsageMobileEngine* e, int operation,
-    const BgsageMobileRequest* request) {
+extern "C" char* neongammon_mobile_analyze(NeongammonMobileEngine* e, int operation,
+    const NeongammonMobileRequest* request) {
     try {
         if(!e || !request) throw std::invalid_argument("engine unavailable");
         const auto& r=*request; validate(r,operation);

@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'build'))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'python'))
 
 import bgbot_cpp
-from bgsage.weights import WeightConfig, PRODUCTION_MODEL
+from neongammon.weights import WeightConfig, PRODUCTION_MODEL
 
 # Position
 CHECKERS = [0,0,0,2,2,-2,3,2,2,0,0,0,-3,4,0,0,0,-3,0,-3,-2,-2,0,0,0,0]

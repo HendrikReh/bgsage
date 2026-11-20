@@ -7,8 +7,8 @@ On first run, saves baseline values to a JSON file. On subsequent runs, compares
 against the baseline and checks accuracy thresholds.
 
 Usage:
-    python bgsage/scripts/benchmark_4ply_cube.py           # run benchmark
-    python bgsage/scripts/benchmark_4ply_cube.py --save     # force save new baseline
+    python neongammon/scripts/benchmark_4ply_cube.py           # run benchmark
+    python neongammon/scripts/benchmark_4ply_cube.py --save     # force save new baseline
 """
 
 from __future__ import annotations
@@ -19,10 +19,10 @@ import sys
 import time
 
 sys.path.insert(0, "build")
-sys.path.insert(0, "bgsage/python")
+sys.path.insert(0, "neongammon/python")
 
-from bgsage import BgBotAnalyzer
-from bgsage.weights import PRODUCTION_MODEL
+from neongammon import BgBotAnalyzer
+from neongammon.weights import PRODUCTION_MODEL
 
 N_THREADS = 16
 BASELINE_FILE = os.path.join(os.path.dirname(__file__), "benchmark_4ply_baseline.json")

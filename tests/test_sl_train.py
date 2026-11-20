@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MPL-2.0
 # Copyright (C) 2026 Mark Higgins
-"""Tests for bgsage.sl_train (the Apple MLX supervised-learning trainer).
+"""Tests for neongammon.sl_train (the Apple MLX supervised-learning trainer).
 
 These tests run the MLX trainer for an epoch or two on small random data and compare the resulting weights with a
 float64 NumPy implementation of the same update rules, using the same shuffle.
@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.join(project_dir, 'build'))
 sys.path.insert(0, os.path.join(project_dir, 'python'))
 
 import bgbot_cpp  # noqa: E402
-from bgsage import sl_train  # noqa: E402
+from neongammon import sl_train  # noqa: E402
 
 needs_mlx = pytest.mark.skipif(not sl_train.mlx_available(), reason="MLX not available")
 WEIGHTS = os.path.join(project_dir, 'models', 'sl_s9_race_race.weights.best')

@@ -30,7 +30,7 @@ match lengths can coexist.
 
 Two public entry points:
 
-  * :func:`build_benchmark_data` - simulate Sage-3P vs Sage-3P matches and emit
+  * :func:`build_benchmark_data` - simulate Neongammon-3P vs Neongammon-3P matches and emit
     the reference data set (three adaptive-precision passes). Crash-safe and
     resumable.
 
@@ -73,24 +73,24 @@ from pathlib import Path
 from typing import Any, Iterable, Optional
 
 # ---------------------------------------------------------------------------
-# bgsage path setup - self-contained within the bgsage repo (mirrors
+# neongammon path setup - self-contained within the neongammon repo (mirrors
 # benchmark_money.py). Importing benchmark_money also runs its identical path
 # setup; doing it here too keeps this module importable on its own (e.g. when
-# the parent-repo Parallelizor scripts add bgsage/scripts to sys.path).
+# the parent-repo Parallelizor scripts add neongammon/scripts to sys.path).
 # ---------------------------------------------------------------------------
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = _SCRIPT_DIR.parent          # = bgsage repo root
-_BGSAGE_PYTHON = _PROJECT_ROOT / "python"   # = bgsage/python
-_BUILD_DIR = _PROJECT_ROOT / "build"        # = bgsage/build
+_PROJECT_ROOT = _SCRIPT_DIR.parent          # = neongammon repo root
+_NEONGAMMON_PYTHON = _PROJECT_ROOT / "python"   # = neongammon/python
+_BUILD_DIR = _PROJECT_ROOT / "build"        # = neongammon/build
 
-for _p in (_SCRIPT_DIR, _BGSAGE_PYTHON, _BUILD_DIR):
+for _p in (_SCRIPT_DIR, _NEONGAMMON_PYTHON, _BUILD_DIR):
     _sp = str(_p)
     if _sp not in sys.path:
         sys.path.insert(0, _sp)
 
 
-# benchmark_money supplies all the match-agnostic machinery. Its bgsage imports
+# benchmark_money supplies all the match-agnostic machinery. Its neongammon imports
 # are deferred, so importing it here does NOT load the engine.
 import benchmark_money as bm  # noqa: E402
 
@@ -123,7 +123,7 @@ _MAX_GAMES = 200
 class _Paths:
     """All on-disk locations for an ``L``-point match benchmark.
 
-    Everything lives under ``bgsage/data/match_benchmark/{L}pt/`` so multiple
+    Everything lives under ``neongammon/data/match_benchmark/{L}pt/`` so multiple
     match lengths coexist. Mirrors the money benchmark's directory layout.
     """
 
@@ -214,10 +214,10 @@ class BenchmarkBot(ABC):
         """Return the bot's cube assessment for the player on roll."""
 
 
-class SageBot(BenchmarkBot):
-    """The Open Sage production engine as a match-aware :class:`BenchmarkBot`.
+class NeongammonBot(BenchmarkBot):
+    """The Neongammon production engine as a match-aware :class:`BenchmarkBot`.
 
-    Args mirror :class:`benchmark_money.SageBot`. Jacoby/beaver are never passed
+    Args mirror :class:`benchmark_money.NeongammonBot`. Jacoby/beaver are never passed
     (the analyzer auto-disables them for match play); the match state is passed
     per call instead.
     """
@@ -229,8 +229,8 @@ class SageBot(BenchmarkBot):
         model: Optional[str] = None,
         parallel_threads: int = 0,
     ):
-        from bgsage import BgBotAnalyzer
-        from bgsage.weights import WeightConfig
+        from neongammon import BgBotAnalyzer
+        from neongammon.weights import WeightConfig
 
         if weights is None and model is not None:
             weights = WeightConfig.from_model(model)
@@ -285,10 +285,10 @@ def _capture_one_game(
     is fixed (true only for the unique Crawford game). All decisions carry the
     mover-perspective match context (``away1``/``away2``/``is_crawford``).
     """
-    from bgsage import (
+    from neongammon import (
         STARTING_BOARD, check_game_over, classify_game_plan, possible_moves,
     )
-    from bgsage.text_export import compute_move_notation
+    from neongammon.text_export import compute_move_notation
 
     state = bm._SimState(board=list(STARTING_BOARD), cube_value=1, cube_owner="centered", active=1)
     decisions: list[dict] = []
@@ -409,11 +409,11 @@ def _capture_one_game(
 
 
 def _simulate_match_and_capture(seed: int, match_length: int, parallel_threads: int) -> tuple[list[dict], dict]:
-    """Play one Sage-3P vs Sage-3P match; capture every decision's 3P analytics.
+    """Play one Neongammon-3P vs Neongammon-3P match; capture every decision's 3P analytics.
 
     Returns ``(decisions, match_record)`` where ``decisions`` is the flat list of
     benchmark decision dicts (all games) and ``match_record`` is the match-history
-    dict ``bgsage.text_export.export_history_to_txt`` consumes (``mode="match"``,
+    dict ``neongammon.text_export.export_history_to_txt`` consumes (``mode="match"``,
     one game per entry in ``match_game_histories``).
     """
     analyzer = bm._get_analyzer("3ply", parallel_threads)
@@ -471,8 +471,8 @@ def _simulate_match_and_capture(seed: int, match_length: int, parallel_threads: 
             crawford_done = True
 
     match_record = {
-        "player1_name": "Sage",
-        "player2_name": "Sage",
+        "player1_name": "Neongammon",
+        "player2_name": "Neongammon",
         "mode": "match",
         "match_length": match_length,
         "match_game_histories": game_histories,
@@ -495,7 +495,7 @@ def _build_stage1_match(seed: int, match_length: int, write_txt: bool, parallel_
     tmp_path.replace(out_path)
 
     if write_txt:
-        from bgsage.text_export import export_history_to_txt
+        from neongammon.text_export import export_history_to_txt
 
         (paths.xg / f"match_seed_{seed}.txt").write_bytes(export_history_to_txt(match_record))
 
@@ -806,7 +806,7 @@ def build_benchmark_data(
 ) -> dict:
     """Build the match-game benchmark data set (three adaptive-precision passes).
 
-    Pass 1: simulate ``n_matches`` Sage-3P vs Sage-3P ``match_length``-point
+    Pass 1: simulate ``n_matches`` Neongammon-3P vs Neongammon-3P ``match_length``-point
     matches, capturing 3-ply analytics for every real decision (optionally writing
     one XG-import ``.txt`` per match). Pass 2: re-evaluate decisions whose 3-ply
     best-vs-2nd-best gap < 0.05 at 3T. Pass 3: roll out (1,296 paths, VR, 3-ply
@@ -1100,10 +1100,10 @@ def _main(argv: Optional[list[str]] = None) -> None:
     p_build.add_argument("--max-seed", type=int, default=None,
                          help="In export modes, only emit jobs for positions with seed <= this")
 
-    p_score = sub.add_parser("score", help="Score the Sage engine against the data set")
+    p_score = sub.add_parser("score", help="Score the Neongammon engine against the data set")
     p_score.add_argument("--match-length", type=int, required=True, help="Match length in points")
     p_score.add_argument("--level", default="3ply",
-                         help="SageBot eval level (1ply..4ply, truncated1/2/3, rollout)")
+                         help="NeongammonBot eval level (1ply..4ply, truncated1/2/3, rollout)")
     p_score.add_argument("--model", default=None, help="Model name (default: production)")
     p_score.add_argument("--n-threads", type=int, default=1,
                          help="Threads scoring decisions concurrently")
@@ -1122,7 +1122,7 @@ def _main(argv: Optional[list[str]] = None) -> None:
             stages=tuple(s.strip() for s in args.stages.split(",") if s.strip()),
         )
     elif args.command == "score":
-        bot = SageBot(eval_level=args.level, model=args.model, parallel_threads=1)
+        bot = NeongammonBot(eval_level=args.level, model=args.model, parallel_threads=1)
         label = args.label or f"sage_{args.level}" + (f"_{args.model}" if args.model else "")
         result = benchmark_pr(bot, match_length=args.match_length, n_threads=args.n_threads,
                               label=label, max_seed=args.max_seed)

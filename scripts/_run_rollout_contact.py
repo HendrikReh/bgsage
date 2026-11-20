@@ -14,8 +14,8 @@ python_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'pyth
 sys.path.insert(0, python_dir)
 
 import bgbot_cpp
-from bgsage.data import load_benchmark_file
-from bgsage.weights import WeightConfig
+from neongammon.data import load_benchmark_file
+from neongammon.weights import WeightConfig
 
 bgbot_cpp.init_escape_tables()
 

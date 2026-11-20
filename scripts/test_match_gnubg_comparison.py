@@ -1,13 +1,13 @@
 # SPDX-License-Identifier: MPL-2.0
 # Copyright (C) 2026 Mark Higgins
-"""Compare bgsage match play cube decisions against GNUbg at 1-ply.
+"""Compare neongammon match play cube decisions against GNUbg at 1-ply.
 
 Runs GNUbg in match mode at several match scores and compares cube decisions
 and equities against our engine. This validates that the MET implementation,
 Janowski-in-MWC-space, and match cube logic produce results consistent with
 the reference implementation.
 
-Note: Since bgsage and GNUbg use completely different neural networks, the
+Note: Since neongammon and GNUbg use completely different neural networks, the
 underlying cubeless probabilities will differ. We expect:
   - Same cube decision framework behavior (MET lookups, Janowski interpolation)
   - Similar directional trends (match play ND != money ND, etc.)
@@ -16,7 +16,7 @@ underlying cubeless probabilities will differ. We expect:
 Usage:
     python scripts/test_match_gnubg_comparison.py [--build-dir build] [--model stage5]
 
-The GNUbg binary comes from bgsage.settings.gnubg_path() (BGSAGE_GNUBG, the
+The GNUbg binary comes from neongammon.settings.gnubg_path() (NEONGAMMON_GNUBG, the
 user settings file, or auto-detection; see CLAUDE.md "GNUbg Path").
 """
 
@@ -27,14 +27,14 @@ import re
 import subprocess
 import tempfile
 
-# Pre-parse build-dir to set paths before importing bgsage
+# Pre-parse build-dir to set paths before importing neongammon
 build_dir_arg = 'build'
 for i, arg in enumerate(sys.argv):
     if arg == '--build-dir' and i + 1 < len(sys.argv):
         build_dir_arg = sys.argv[i + 1]
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
-project_dir = os.path.dirname(script_dir)  # the bgsage repo root
+project_dir = os.path.dirname(script_dir)  # the neongammon repo root
 
 build_dir = os.path.join(project_dir, build_dir_arg)
 build_dir_std = os.path.join(project_dir, 'build')
@@ -44,8 +44,8 @@ sys.path.insert(0, build_dir_std)
 
 
 def run_gnubg(cmd, timeout=60):
-    """Run the GNUbg CLI (bgsage.settings.gnubg_path()) and return stdout."""
-    from bgsage.settings import gnubg_path
+    """Run the GNUbg CLI (neongammon.settings.gnubg_path()) and return stdout."""
+    from neongammon.settings import gnubg_path
     with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
         f.write(cmd)
         cmd_file = f.name
@@ -227,12 +227,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--build-dir', type=str, default='build')
 
-    from bgsage.weights import WeightConfig
+    from neongammon.weights import WeightConfig
     WeightConfig.add_model_arg(parser)
     args = parser.parse_args()
 
     import bgbot_cpp
-    from bgsage import BgBotAnalyzer, STARTING_BOARD
+    from neongammon import BgBotAnalyzer, STARTING_BOARD
 
     w = WeightConfig.from_args(args)
     w.validate()
@@ -241,14 +241,14 @@ def main():
     # backgame-aware production layouts alike).
     analyzer = BgBotAnalyzer(weights=w, eval_level="1ply")
 
-    from bgsage.settings import gnubg_path
+    from neongammon.settings import gnubg_path
     if not os.path.isfile(gnubg_path()):
         print(f"GNUbg CLI not found at {gnubg_path()}, skipping comparison "
-              f"(configure it with BGSAGE_GNUBG or bgsage.settings.set_gnubg_path)")
+              f"(configure it with NEONGAMMON_GNUBG or neongammon.settings.set_gnubg_path)")
         return 0
 
     print("=" * 70)
-    print("Match Play Cube Decision: bgsage vs GNUbg (1-ply)")
+    print("Match Play Cube Decision: neongammon vs GNUbg (1-ply)")
     print("=" * 70)
 
     starting = STARTING_BOARD
@@ -328,17 +328,17 @@ def main():
             g = parse_cube_output(gnubg_output)
 
             if g is not None and g.get('no_cube_decision'):
-                # GNUbg offers no cube action; bgsage must agree the player
+                # GNUbg offers no cube action; neongammon must agree the player
                 # cannot double here and must not double.
                 can_dbl = bgbot_cpp.can_double_match(
                     away1, away2, 1, bgbot_cpp.CubeOwner.CENTERED, is_craw)
                 print(f"  GNUbg:  no cube decision ({g['reason']})")
-                print(f"  bgsage: can_double={can_dbl}  -> {our_a}")
+                print(f"  neongammon: can_double={can_dbl}  -> {our_a}")
                 if not can_dbl and not cube.should_double:
                     print(f"  -> AGREE: no cube action")
                     agree += 1
                 else:
-                    print(f"  -> DISAGREE: bgsage treats the cube as available")
+                    print(f"  -> DISAGREE: neongammon treats the cube as available")
                     disagree += 1
                 continue
 
@@ -361,9 +361,9 @@ def main():
             if gnubg_probs:
                 gnubg_pstr = f"W={gnubg_probs[0]:.3f} Gw={gnubg_probs[1]:.3f} Bw={gnubg_probs[2]:.3f} Gl={gnubg_probs[4]:.3f} Bl={gnubg_probs[5]:.3f}"
 
-            print(f"  bgsage: ND={our['equity_nd']:+.4f}  DT={our['equity_dt']:+.4f}  DP={our['equity_dp']:+.4f}  -> {our_a}")
+            print(f"  neongammon: ND={our['equity_nd']:+.4f}  DT={our['equity_dt']:+.4f}  DP={our['equity_dp']:+.4f}  -> {our_a}")
             print(f"  GNUbg:  ND={gnubg_nd:+.4f}  DT={gnubg_dt:+.4f}  DP={gnubg_dp:+.4f}  -> {gnubg_a}")
-            print(f"  bgsage probs: W={our_probs[0]:.3f} Gw={our_probs[1]:.3f} Bw={our_probs[2]:.3f} Gl={our_probs[3]:.3f} Bl={our_probs[4]:.3f}")
+            print(f"  neongammon probs: W={our_probs[0]:.3f} Gw={our_probs[1]:.3f} Bw={our_probs[2]:.3f} Gl={our_probs[3]:.3f} Bl={our_probs[4]:.3f}")
             if gnubg_pstr:
                 print(f"  GNUbg  probs: {gnubg_pstr}")
 
@@ -378,11 +378,11 @@ def main():
                 gnubg_margin = abs(gnubg_nd - gnubg_dt) if gnubg_dt == gnubg_dt else 999
 
                 if our_margin < 0.15 or gnubg_margin < 0.15:
-                    print(f"  -> BORDERLINE: bgsage={our_a}, GNUbg={gnubg_a} "
+                    print(f"  -> BORDERLINE: neongammon={our_a}, GNUbg={gnubg_a} "
                           f"(margins: ours={our_margin:.3f}, gnubg={gnubg_margin:.3f})")
                     agree += 1  # count borderline as OK
                 else:
-                    print(f"  -> DISAGREE: bgsage={our_a}, GNUbg={gnubg_a}")
+                    print(f"  -> DISAGREE: neongammon={our_a}, GNUbg={gnubg_a}")
                     disagree += 1
 
         except Exception as e:

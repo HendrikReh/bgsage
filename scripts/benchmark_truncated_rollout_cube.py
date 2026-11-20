@@ -62,7 +62,7 @@ def _setup_paths() -> None:
 
 
 def _get_weights():
-    from bgsage.weights import WeightConfig
+    from neongammon.weights import WeightConfig
 
     weights = WeightConfig.default()
     weights.validate()

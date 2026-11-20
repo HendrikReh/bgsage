@@ -144,8 +144,8 @@ def synthetic_snake(rng: random.Random, snake) -> list[int] | None:
 def play_worker(args):
     """Seeds [start, start+count): synthesise, play, harvest. Returns (boards, n_decisions)."""
     start, count, top, exits = args
-    from bgsage import BgBotAnalyzer, check_game_over, flip_board, is_race, possible_moves
-    from bgsage.weights import WeightConfig
+    from neongammon import BgBotAnalyzer, check_game_over, flip_board, is_race, possible_moves
+    from neongammon.weights import WeightConfig
     import snake_rule as sr
 
     analyzer = BgBotAnalyzer(weights=WeightConfig.from_model(MODEL),

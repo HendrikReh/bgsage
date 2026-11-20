@@ -28,7 +28,7 @@ sys.path.insert(0, str(REPO / "build"))
 sys.path.insert(0, str(REPO / "python"))
 
 import bgbot_cpp  # noqa: E402
-from bgsage import BgBotAnalyzer  # noqa: E402
+from neongammon import BgBotAnalyzer  # noqa: E402
 
 
 # Post-move position from the 8/6 8/3 play of dice 5-2 on the reference

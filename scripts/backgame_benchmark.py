@@ -102,17 +102,17 @@ from pathlib import Path
 from typing import Callable, NamedTuple, Optional
 
 # ---------------------------------------------------------------------------
-# bgsage path setup - self-contained within the bgsage repo. Never reaches into
-# a parent project: weights, build artifacts and outputs all live under bgsage/.
+# neongammon path setup - self-contained within the neongammon repo. Never reaches into
+# a parent project: weights, build artifacts and outputs all live under neongammon/.
 # (Mirrors scripts/benchmark_money.py.)
 # ---------------------------------------------------------------------------
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = _SCRIPT_DIR.parent          # = bgsage repo root
-_BGSAGE_PYTHON = _PROJECT_ROOT / "python"   # = bgsage/python
-_BUILD_DIR = _PROJECT_ROOT / "build"        # = bgsage/build
+_PROJECT_ROOT = _SCRIPT_DIR.parent          # = neongammon repo root
+_NEONGAMMON_PYTHON = _PROJECT_ROOT / "python"   # = neongammon/python
+_BUILD_DIR = _PROJECT_ROOT / "build"        # = neongammon/build
 
-for _p in (_BGSAGE_PYTHON, _BUILD_DIR, _SCRIPT_DIR):
+for _p in (_NEONGAMMON_PYTHON, _BUILD_DIR, _SCRIPT_DIR):
     _sp = str(_p)
     if _sp not in sys.path:
         sys.path.insert(0, _sp)
@@ -383,7 +383,7 @@ def read_xgp_position(path: Path) -> StartPosition:
     owner, and encodes the cube as 0 = centred, +N = player 1 owns 2^N,
     -N = player 2 owns 2^N.
     """
-    from bgsage.xg_file import (
+    from neongammon.xg_file import (
         TS_CUBE, TS_MOVE, XgArchive, iter_records, norm_bars,
         parse_cube_record, parse_move_record,
     )
@@ -658,7 +658,7 @@ def _play_game(
     ``record`` returns False when enough decisions have been collected, which
     ends the game immediately.
     """
-    from bgsage import check_game_over, flip_board, is_race, possible_moves
+    from neongammon import check_game_over, flip_board, is_race, possible_moves
 
     board = list(start.board)
     cube_value, cube_owner = start.cube_value, start.cube_owner
@@ -868,8 +868,8 @@ def generate_folder(
 
 
 def cmd_generate(args: argparse.Namespace) -> None:
-    from bgsage import BgBotAnalyzer
-    from bgsage.weights import WeightConfig
+    from neongammon import BgBotAnalyzer
+    from neongammon.weights import WeightConfig
 
     _OUT_DIR.mkdir(parents=True, exist_ok=True)
     folders = [f.name for f in subfolders() if args.folder in (None, f.name)]
@@ -1050,7 +1050,7 @@ def cmd_status(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
-    from bgsage.weights import PRODUCTION_MODEL
+    from neongammon.weights import PRODUCTION_MODEL
 
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)

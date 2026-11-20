@@ -9,7 +9,7 @@ game in every match this script:
    already encoded match equity into its equity_nd/dt/dp/checker numbers,
    so ``compute_game_pr_stats`` works unchanged.
 
-2. Re-evaluates Sage's flagged decisions at 3T (configurable via
+2. Re-evaluates Neongammon's flagged decisions at 3T (configurable via
    ``--re-eval-level``) with match state passed through (away counts,
    Crawford). 2T disagreement with XG drives ``Dispute`` emission; the
    measured error uses XG's own equities (consistent with the money-game
@@ -17,7 +17,7 @@ game in every match this script:
 
 3. Rolls out each remaining disputed decision (1,296 trials, no truncation,
    3-ply throughout) with match state threaded through so MWC scoring is
-   used. Net Sage error per dispute is rollout-best minus chosen-equity,
+   used. Net Neongammon error per dispute is rollout-best minus chosen-equity,
    signed (sage_err - xg_err) so positive means XG is the better player.
 
 Outputs:
@@ -25,7 +25,7 @@ Outputs:
   - Per-match aggregate PR + per-game PR mean/std
   - Across-matches aggregate PR
   - Dispute counts by type
-  - Rollout-based net Sage error and "new PR"
+  - Rollout-based net Neongammon error and "new PR"
 
 Cache files:
   - ``sage_<level>_cache.jsonl`` — re-eval cache keyed by
@@ -35,17 +35,17 @@ Cache files:
     dispute records; keyed by (file, game_number, turn_number, decision_type)
     so resumes work cleanly.
 
-Default folder is ``bgsage/logs/sage_vs_sage_match`` (inside the bgsage repo,
+Default folder is ``neongammon/logs/sage_vs_sage_match`` (inside the neongammon repo,
 matching where ``run_sage_vs_sage_match.py`` writes its .txt files). After
 running XG's Batch Analyze on those files with "Save Games after analyze"
 checked, run this script.
 
 Usage:
 
-    python bgsage/scripts/aggregate_xg_match_pr.py
-    python bgsage/scripts/aggregate_xg_match_pr.py --re-eval-level truncated2
-    python bgsage/scripts/aggregate_xg_match_pr.py --skip-rollouts
-    python bgsage/scripts/aggregate_xg_match_pr.py --limit 5
+    python neongammon/scripts/aggregate_xg_match_pr.py
+    python neongammon/scripts/aggregate_xg_match_pr.py --re-eval-level truncated2
+    python neongammon/scripts/aggregate_xg_match_pr.py --skip-rollouts
+    python neongammon/scripts/aggregate_xg_match_pr.py --limit 5
 """
 
 from __future__ import annotations
@@ -60,22 +60,22 @@ from dataclasses import dataclass
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
-# bgsage path setup — strictly inside the bgsage repo per CLAUDE.md
+# neongammon path setup — strictly inside the neongammon repo per CLAUDE.md
 # ---------------------------------------------------------------------------
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = _SCRIPT_DIR.parent           # bgsage/
-_BGSAGE_PYTHON = _PROJECT_ROOT / "python"
+_PROJECT_ROOT = _SCRIPT_DIR.parent           # neongammon/
+_NEONGAMMON_PYTHON = _PROJECT_ROOT / "python"
 _BUILD_DIR = _PROJECT_ROOT / "build"
 
-for _p in (_BGSAGE_PYTHON, _BUILD_DIR):
+for _p in (_NEONGAMMON_PYTHON, _BUILD_DIR):
     sp = str(_p)
     if sp not in sys.path:
         sys.path.insert(0, sp)
 
 
-from bgsage.board import flip_board  # noqa: E402
-from bgsage.xg_compare import (  # noqa: E402
+from neongammon.board import flip_board  # noqa: E402
+from neongammon.xg_compare import (  # noqa: E402
     _is_trivial_take_pass,
     compute_game_pr_stats,
     parse_xg_match,
@@ -112,7 +112,7 @@ _re_eval_analyzer = None  # lazy-built
 def _get_re_eval_analyzer(n_threads: int = 0):
     global _re_eval_analyzer
     if _re_eval_analyzer is None:
-        from bgsage import BgBotAnalyzer
+        from neongammon import BgBotAnalyzer
         _re_eval_analyzer = BgBotAnalyzer(
             eval_level=_RE_EVAL_LEVEL, cubeful=True,
             parallel_threads=n_threads,
@@ -161,7 +161,7 @@ def _evaluate_single_board_at_re_eval(
     auto-disabled — matches the convention BgBotAnalyzer uses. The C++
     binding takes those flags directly, so we explicitly suppress them.
     """
-    from bgsage.analyzer import resolve_owner
+    from neongammon.analyzer import resolve_owner
     is_match = away1 > 0 or away2 > 0
     jacoby = not is_match
     beaver = not is_match
@@ -225,7 +225,7 @@ def _get_or_compute_re_eval_checker(
     important_boards=(),
 ) -> dict:
     """Get-or-compute the re-eval checker_play result and guarantee the
-    important boards (Sage's played + XG's #1) are at Rollout quality so
+    important boards (Neongammon's played + XG's #1) are at Rollout quality so
     moves[0] reflects the true re-eval best."""
     key = _re_eval_cache_key(file, game_number, turn_number, "checker")
     entry = cache.get(key)
@@ -596,7 +596,7 @@ def _find_disputes_in_game(
 
 def _build_rollout_analyzer(seed: int = 42, n_threads: int = 0,
                             n_trials: int = _ROLLOUT_N_TRIALS):
-    from bgsage import BgBotAnalyzer
+    from neongammon import BgBotAnalyzer
     import bgbot_cpp
     return BgBotAnalyzer(
         eval_level="rollout",
@@ -820,14 +820,14 @@ def _dispute_key(d: Dispute) -> str:
 
 
 def _dispute_summary_row(d: Dispute) -> tuple[str, str]:
-    """Render Sage's and XG's choices as short human-readable strings.
+    """Render Neongammon's and XG's choices as short human-readable strings.
 
     Cube disputes use the action labels ("double" / "no_double" / "take" /
     "pass"). Checker disputes use ``compute_move_notation`` to render the
     pre-board -> post-board difference as a notation string like ``13/10 8/5``.
     """
     if d.decision_type == "checker":
-        from bgsage.text_export import compute_move_notation
+        from neongammon.text_export import compute_move_notation
         d1, d2 = d.dice
         sage_move = compute_move_notation(
             list(d.board), list(d.sage_choice["board"]), d1, d2,
@@ -850,13 +850,13 @@ def _print_threshold_breakdown(
 ) -> None:
     """Print how many disputes would be rolled out vs skipped at each
     threshold, so the user can pick a rollout-budget tradeoff. The skipped
-    disputes are assumed to be cases where Sage was wrong (and they
-    contribute ``+xg_measured_error`` to net Sage error without an actual
+    disputes are assumed to be cases where Neongammon was wrong (and they
+    contribute ``+xg_measured_error`` to net Neongammon error without an actual
     rollout)."""
     if not disputes:
         return
     print()
-    print("Threshold breakdown (skipped disputes assumed Sage-wrong):")
+    print("Threshold breakdown (skipped disputes assumed Neongammon-wrong):")
     print(f"  {'threshold':>10} {'roll out':>10} {'skip':>6}")
     n = len(disputes)
     for t in thresholds:
@@ -866,7 +866,7 @@ def _print_threshold_breakdown(
 
 
 def _print_top_disputes(disputes: list[Dispute], n: int) -> None:
-    """Print the top-N disputes by XG-measured Sage error, sorted descending.
+    """Print the top-N disputes by XG-measured Neongammon error, sorted descending.
 
     Includes match context (away counts + Crawford) so a reader can see why
     a position matters. Decisions tied on error follow insertion order.
@@ -875,7 +875,7 @@ def _print_top_disputes(disputes: list[Dispute], n: int) -> None:
         return
     ranked = sorted(disputes, key=lambda d: -d.xg_measured_error)[:n]
     print()
-    print(f"Top {len(ranked)} disputes by XG-measured Sage error")
+    print(f"Top {len(ranked)} disputes by XG-measured Neongammon error")
     print("=" * 60)
     header = (
         f"{'#':<3} {'file':<22} {'g.t':>6} {'type':<9} "
@@ -1015,9 +1015,9 @@ def main() -> None:
     parser.add_argument(
         "--threshold", type=float, default=0.005,
         help=(
-            "Skip the rollout when XG's measured Sage error is <= this value "
+            "Skip the rollout when XG's measured Neongammon error is <= this value "
             "(default: 0.005). Skipped disputes contribute +xg_measured_error "
-            "to net Sage error without an actual rollout."
+            "to net Neongammon error without an actual rollout."
         ),
     )
     parser.add_argument(
@@ -1029,7 +1029,7 @@ def main() -> None:
         choices=_RE_EVAL_LEVEL_CHOICES,
         default=_DEFAULT_RE_EVAL_LEVEL,
         help=(
-            f"Eval level used to re-evaluate positions where Sage 3-ply "
+            f"Eval level used to re-evaluate positions where Neongammon 3-ply "
             f"disagrees with XG (default: {_DEFAULT_RE_EVAL_LEVEL})."
         ),
     )
@@ -1048,7 +1048,7 @@ def main() -> None:
         "--top-disputes", type=int, default=0,
         help=(
             "After PR aggregation, print a table of the top N disputes by "
-            "XG-measured Sage error (highest first). Useful with "
+            "XG-measured Neongammon error (highest first). Useful with "
             "--skip-rollouts for a quick look at the biggest disagreements."
         ),
     )
@@ -1211,7 +1211,7 @@ def main() -> None:
         print(
             f"Threshold {args.threshold:.4f}: "
             f"{n_to_roll} will be rolled out, {n_to_skip} skipped "
-            f"(assumed Sage wrong)."
+            f"(assumed Neongammon wrong)."
         )
         if args.dry_run:
             print(f"\n--dry-run: would roll out {n_to_roll} disputes. Stopping.")
@@ -1316,7 +1316,7 @@ def main() -> None:
 
     print()
     print("Decision outcomes vs rollout best (using rollout equities):")
-    print(f"  Sage matched rollout best:    {pct(cases.get('sage_best', 0))}")
+    print(f"  Neongammon matched rollout best:    {pct(cases.get('sage_best', 0))}")
     print(f"  XG matched rollout best:      {pct(cases.get('xg_best', 0))}")
     print(f"  Both matched (tied):          {pct(cases.get('both_best', 0))}")
     print(f"  Neither matched:              {pct(cases.get('both_wrong', 0))}")
@@ -1325,10 +1325,10 @@ def main() -> None:
     avg_xg = sum(xg_errs) / n
     print()
     print("Average rollout-equity error (per disputed decision):")
-    print(f"  Sage: {avg_sage:.4f}    (sum {sum(sage_errs):.4f} over {n} disputes)")
+    print(f"  Neongammon: {avg_sage:.4f}    (sum {sum(sage_errs):.4f} over {n} disputes)")
     print(f"  XG:   {avg_xg:.4f}    (sum {sum(xg_errs):.4f} over {n} disputes)")
-    print(f"  Diff (Sage - XG):    {(avg_sage - avg_xg):+.4f}")
-    print("  Sign: positive = XG is the better player; negative = Sage is better.")
+    print(f"  Diff (Neongammon - XG):    {(avg_sage - avg_xg):+.4f}")
+    print("  Sign: positive = XG is the better player; negative = Neongammon is better.")
 
 
 if __name__ == "__main__":

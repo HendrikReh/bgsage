@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: MPL-2.0
 # Copyright (C) 2026 Mark Higgins
-"""Run Sage-vs-Sage N-point matches (optionally in parallel) and write each
+"""Run Neongammon-vs-Neongammon N-point matches (optionally in parallel) and write each
 match as one Backgammon Galaxy / XG-import compatible .txt transcript.
 
 Public entry point: ``run_sage_vs_sage_match(match_length, n_matches, level,
 initial_seed=1, workers=6, out_dir=None)``.
 
-Each match is a sequence of games played to ``match_length`` points by Sage on
+Each match is a sequence of games played to ``match_length`` points by Neongammon on
 both sides at the specified eval level. Match state (away counts, Crawford)
 is threaded into ``analyzer.cube_action`` / ``analyzer.checker_play`` so the
 bot makes match-aware decisions. Jacoby and beaver are auto-disabled by the
@@ -14,13 +14,13 @@ analyzer when match params are non-zero. The Crawford game suppresses all
 cube offers.
 
 Per-match transcripts go to ``<out_dir>/match_seed_<N>.txt``. Default
-``out_dir`` is ``bgsage/logs/sage_vs_sage_match`` inside the bgsage repo
+``out_dir`` is ``neongammon/logs/sage_vs_sage_match`` inside the neongammon repo
 (deliberately separate from the parent project's ``logs/`` directory).
 
 Usage:
 
-    python bgsage/scripts/run_sage_vs_sage_match.py 5 70
-    python bgsage/scripts/run_sage_vs_sage_match.py 7 30 --level 3P --workers 6
+    python neongammon/scripts/run_sage_vs_sage_match.py 5 70
+    python neongammon/scripts/run_sage_vs_sage_match.py 7 30 --level 3P --workers 6
 
 Match ``i`` uses RNG seed ``initial_seed + i`` (``i`` in ``0..n_matches-1``).
 When ``workers > 1``, matches run in parallel via ``ProcessPoolExecutor``; each
@@ -41,18 +41,18 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
-# bgsage path setup
+# neongammon path setup
 # ---------------------------------------------------------------------------
-# Keep this script strictly inside the bgsage repo: resolve to bgsage's own
+# Keep this script strictly inside the neongammon repo: resolve to neongammon's own
 # python package and build directory, not the host project's. This mirrors
-# the boundary rule in bgsage/CLAUDE.md.
+# the boundary rule in neongammon/CLAUDE.md.
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = _SCRIPT_DIR.parent            # bgsage/ (this repo's root)
-_BGSAGE_PYTHON = _PROJECT_ROOT / "python"
+_PROJECT_ROOT = _SCRIPT_DIR.parent            # neongammon/ (this repo's root)
+_NEONGAMMON_PYTHON = _PROJECT_ROOT / "python"
 _BUILD_DIR = _PROJECT_ROOT / "build"
 
-for _p in (_BGSAGE_PYTHON, _BUILD_DIR):
+for _p in (_NEONGAMMON_PYTHON, _BUILD_DIR):
     sp = str(_p)
     if sp not in sys.path:
         sys.path.insert(0, sp)
@@ -91,7 +91,7 @@ def _make_analyzer(level: str, parallel_threads: int = 0):
     cached = _analyzer_cache.get(canonical)
     if cached is not None:
         return cached
-    from bgsage import BgBotAnalyzer
+    from neongammon import BgBotAnalyzer
 
     analyzer = BgBotAnalyzer(
         eval_level=canonical, cubeful=True, parallel_threads=parallel_threads,
@@ -138,7 +138,7 @@ class _State:
 
 
 def _initial_state() -> _State:
-    from bgsage import STARTING_BOARD
+    from neongammon import STARTING_BOARD
 
     return _State(
         board=list(STARTING_BOARD),
@@ -149,7 +149,7 @@ def _initial_state() -> _State:
 
 
 def _flip_state(state: _State) -> None:
-    from bgsage import flip_board
+    from neongammon import flip_board
 
     state.board = list(flip_board(state.board))
     if state.cube_owner == "player":
@@ -169,7 +169,7 @@ _WIN_TYPE_BY_MULT = {1: "single", 2: "gammon", 3: "backgammon"}
 
 
 def _check_game_over(board: list[int]) -> tuple[str, int] | None:
-    from bgsage import check_game_over
+    from neongammon import check_game_over
 
     code = check_game_over(board)
     if code > 0:
@@ -248,7 +248,7 @@ def _play_game(
     They stay constant for the duration. ``is_crawford`` is fixed for the
     whole game (true only for the unique Crawford game in the match).
     """
-    from bgsage import possible_moves
+    from neongammon import possible_moves
 
     analyzer = _make_analyzer(level, parallel_threads=parallel_threads)
     state = _initial_state()
@@ -403,7 +403,7 @@ def _result_field(record: _GameRecord, points_awarded: int) -> tuple[str, int]:
 
 
 def _game_record_to_history_dict(record: _GameRecord) -> dict:
-    from bgsage.text_export import compute_move_notation
+    from neongammon.text_export import compute_move_notation
 
     move_history = []
     for turn in _iterate_turns(record.events):
@@ -435,8 +435,8 @@ def _game_record_to_history_dict(record: _GameRecord) -> dict:
 
 def _match_to_history_dict(records: list[_GameRecord], match_length: int) -> dict:
     return {
-        "player1_name": "Sage",
-        "player2_name": "Sage",
+        "player1_name": "Neongammon",
+        "player2_name": "Neongammon",
         "mode": "match",
         "match_length": match_length,
         "match_game_histories": [_game_record_to_history_dict(r) for r in records],
@@ -444,7 +444,7 @@ def _match_to_history_dict(records: list[_GameRecord], match_length: int) -> dic
 
 
 def _export_match(records: list[_GameRecord], match_length: int, path: Path) -> None:
-    from bgsage.text_export import export_history_to_txt
+    from neongammon.text_export import export_history_to_txt
 
     path.write_bytes(export_history_to_txt(_match_to_history_dict(records, match_length)))
 
@@ -568,7 +568,7 @@ def run_sage_vs_sage_match(
     workers: int = 6,
     out_dir: Path | str | None = None,
 ) -> list[Path]:
-    """Play ``n_matches`` Sage-vs-Sage matches and return the .txt paths.
+    """Play ``n_matches`` Neongammon-vs-Neongammon matches and return the .txt paths.
 
     Match ``i`` uses RNG seed ``initial_seed + i`` (``i`` in
     ``0..n_matches-1``). With ``workers == 1`` matches run serially in-process

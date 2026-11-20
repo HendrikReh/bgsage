@@ -21,8 +21,8 @@ for _p in (os.path.join(_ROOT, "build"), os.path.join(_ROOT, "python")):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from bgsage import BgBotAnalyzer, STARTING_BOARD, flip_board, possible_moves  # noqa: E402
-from bgsage.board import check_game_over  # noqa: E402
+from neongammon import BgBotAnalyzer, STARTING_BOARD, flip_board, possible_moves  # noqa: E402
+from neongammon.board import check_game_over  # noqa: E402
 
 
 def _positions(n=24, seed=7):
@@ -95,7 +95,7 @@ def test_best_move_comes_from_the_search(analyzers):
 def test_3ply_still_scores_every_move():
     """3-ply is not in CUBEFUL_FILTERED_PLIES: there the full search pays
     (money benchmark, 2026-11-19), so every candidate stays 3-ply."""
-    from bgsage.analyzer import CUBEFUL_FILTERED_PLIES
+    from neongammon.analyzer import CUBEFUL_FILTERED_PLIES
 
     assert 3 not in CUBEFUL_FILTERED_PLIES
     an = BgBotAnalyzer(eval_level="3ply", cubeful=True)

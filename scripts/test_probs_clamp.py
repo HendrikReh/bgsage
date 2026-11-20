@@ -24,7 +24,7 @@ sys.path.insert(0, str(ROOT / "python"))
 
 
 import bgbot_cpp
-from bgsage import BgBotAnalyzer, STARTING_BOARD
+from neongammon import BgBotAnalyzer, STARTING_BOARD
 
 
 def fmt_probs(probs):

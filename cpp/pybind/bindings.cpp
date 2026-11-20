@@ -1805,7 +1805,7 @@ PYBIND11_MODULE(bgbot_cpp, m) {
        "evaluation hot paths see them (possible_moves sorts them). Same set\n"
        "as possible_moves; exposed so tests can pin the order.");
 
-    bgsage_python::bind_move_arrays(m);
+    neongammon_python::bind_move_arrays(m);
 
     m.def("possible_single_die_moves", [](const std::vector<int>& board, int die) {
         auto b = list_to_board(board);

@@ -14,16 +14,16 @@ plain cube_action call walks, with the 21 player rolls (and, from 3-ply, the
   board, and each opponent-roll equity the player's (N-2)-ply one.
 
 Run with:
-    python -m pytest bgsage/tests/test_2ply_details.py -v
-    python -m unittest bgsage.tests.test_2ply_details -v
+    python -m pytest neongammon/tests/test_2ply_details.py -v
+    python -m unittest neongammon.tests.test_2ply_details -v
 """
 import os
 import sys
 import unittest
 
-# Setup paths — tests/ lives at the bgsage repo root, so one level up is the repo.
+# Setup paths — tests/ lives at the neongammon repo root, so one level up is the repo.
 script_dir = os.path.dirname(os.path.abspath(__file__))
-repo_dir = os.path.dirname(script_dir)  # bgsage repo root
+repo_dir = os.path.dirname(script_dir)  # neongammon repo root
 build_dir = os.path.join(repo_dir, "build")
 
 sys.path.insert(0, build_dir)
@@ -32,9 +32,9 @@ sys.path.insert(0, os.path.join(repo_dir, "python"))
 import bgbot_cpp
 from unittest import mock
 
-import bgsage.analyzer
-from bgsage import BgBotAnalyzer
-from bgsage.board import flip_board, check_game_over, is_race, possible_moves
+import neongammon.analyzer
+from neongammon import BgBotAnalyzer
+from neongammon.board import flip_board, check_game_over, is_race, possible_moves
 
 # Test position: contact/priming position with non-trivial cube dynamics
 BOARD = [0, 0, 0, 2, 3, 0, 4, -2, 2, 0, 0, 0, -4, 2, -3, 0, -1, 0, 0, -3, 2, 0, -2, 0, 0, 0]
@@ -87,7 +87,7 @@ def tearDownModule():
     _PATCHER.stop()
 
 
-_PATCHER = mock.patch.dict(bgsage.analyzer.MONEY_CONTACT_CUBE_LIFE, clear=True)
+_PATCHER = mock.patch.dict(neongammon.analyzer.MONEY_CONTACT_CUBE_LIFE, clear=True)
 
 
 class TestTwoPlyDetailsND(unittest.TestCase):

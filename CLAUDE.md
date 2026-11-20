@@ -1,10 +1,10 @@
-# bgsage — Open Sage Bot Engine Library
+# neongammon — Neongammon Bot Engine Library
 
 Neural-network backgammon engine with C++ core and Python interface. Licensed under MPL-2.0.
 
 ## Platform Scope (this fork)
 
-**This fork (HendrikReh/bgsage) targets macOS on Apple Silicon (arm64) only.**
+**This fork (HendrikReh/neongammon) targets macOS on Apple Silicon (arm64) only.**
 The development machine is an M4 Pro Mac mini (10P+4E cores, 20-core GPU,
 64 GB). Upstream (markbgsage/bgsage) was developed on Windows with an NVIDIA
 GPU; this fork removed its Windows, MSVC, CUDA and Linux build code on
@@ -18,7 +18,7 @@ GPU; this fork removed its Windows, MSVC, CUDA and Linux build code on
   Linux x86-64 cloud containers, so the AVX2 kernels in `neural_net.cpp` and
   the x86-64 branch of `cpp/CMakeLists.txt` stay, marked "Modal only". Keep
   them compiling; nothing else uses them.
-- **GPU training** runs on the Apple GPU through MLX (`bgsage.sl_train`,
+- **GPU training** runs on the Apple GPU through MLX (`neongammon.sl_train`,
   `pip install mlx`); every training script calls it.
 - **Upstream merges** now conflict wherever upstream touches the removed code;
   resolve those by keeping this fork's side.
@@ -32,19 +32,20 @@ GPU; this fork removed its Windows, MSVC, CUDA and Linux build code on
 
 ## Repo Boundary Rule
 
-**This is a standalone library repo (`bgsage/`). When the working directory is
+**This is a standalone library repo (`neongammon/`; a checkout made before the
+2026-11-20 rename may still sit in a folder called `bgsage/`). When the working directory is
 pointed at this folder, ALL new files, edits, and commits MUST stay within this
 repo.** Never create or modify files outside this repo, even if parent CLAUDE.md
 files (from a host project that vendors this repo as a submodule) are loaded as
-context. New Python modules go in `python/bgsage/`, new scripts in `scripts/`,
+context. New Python modules go in `python/neongammon/`, new scripts in `scripts/`,
 new C++ in `cpp/`.
 
 The same applies to *runtime* paths: every directory the code references —
-compiled extension, weights, data, output dirs — must resolve inside `bgsage/`.
+compiled extension, weights, data, output dirs — must resolve inside `neongammon/`.
 Scripts must not reach into a parent directory for the compiled extension, model
-weights, or output logs. The compiled `bgbot_cpp*.so` belongs in `bgsage/build/`,
-default output directories resolve under `bgsage/logs/`, and scripts should set
-`_PROJECT_ROOT = _SCRIPT_DIR.parent` (the bgsage repo root) — never
+weights, or output logs. The compiled `bgbot_cpp*.so` belongs in `neongammon/build/`,
+default output directories resolve under `neongammon/logs/`, and scripts should set
+`_PROJECT_ROOT = _SCRIPT_DIR.parent` (the neongammon repo root) — never
 `.parent.parent` (which points at the host project). Several existing scripts
 in `scripts/` still resolve paths via the host project root; treat that as
 legacy and fix it when convenient.
@@ -73,7 +74,7 @@ cpp/                         # C++ core (all performance-critical code)
   src/                      # Implementation (.cpp)
   pybind/bindings.cpp       # pybind11 Python bindings
   CMakeLists.txt            # Engine build (included by ../CMakeLists.txt and mobile/CMakeLists.txt)
-python/bgsage/               # Python package
+python/neongammon/           # Python package
   analyzer.py               # Public API: checker + cube analysis
   types.py                  # Dataclasses (Probabilities, MoveAnalysis, etc.)
   board.py                  # Board utilities (flip, possible_moves, etc.)
@@ -156,7 +157,7 @@ The **production model** is the single source of truth for which trained weights
 all scripts and the analyzer use by default. It is defined in one place:
 
 ```python
-# python/bgsage/weights.py
+# python/neongammon/weights.py
 PRODUCTION_MODEL: str = "stage11"   # ← change this line to promote a new model
 ```
 
@@ -196,7 +197,7 @@ python scripts/run_full_benchmark.py --model stage3
 
 **IMPORTANT: When writing scripts or code that needs checker play or cube action
 analysis without targeting a specific model, always use `BgBotAnalyzer` from
-`bgsage`.** This is the standard model-independent Python interface — it
+`neongammon`.** This is the standard model-independent Python interface — it
 abstracts away whether the production model is a 5-NN or 17-NN pair strategy.
 Do NOT call low-level `bgbot_cpp` functions directly (e.g.
 `cube_decision_nply`, `cube_decision_nply_pair`) unless you need to target a
@@ -212,9 +213,9 @@ applicable) to use a different model.
 Given a board position, two dice, and cube information, return all legal moves
 ranked by equity, with cubeless post-move probabilities for each.
 
-**Python** — `BgBotAnalyzer.checker_play()` (`python/bgsage/analyzer.py`):
+**Python** — `BgBotAnalyzer.checker_play()` (`python/neongammon/analyzer.py`):
 ```python
-from bgsage import BgBotAnalyzer, STARTING_BOARD
+from neongammon import BgBotAnalyzer, STARTING_BOARD
 
 analyzer = BgBotAnalyzer(eval_level="3ply", cubeful=True)
 result = analyzer.checker_play(STARTING_BOARD, 3, 1, cube_value=1, cube_owner="centered")
@@ -246,9 +247,9 @@ for (auto& c : candidates) {
 Given a post-move board (right before the opponent's turn) and cube information,
 return cubeful equity, cubeless equity, and cubeless probabilities.
 
-**Python (single)** — `BgBotAnalyzer.post_move_analytics()` (`python/bgsage/analyzer.py`):
+**Python (single)** — `BgBotAnalyzer.post_move_analytics()` (`python/neongammon/analyzer.py`):
 ```python
-from bgsage import BgBotAnalyzer
+from neongammon import BgBotAnalyzer
 
 analyzer = BgBotAnalyzer(eval_level="2ply")
 result = analyzer.post_move_analytics(post_move_board, cube_owner="centered")
@@ -259,9 +260,9 @@ result = analyzer.post_move_analytics(board, cube_owner="centered",
                                        away1=5, away2=3, is_crawford=False)
 ```
 
-**Python (batch, parallelized)** — `batch_post_move_evaluate()` (`python/bgsage/batch.py`):
+**Python (batch, parallelized)** — `batch_post_move_evaluate()` (`python/neongammon/batch.py`):
 ```python
-from bgsage import batch_post_move_evaluate
+from neongammon import batch_post_move_evaluate
 
 positions = [
     {"board": board1, "cube_owner": "centered"},
@@ -293,9 +294,9 @@ Given a pre-roll board position and cube information, return cubeful equity
 information for the three cube states (No Double, Double/Take, Double/Pass),
 cubeless equity, and cubeless probabilities.
 
-**Python** — `BgBotAnalyzer.cube_action()` (`python/bgsage/analyzer.py`):
+**Python** — `BgBotAnalyzer.cube_action()` (`python/neongammon/analyzer.py`):
 ```python
-from bgsage import BgBotAnalyzer
+from neongammon import BgBotAnalyzer
 
 analyzer = BgBotAnalyzer(eval_level="3ply", cubeful=True)
 cube = analyzer.cube_action(board, cube_value=1, cube_owner="centered")
@@ -400,9 +401,9 @@ absent from every entry, and the cost is that of a plain 2-ply cube evaluation. 
 details path always ran its two manual recursion levels, so a 2-ply details
 request silently returned 3-ply-grade headline equities at ~21x the cost.)
 
-**Python (batch, pre-roll)** — `batch_evaluate()` (`python/bgsage/batch.py`):
+**Python (batch, pre-roll)** — `batch_evaluate()` (`python/neongammon/batch.py`):
 ```python
-from bgsage import batch_evaluate
+from neongammon import batch_evaluate
 
 positions = [{"board": b, "cube_value": 1, "cube_owner": "centered"} for b in boards]
 results = batch_evaluate(positions, eval_level="3ply", n_threads=0)
@@ -440,9 +441,9 @@ depths in
 filter's survivors and promotions go through the cube-aware tree, the rest keep 1-ply
 values; at other depths every move does. `tests/test_batch_checker_play_parity.py`.
 
-**Python batch wrapper** — `batch_checker_play()` (`python/bgsage/batch.py`):
+**Python batch wrapper** — `batch_checker_play()` (`python/neongammon/batch.py`):
 ```python
-from bgsage import batch_checker_play
+from neongammon import batch_checker_play
 positions = [
     {"board": b, "die1": 3, "die2": 1, "cube_value": 1, "cube_owner": "centered"}
     for b in boards
@@ -451,7 +452,7 @@ results = batch_checker_play(positions, eval_level="3ply", n_threads=0)
 # results: list[CheckerPlayResult], each with .moves sorted best-first
 ```
 
-**Keeping models loaded across batch calls** — `BatchModels` (`python/bgsage/batch.py`).
+**Keeping models loaded across batch calls** — `BatchModels` (`python/neongammon/batch.py`).
 Each batch call loads the model's weights (~15 ms for Stage 11). Callers that submit many
 small batches pass one `BatchModels` instead, which loads the base strategy once and builds
 every N-ply strategy around it (`bgbot_cpp.create_multipy_from_base`). Results are identical.
@@ -461,7 +462,7 @@ database by default (`bearoff_db=True`, a path, or `False`; loaded once per proc
 bearoff positions, so batch and analyzer agree there too. The batch functions take
 `bearoff_db=` when they are given `weights` rather than `models`.
 ```python
-from bgsage import BatchModels, batch_checker_play, batch_evaluate
+from neongammon import BatchModels, batch_checker_play, batch_evaluate
 models = BatchModels()          # or BatchModels(WeightConfig.from_model("stage5"))
 for chunk in chunks:
     batch_checker_play(chunk, eval_level="2ply", models=models)
@@ -473,18 +474,18 @@ for chunk in chunks:
 Given a board position, return the game plan for the player on roll and the
 opponent. Plans: `"purerace"`, `"racing"`, `"attacking"`, `"priming"`, `"anchoring"`.
 
-**Python (both plans)** — `classify_game_plans()` (`python/bgsage/board.py`):
+**Python (both plans)** — `classify_game_plans()` (`python/neongammon/board.py`):
 ```python
-from bgsage import classify_game_plans
+from neongammon import classify_game_plans
 
 result = classify_game_plans(board)
 # result: GamePlanResult with .player and .opponent
 print(f"Player: {result.player}, Opponent: {result.opponent}")
 ```
 
-**Python (player only)** — `classify_game_plan()` (`python/bgsage/board.py`):
+**Python (player only)** — `classify_game_plan()` (`python/neongammon/board.py`):
 ```python
-from bgsage import classify_game_plan
+from neongammon import classify_game_plan
 plan = classify_game_plan(board)  # -> str: "purerace", "racing", etc.
 ```
 
@@ -501,7 +502,7 @@ takes `numpy array [N, 26]`, returns `int32 array` (0=purerace, 1=racing, etc.).
 
 Board manipulation, move generation, and game state queries.
 
-**Python** — `python/bgsage/board.py` (all importable from `bgsage`):
+**Python** — `python/neongammon/board.py` (all importable from `neongammon`):
 
 | Function | Purpose |
 |----------|---------|
@@ -529,7 +530,7 @@ Board manipulation, move generation, and game state queries.
 
 Match play gammonless take points, dead cube take points, and gammon prices.
 
-**Python** — `python/bgsage/matchinfo.py`:
+**Python** — `python/neongammon/matchinfo.py`:
 
 | Function | Description |
 |----------|-------------|
@@ -574,10 +575,10 @@ runs **no additional neural-net evaluation** — pass in analytics you already
 have. Cube legality is irrelevant: the ND per-roll details exist whether or not
 the player owns the cube.
 
-**Python** — `python/bgsage/luck.py` (both importable from `bgsage`):
+**Python** — `python/neongammon/luck.py` (both importable from `neongammon`):
 
 ```python
-from bgsage import BgBotAnalyzer, roll_luck
+from neongammon import BgBotAnalyzer, roll_luck
 
 analyzer = BgBotAnalyzer(eval_level="3ply")
 
@@ -613,8 +614,8 @@ present) return `None` — the caller decides how to record "no luck computed".
 All interfaces default to the production model. To use a specific model:
 
 ```python
-from bgsage import BgBotAnalyzer, batch_evaluate, batch_post_move_evaluate
-from bgsage.weights import WeightConfig
+from neongammon import BgBotAnalyzer, batch_evaluate, batch_post_move_evaluate
+from neongammon.weights import WeightConfig
 
 weights = WeightConfig.from_model("stage3")
 
@@ -690,7 +691,7 @@ The mean_rolls includes the upcoming roll (1 checker on point 1 → mean=1.0 →
 ### Python API
 
 ```python
-from bgsage import BgBotAnalyzer
+from neongammon import BgBotAnalyzer
 
 # BearoffDB auto-loaded from data/ directory (bearoff_db=True by default)
 analyzer = BgBotAnalyzer(eval_level="3ply")
@@ -731,19 +732,21 @@ python scripts/generate_bearoff_db.py  # ~4 seconds, outputs data/bearoff_1sided
 
 ## GNUbg Path
 
-`bgsage.gnubg` (`GnuBgAnalyzer`, `post_move_analytics*`) runs the GNUbg CLI.
-`bgsage.settings.gnubg_path()` picks the binary, first hit wins:
+`neongammon.gnubg` (`GnuBgAnalyzer`, `post_move_analytics*`) runs the GNUbg CLI.
+`neongammon.settings.gnubg_path()` picks the binary, first hit wins:
 
 1. `settings.set_gnubg_path(path)` in code (this process), or per instance
    `GnuBgAnalyzer(gnubg_path=...)` / `post_move_analytics(..., gnubg_path=...)`
-2. the `BGSAGE_GNUBG` environment variable
-3. `"gnubg_path"` in the user settings file: `~/.config/bgsage/settings.json`
-   (`$XDG_CONFIG_HOME` respected), or wherever `BGSAGE_SETTINGS` points
+2. the `NEONGAMMON_GNUBG` environment variable
+3. `"gnubg_path"` in the user settings file: `~/.config/neongammon/settings.json`
+   (`$XDG_CONFIG_HOME` respected), or wherever `NEONGAMMON_SETTINGS` points
+   (the pre-rename `BGSAGE_GNUBG` / `BGSAGE_SETTINGS` and
+   `~/.config/bgsage/settings.json` are still read when the new ones are absent)
 4. auto-detection: `gnubg` on PATH, then `/opt/homebrew/bin/gnubg` and
    `/usr/local/bin/gnubg`
 
 ```python
-from bgsage import settings
+from neongammon import settings
 settings.set_gnubg_path("/opt/homebrew/bin/gnubg", persist=True)  # saved for later sessions
 settings.set_gnubg_path(None, persist=True)                       # back to auto-detection
 ```
@@ -883,7 +886,7 @@ race net; the candidates are in `models/race_diag/`.
 one-decision `.xg` games (`generate --subset race|contact|all`; the record
 templates are cloned from any XG-analysed game, `data/benchmark_pr_xg/template.xg`),
 XG Batch-Analyzes them, `score` reads XG's ranked moves back into
-`xg_reference.jsonl`, and `sage` scores Sage (1-ply / 2-ply, `--race-net` for
+`xg_reference.jsonl`, and `sage` scores Neongammon (1-ply / 2-ply, `--race-net` for
 other race nets) and optionally GNUbg (`--gnubg`) against BOTH the Stage 5
 rollout and XG. XG's reference value for a move is the cubeless equity of its
 own evaluation, at whatever depth XG's filter left it (4-ply for the leaders),
@@ -908,7 +911,7 @@ rates stage11 2-ply above the Stage 5 rollout's own best moves (-0.68 +-
 Stage 5, so check improvements against XG. XG's own #1 does not score 0
 because XG ranks moves cubeful (centred cube, Jacoby off) while the reference
 is cubeless; read the XG column from ~0.6 up. In the bearoff races XG agrees
-with the exact database (Sage with the DB scores 0.00 there), while the Stage 5
+with the exact database (Neongammon with the DB scores 0.00 there), while the Stage 5
 rollout's best moves cost 0.13: that is the rollout reference's noise.
 
 **The race-net swap, paired (2026-11-18).** `sage --race-net "s6
@@ -942,16 +945,16 @@ adds the PubEval opponent prefilter BgBotAnalyzer uses; the older 5-NN-only
 `score_benchmark_pr_nply` binding has none (Stage 5 2-ply 4.104 vs 4.097 on
 an 8k-decision set; 1-ply identical).
 
-## Comparing Sage to XG via .xg Files
+## Comparing Neongammon to XG via .xg Files
 
-The goal is to benchmark Sage's evaluations against XG (eXtreme Gammon),
+The goal is to benchmark Neongammon's evaluations against XG (eXtreme Gammon),
 historically considered the strongest backgammon engine. There are two
 natural approaches:
 
-1. **Head-to-head play** — Sage and XG play games against each other;
+1. **Head-to-head play** — Neongammon and XG play games against each other;
    tally points. XG has no API, so `scripts/xg_h2h.py` gets XG's moves out
    of its own Batch Analyze, replaying every game to a fixed point:
-   - Sage plays its seat and predicts XG's.
+   - Neongammon plays its seat and predicts XG's.
    - Each round writes the XG decisions still unanswered as one-decision
      `.xg` games; you Batch-Analyze the round's folder once.
    - The next `round` reads XG's #1 moves and cube recommendations back
@@ -960,14 +963,14 @@ natural approaches:
    - A game is finished when every XG decision in it is XG's own answer.
    Dice are drawn per (game pair, turn), so a changed move never changes a
    later roll, and a finished game is the game live play would have
-   produced (`tests/test_xg_h2h.py` checks this with a Sage level standing
+   produced (`tests/test_xg_h2h.py` checks this with a Neongammon level standing
    in for XG). The opening is standard (no doubles, higher die moves
    first), each dice sequence is played twice with the seats swapped, and
    no game is ever skipped. The rules are money, Jacoby on, Beaver off.
-   `report --luck` subtracts each roll's luck, from Sage's 2-ply analytics,
+   `report --luck` subtracts each roll's luck, from Neongammon's 2-ply analytics,
    times the cube; every roll's luck averages zero whatever evaluator
    measures it, so the adjusted mean stays unbiased. In a stand-in test
-   (Sage 1-ply vs 2-ply, 8 games) that cut the per-game standard error from
+   (Neongammon 1-ply vs 2-ply, 8 games) that cut the per-game standard error from
    0.89 to 0.11 points.
 
    ```bash
@@ -982,10 +985,10 @@ natural approaches:
    retired stubs: they allowed non-standard openings, accepted incomplete
    XG decisions and skipped failed games.
 
-2. **Sage plays itself; XG scores it** — Sage plays both sides of many
+2. **Neongammon plays itself; XG scores it** — Neongammon plays both sides of many
    games, each game is exported as text, and XG's *Batch Analyze* feature
    scores the lot in a single pass. The Performance Rating (PR = equity
-   error per decision × 500) measures how often Sage's chosen moves and
+   error per decision × 500) measures how often Neongammon's chosen moves and
    cube actions deviate from XG's recommendations. Batch Analyze can chew
    through hundreds of files without intervention, so this is what we use.
 
@@ -993,7 +996,7 @@ natural approaches:
 
 Three steps; the middle one is manual because it goes through XG's GUI.
 
-**1. Generate Sage-vs-Sage transcripts** with
+**1. Generate Neongammon-vs-Neongammon transcripts** with
 [scripts/run_sage_vs_sage_games.py](scripts/run_sage_vs_sage_games.py):
 
 ```bash
@@ -1016,7 +1019,7 @@ run_sage_vs_sage_games(
 
 This writes `seed_<N>.txt` per game in the output directory. Each
 transcript is a single money game (Jacoby + Beaver on, both sides
-labelled "Sage") in Backgammon Galaxy / XG-import compatible text format.
+labelled "Neongammon") in Backgammon Galaxy / XG-import compatible text format.
 With `workers > 1`, each worker process pre-loads its own analyzer at
 `parallel_threads=1` so 6 workers × 1 thread don't oversubscribe the CPU.
 
@@ -1036,7 +1039,7 @@ python scripts/aggregate_xg_pr.py [folder] [--pattern '*.xg']
 ```
 
 For each .xg, the script parses turns via
-`bgsage.xg_compare.parse_xg_game`, applies XG-style decision filters
+`neongammon.xg_compare.parse_xg_game`, applies XG-style decision filters
 (skip forced moves and trivial cube positions), and computes per-player
 error totals + decision counts. It prints:
 
@@ -1045,12 +1048,12 @@ error totals + decision counts. It prints:
 - Aggregate PR computed from summed errors and summed decisions
   (weighted by decision count rather than equally per game).
 
-### Public API (`bgsage.xg_compare`)
+### Public API (`neongammon.xg_compare`)
 
 The .xg parser and PR aggregation are exposed for ad-hoc scripting:
 
 ```python
-from bgsage.xg_compare import parse_xg_game, compute_game_pr_stats
+from neongammon.xg_compare import parse_xg_game, compute_game_pr_stats
 
 with open("seed_8.xg", "rb") as f:
     turns = parse_xg_game(f.read())
@@ -1204,16 +1207,16 @@ unnatural minima. TD gives realistic probability distributions that SL refines.
 1. **TD Self-Play (CPU)**: 25k-200k games @ alpha=0.1. Serial only (parallel TD deprecated).
 2. **Supervised Learning (GPU)**: Backprop against GNUbg rolled-out probabilities,
    batch size 128 (4096 in the S11 scripts). Scripts call
-   `bgsage.sl_train.supervised_train` / `supervised_train_preencoded`, which
+   `neongammon.sl_train.supervised_train` / `supervised_train_preencoded`, which
    run on the Mac GPU through **Apple MLX** (`pip install mlx`). See "GPU SL
-   trainer (`bgsage.sl_train`)" below.
+   trainer (`neongammon.sl_train`)" below.
 
 **Key training rules:**
 - All contact NNs train on ALL contact+crashed data, NOT game-plan subsets
 - Narrow subsets cause catastrophic regression
 - Game plan weight (`--gameplan-weight`) specializes each NN during SL
 
-### GPU SL trainer (`bgsage.sl_train`)
+### GPU SL trainer (`neongammon.sl_train`)
 
 `supervised_train(boards, targets, ...)` and
 `supervised_train_preencoded(inputs, targets, ...)` return a dict with
@@ -1297,7 +1300,7 @@ Key parameters to customize:
 - `MODEL_PREFIX` / `TD_MODEL_NAME`: file naming prefix (e.g., `sl_s5s` / `td_s5s`)
 - `CONFIGS`: per-NN SL schedule (epochs, learning rates, game plan weights)
 
-**Step 2: Register the model** in `python/bgsage/weights.py`:
+**Step 2: Register the model** in `python/neongammon/weights.py`:
 ```python
 MODELS["stage5small"] = {
     "hidden": (100, 200, 200, 200, 200),
@@ -1307,7 +1310,7 @@ MODELS["stage5small"] = {
 
 **Step 3: Launch training as a detached process.**
 Training is long-running and must survive past Claude Code's ~1h timeout.
-Run from the bgsage repo root:
+Run from the neongammon repo root:
 ```bash
 # IMPORTANT: Use python -u for unbuffered output.
 nohup build/venv/bin/python -u scripts/run_stage5small_training.py \
@@ -1662,7 +1665,7 @@ than the old `truncated3` = XG Roller++ Checker (trunc-5) mapping. See the
 `truncated3` branch in `analyzer.py`.
 
 ```python
-from bgsage import BgBotAnalyzer
+from neongammon import BgBotAnalyzer
 
 # XGRoller equivalent
 analyzer = BgBotAnalyzer(eval_level="rollout",
@@ -1743,7 +1746,7 @@ emerge naturally from recursion, not from heuristic Janowski conversion.
 
 ```python
 import bgbot_cpp
-from bgsage.weights import WeightConfig
+from neongammon.weights import WeightConfig
 w = WeightConfig.default()
 
 # Full rollout, 3-ply for both checker and cube, no ply reductions
@@ -1817,7 +1820,7 @@ average pip count (next section).
 
 ### Cube life by depth (money)
 
-`BgBotAnalyzer` and the `bgsage.batch` functions use a higher Janowski cube
+`BgBotAnalyzer` and the `neongammon.batch` functions use a higher Janowski cube
 life for CONTACT positions in money analysis at 1-ply and 2-ply:
 `MONEY_CONTACT_CUBE_LIFE = {1: 0.7375, 2: 0.7625}` in `analyzer.py`, the
 values at 120 average pips. Both rise with the average pip count,
@@ -1854,7 +1857,7 @@ cubeful equity is still minus the opponent's cube analysis.
   | 3-ply | 1.97 (17) | 1.04 (19) | 1.15 (20) | -0.93 +- 0.14 |
   | 4-ply | 1.98 (12) | 0.94 (12) | 0.95 (15) | -1.04 +- 0.11 |
 
-  The gain holds on both seed halves and against the Sage reference. A
+  The gain holds on both seed halves and against the Neongammon reference. A
   (value, slope) grid fitted on one seed half at 2-ply lands at 0.72-0.74 +
   0.00175/pip, next to the 1-ply value (out of fold 1.11). The analyzer's
   2-ply cube tree scores 0.77 (8) on the same positions. Before 2026-11-19
@@ -1909,7 +1912,7 @@ Caveats:
 - Match play is excluded because the same values do not help on the 5-point
   match benchmark: 1-ply 2.35 -> 2.38, 2-ply 1.58 -> 1.82. 0.75 at 2-ply gave
   1.32 there, but without a held-out check.
-- Every reference above is a Sage rollout, which makes its own in-trial
+- Every reference above is a Neongammon rollout, which makes its own in-trial
   cube decisions at 3-ply with 0.68. The XG check below is the independent
   one.
 
@@ -1919,16 +1922,16 @@ the money benchmark's cube positions as one-decision `.xg` games:
 the opponent owns the cube are skipped, because the mover has no decision
 there. XG Batch-Analyzes them ("World Class": 4-ply, XG Roller+ for close
 decisions). `score --xg-dir` reads XG's ND / DT / DP back into
-`xg_reference.jsonl`. `sage --xg-dir` scores Sage old and new against both
+`xg_reference.jsonl`. `sage --xg-dir` scores Neongammon old and new against both
 references, with paired differences.
 
 All 2,196 positions (2,842 decisions) were analysed: 1,503 at 4-ply, 685 by
 XG Roller+ and 8 at 2-ply. XG's equities come out normalised (DP = 1.0,
-player-owned cubes included). XG's own cube PR against the Sage reference is
+player-owned cubes included). XG's own cube PR against the Neongammon reference is
 0.44, so the two references are close. Cube PR old -> new, blunders in
 brackets:
 
-| Level | vs Sage reference | vs XG | paired new - old vs XG |
+| Level | vs Neongammon reference | vs XG | paired new - old vs XG |
 |---|---|---|---|
 | 1-ply | 3.21 (29) -> 2.36 (39) | 2.74 (33) -> 2.00 (42) | -0.73 +- 0.19 |
 | 2-ply | 2.92 (18) -> 1.30 (19) | 2.30 (15) -> 1.02 (18) | -1.28 +- 0.15 |
@@ -1962,7 +1965,7 @@ cube ownership gave no optimum that held across halves.
 Fitted on one half of the seeds against XG and scored on the other, both ways
 round (cube PR, blunders in brackets):
 
-| Out of fold | vs XG | vs Sage reference |
+| Out of fold | vs XG | vs Neongammon reference |
 |---|---|---|
 | 1-ply, flat cube life (refitted the same way) | 2.07 (40) | 2.49 (37) |
 | 1-ply, pip slope | 1.68 (33) | 1.98 (35) |
@@ -1981,7 +1984,7 @@ the diagonal of the (value, slope) grid at both levels, and 0.00150 vs
 Against the previous flat values (same positions as the fit, so in
 sample):
 - 1-ply, flat 0.75: XG cube set 2.00 (42) -> 1.62 (33) vs XG and
-  2.36 (39) -> 1.89 (34) vs the Sage reference. Full money benchmark: total
+  2.36 (39) -> 1.89 (34) vs the Neongammon reference. Full money benchmark: total
   PR 2.43 -> 2.35, cube 2.36 -> 1.89, checker 2.441 -> 2.435 (paired
   -0.006 +- 0.010; 30 of 14,693 picks change).
 - 2-ply, flat 0.80: full money benchmark total PR 1.383 -> 1.338, cube
@@ -2177,7 +2180,7 @@ whenever the leader takes, matching GNUbg and rollouts.
 
 These are Stage 5's numbers, kept as the baseline the later stages are measured
 against. **The production model is `stage11`** (`PRODUCTION_MODEL` in
-`python/bgsage/weights.py`); its results live in the Stage 11 sections below and
+`python/neongammon/weights.py`); its results live in the Stage 11 sections below and
 in `MODEL_BENCHMARKS.md`. The 1-ply contact/race ER and PubEval figures here have
 not been re-run for Stage 11 — re-run `scripts/run_full_benchmark.py --model
 stage11` before quoting a headline 1-ply ER for the current engine.
@@ -2196,7 +2199,7 @@ Benchmark PR (103k decisions), Stage 5: 1-ply=2.47, 2-ply=1.85, 3-ply=1.53.
 (100h/200h) and Stage 5 (200h/400h). Tests whether 300h contact NNs close the gap
 to 400h.
 
-**Weights:** Registered as `"stage6"` in `python/bgsage/weights.py`. Weight files
+**Weights:** Registered as `"stage6"` in `python/neongammon/weights.py`. Weight files
 are `sl_s6_{plan}.weights.best` in `models/`.
 
 **Training:** Same TD + SL pipeline as Stage 5. TD: 200k games @ α=0.1 + 1M @ α=0.02.
@@ -2233,7 +2236,7 @@ for player, `classify_game_plan(flip(board))` for opponent. PureRace selected wh
 
 **Hidden sizes:** 100h PureRace, 300h for all 16 contact pair NNs.
 
-**Weights:** Registered as `"stage7"` in `python/bgsage/weights.py`. Weight files are
+**Weights:** Registered as `"stage7"` in `python/neongammon/weights.py`. Weight files are
 `sl_s7_{pair}.weights.best` in `models/`. Shared pairs use `sl_s7_prim_anch.weights.best`.
 
 **Training:**
@@ -2304,7 +2307,7 @@ subset. Any NN with worse ER than S5's corresponding plan NN is replaced with th
 weights, guaranteeing no regressions. 10 of 13 pair NNs beat S5; 3 were replaced
 (race_prim, att_att, prim_att).
 
-**Weights:** Registered as `"stage8"` in `python/bgsage/weights.py`. Weight files
+**Weights:** Registered as `"stage8"` in `python/neongammon/weights.py`. Weight files
 are `sl_s8_{pair}.weights.best` in `models/`. 3 of the 14 canonical weight files
 are copies of S5 plan weights (due to fallback).
 
@@ -2356,7 +2359,7 @@ model (like S7 or S8), so future training runs can follow the same process.
 
 ### Step 1: Register the Model
 
-Add an entry to `MODELS` in `python/bgsage/weights.py`:
+Add an entry to `MODELS` in `python/neongammon/weights.py`:
 ```python
 MODELS["stage9"] = {
     "hidden": (100,) + (400,) * 16,        # (purerace_h,) + (contact_h,) * 16
@@ -2379,7 +2382,7 @@ Copy `scripts/run_s8_training.py` and update these constants:
 
 Training is long-running (~30-50 hours depending on hidden size, measured
 upstream on Windows + RTX 4070S). Launch it as a detached process from the
-bgsage repo root; its SL phases run through MLX:
+neongammon repo root; its SL phases run through MLX:
 
 ```bash
 nohup build/venv/bin/python -u scripts/run_s9_training.py \
@@ -2460,7 +2463,7 @@ fast filter for multi-ply search and truncated rollouts. The hypothesis was that
 a smaller model for 1-ply filtering and a full-size model for leaf evaluations could
 speed up 4-ply and Roller++ calculations.
 
-**Weights:** Registered as `"stage5small"` in `python/bgsage/weights.py`. Weight files
+**Weights:** Registered as `"stage5small"` in `python/neongammon/weights.py`. Weight files
 are `sl_s5s_{plan}.weights.best` in `models/`.
 
 **Training:** Same TD + SL pipeline as Stage 5. TD: 200k games @ α=0.1 + 1M @ α=0.02.
@@ -2662,7 +2665,7 @@ standard-game play is byte-equal to S9 outside rare deep backgames.
 `blended_backgame_probs` + `select_nn_idx` in `cpp/src/neural_net.cpp` (sentinel
 handling in the batch methods and in `cube_eval.cpp`'s `eval_groups_pair`);
 constants in `neural_net.h`; the `stage10` registry entry (`extra_backgame`
-list) and 21-length `plan_names` in `python/bgsage/weights.py`. Weight files
+list) and 21-length `plan_names` in `python/neongammon/weights.py`. Weight files
 (**v3** — the pasko nets retrained on the S10-gated benchmark/train sets and
 warm-restarted twice): `sl_s10_player_bg_v3.weights.best`,
 `sl_s10_opponent_bg_v3.weights.best`. The original shipped nets
@@ -3010,7 +3013,7 @@ the round-2 `sl_snake2_warm` net, below). Snake folder, every pick
 rollout-graded, PR at 1P / 2P / 3P: Stage 9 63.56 / 48.06 / 32.18 (364 /
 286 / 205 blunders); trio 52.45 / 34.72 / 28.49; `stage11s` **15.71 / 35.65 /
 24.35** (141 / 251 / 165). The 1-ply figure is the first real competence any
-Open Sage net has shown in the region. **Why 2-ply scores worse than 1-ply
+Neongammon net has shown in the region. **Why 2-ply scores worse than 1-ply
 — measured 2026-09-04** on the 795 checker decisions (cubeless 1-ply PR
 16.0): two separate effects, one a bug and one not.
 
@@ -3075,7 +3078,7 @@ and through `cubeless_tree_probs`, which passes its pre-move board;
 cache folds the pin into its fingerprint. Switch it off with
 `set_root_pinned([])` on the strategy (bound on both classes — the analyzer's
 `_strategy_1ply` is the bearoff wrapper) or process-wide with
-`BGSAGE_NO_ROOT_ROUTING=1` in the environment at construction.
+`NEONGAMMON_NO_ROOT_ROUTING=1` in the environment at construction.
 
 Two leaks made the first measurements wrong, and are why
 `tests/test_backgame_category.py::test_root_routing_pins_leaves_and_cache_through_nested_wrappers`
@@ -3172,7 +3175,7 @@ How the run worked:
   graded against them, XG's own #1 cost PR 61 against XG.
 - XG always analyses the played move at full depth. So
   `score_folder_vs_xg.py complete` writes a second set of games that play
-  each of Sage's picks XG had left shallower (1,244 games). With that pass,
+  each of Neongammon's picks XG had left shallower (1,244 games). With that pass,
   every decision is graded.
 
 Results, PR (paired differences +- 1 SE). The twin row covers 959 decisions,
@@ -3273,16 +3276,16 @@ Read only the ranking of the levels. In absolute terms XG and the rollouts
 disagree widely here:
 - XG's #1 costs 25.9 / 38.8 against the two rollouts (checker play 26.9 /
   46.3).
-- Sage costs 31-39 against XG.
+- Neongammon costs 31-39 against XG.
 - XG's own figures are a mix of 4-ply and Roller+.
 
 *Why XG and the rollouts disagree in snakes (2026-11-19).* XG misjudges
 the positions themselves. The cube and the move ranking are not the cause:
-- **Values, same move, cubeless.** XG's offset from either Sage rollout
-  has sd 0.39 equity per decision (P(win) sd 0.12). The two Sage rollouts
+- **Values, same move, cubeless.** XG's offset from either Neongammon rollout
+  has sd 0.39 equity per decision (P(win) sd 0.12). The two Neongammon rollouts
   (S9 play, S11 play) agree to 0.07 (P(win) 0.022). In ordinary contact
-  positions XG and Sage agree to 0.009 in P(win) (Benchmark PR sample, XG
-  4-ply #1 against Sage 2-ply).
+  positions XG and Neongammon agree to 0.009 in P(win) (Benchmark PR sample, XG
+  4-ply #1 against Neongammon 2-ply).
 - **Not the cube.** Graded on shared moves, XG's #1 costs PR 24.2 against
   the rollout cubeful, and its cubeless pick costs 17.7 graded cubeless.
   Within each engine, switching between cubeful and cubeless ranking

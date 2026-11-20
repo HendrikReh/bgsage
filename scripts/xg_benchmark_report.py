@@ -1,30 +1,30 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MPL-2.0
 # Copyright (C) 2026 Mark Higgins
-"""Sage-vs-XG rollout benchmark report — the two standing analyses in one run.
+"""Neongammon-vs-XG rollout benchmark report — the two standing analyses in one run.
 
-This is the single entry point for the Sage-vs-XG comparison. It (optionally)
+This is the single entry point for the Neongammon-vs-XG comparison. It (optionally)
 harvests the latest XG rollout results, then prints two reports with consistent
 formatting:
 
   1. EVAL-LEVEL PR TABLE (benchmark_pr_xg_levels)
-       Performance Rating of six evaluators — Sage 1T/2T/3T and XG
+       Performance Rating of six evaluators — Neongammon 1T/2T/3T and XG
        Roller/Roller+/Roller++ — against XG's full rollout as the reference, over
        the benchmark's rollout-tier positions. Lower PR = the level's chosen
        decisions are closer to the full rollout.
 
   2. DISPUTE REPORT (xg_dispute_analysis)
-       On positions where Sage 3T and XG Roller++ pick DIFFERENT decisions and we
-       have both a Sage and an XG full rollout, which bot is closer to each
-       rollout — measured separately against the Sage rollout and the XG rollout.
+       On positions where Neongammon 3T and XG Roller++ pick DIFFERENT decisions and we
+       have both a Neongammon and an XG full rollout, which bot is closer to each
+       rollout — measured separately against the Neongammon rollout and the XG rollout.
 
 Methodology (so results are reproducible and checkable by others):
   - Reference = full rollouts (1296+ games, roll-until-CI-0.005, 3-ply checker &
     cube, VR on). XG rollouts come from XG's Batch Rollout (parsed from the .xg
-    files into data/<bench>/xg_results/rollout.jsonl); the Sage rollout is the
+    files into data/<bench>/xg_results/rollout.jsonl); the Neongammon rollout is the
     benchmark reference in data/<bench>/benchmark.json.
   - Each evaluator's *chosen* decision is taken from cached data, not recomputed:
-    Sage 3T from build/stage2_3t.jsonl; Sage 1T/2T recovered from their
+    Neongammon 3T from build/stage2_3t.jsonl; Neongammon 1T/2T recovered from their
     scores/*.jsonl errors; XG Roller/Roller+/Roller++ from the seed_<N>_*.xg
     batch-analyze files.
   - Every evaluator's own pick is force-rolled by XG (the flag policy), so
@@ -77,7 +77,7 @@ def main(argv=None):
     levels.print_report(levels.score(args.benchmark, args.match_length), args.benchmark)
 
     print("\n" + _RULE)
-    print("REPORT 2 — Sage 3T vs XG Roller++ on disputed positions")
+    print("REPORT 2 — Neongammon 3T vs XG Roller++ on disputed positions")
     print(_RULE)
     dispute.print_report(dispute.score(args.benchmark, args.match_length), args.benchmark)
 

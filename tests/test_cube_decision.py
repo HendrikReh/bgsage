@@ -20,9 +20,9 @@ for _p in (os.path.join(_ROOT, "build"), os.path.join(_ROOT, "python")):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from bgsage import BgBotAnalyzer, STARTING_BOARD, flip_board, possible_moves  # noqa: E402
-from bgsage.board import check_game_over  # noqa: E402
-from bgsage.simulation import GameConfig, simulate_game  # noqa: E402
+from neongammon import BgBotAnalyzer, STARTING_BOARD, flip_board, possible_moves  # noqa: E402
+from neongammon.board import check_game_over  # noqa: E402
+from neongammon.simulation import GameConfig, simulate_game  # noqa: E402
 
 SNAKE = [0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 2, 3, 3, 2, 2, 1, -7, -7, 0]
 BEAROFF = [0, 3, 3, 2, 3, 2, 2] + [0] * 12 + [-2, -3, -2, -3, -2, -2] + [0]

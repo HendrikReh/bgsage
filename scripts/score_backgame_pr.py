@@ -107,8 +107,8 @@ def cube_subdecisions(entry: dict) -> tuple[bool, bool]:
 def score_level(rows: list[dict], level: str, threads: int,
                 model: str | None = None) -> dict:
     """Play every decision at ``level`` and total the equity errors."""
-    from bgsage import BgBotAnalyzer
-    from bgsage.weights import WeightConfigPair
+    from neongammon import BgBotAnalyzer
+    from neongammon.weights import WeightConfigPair
 
     weights = WeightConfigPair.from_model(model) if model else None
     analyzer = BgBotAnalyzer(weights=weights, eval_level=level, cubeful=True,

@@ -1,13 +1,13 @@
 # SPDX-License-Identifier: MPL-2.0
 # Copyright (C) 2026 Mark Higgins
-"""bgsage — the Open Sage bot engine, a neural-network backgammon engine.
+"""neongammon — the Neongammon bot engine, a neural-network backgammon engine.
 
 Provides position analysis (checker play and cube decisions) at multiple
 evaluation levels: raw NN (1-ply), N-ply search, and Monte Carlo rollout.
 
 Quick start::
 
-    from bgsage import BgBotAnalyzer, STARTING_BOARD
+    from neongammon import BgBotAnalyzer, STARTING_BOARD
 
     analyzer = BgBotAnalyzer()
     result = analyzer.checker_play(STARTING_BOARD, 3, 1)

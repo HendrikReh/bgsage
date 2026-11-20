@@ -4,7 +4,7 @@
 
 The benchmark scores ``|eval(B) - rollout(B)|`` where ``eval`` is the *post-move*
 static equity (``evaluate_board(B, B)``: positive just moved into B, opponent to
-roll) and ``rollout(B)`` is the Sage rolled-out equity in ``pasko-benchmark-rollout``.
+roll) and ``rollout(B)`` is the Neongammon rolled-out equity in ``pasko-benchmark-rollout``.
 XG has no batch position-eval, only game/decision analysis -- and it only evaluates
 a board as a *played-move candidate*, which is also post-move. So each position B is
 presented as a played move:
@@ -17,7 +17,7 @@ presented as a played move:
     (you)     -- XG Batch Analyze the shard folder at the desired ply, "Save games
                  after analyze" ON.
     score     -- harvest XG's eval of each B (== eval(B) in the benchmark convention)
-                 and report XG's ER/PR vs the rollouts, alongside Sage models.
+                 and report XG's ER/PR vs the rollouts, alongside Neongammon models.
 
 ~6.5% of positions have a checker on the bar (no legal "just moved" state -> no
 predecessor) and are dropped; the remainder reproduce the models' known scores, so
@@ -26,10 +26,10 @@ the round-trip is self-validating (Stage 9 ~27.2 on the packable subset vs 27.5 
 Needs a real XG .xg file as a record template (default: an example game you saved
 from XG). Usage:
 
-    python bgsage/scripts/score_xg_pasko_benchmark.py generate \
+    python neongammon/scripts/score_xg_pasko_benchmark.py generate \
         --template logs/pasko_xg/example.xg --out-dir logs/pasko_xg/benchmark_full
     #  ... XG Batch Analyze that folder at 1-ply, save ...
-    python bgsage/scripts/score_xg_pasko_benchmark.py score \
+    python neongammon/scripts/score_xg_pasko_benchmark.py score \
         logs/pasko_xg/benchmark_full --models
 """
 
@@ -41,18 +41,18 @@ import sys
 from collections import Counter
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-_BGSAGE_ROOT = os.path.dirname(_SCRIPT_DIR)
-_PARENT_ROOT = os.path.dirname(_BGSAGE_ROOT)
+_NEONGAMMON_ROOT = os.path.dirname(_SCRIPT_DIR)
+_PARENT_ROOT = os.path.dirname(_NEONGAMMON_ROOT)
 
 sys.path.insert(0, os.path.join(_PARENT_ROOT, 'build'))
-sys.path.insert(0, os.path.join(_BGSAGE_ROOT, 'build'))
-sys.path.insert(0, os.path.join(_BGSAGE_ROOT, 'python'))
+sys.path.insert(0, os.path.join(_NEONGAMMON_ROOT, 'build'))
+sys.path.insert(0, os.path.join(_NEONGAMMON_ROOT, 'python'))
 
 import bgbot_cpp
-from bgsage import xg_file as xf
+from neongammon import xg_file as xf
 
-DATA_DIR = os.path.join(_BGSAGE_ROOT, 'data')
-MODELS_DIR = os.path.join(_BGSAGE_ROOT, 'models')
+DATA_DIR = os.path.join(_NEONGAMMON_ROOT, 'data')
+MODELS_DIR = os.path.join(_NEONGAMMON_ROOT, 'models')
 
 
 # ---------------------------------------------------------------------------
@@ -124,7 +124,7 @@ def find_predecessor(B, max_moves=16):
 
 
 def derive_half_moves(pre, post, d1, d2):
-    """Exact per-die (from, to) half-move sequence (bgsage points) for pre -> post.
+    """Exact per-die (from, to) half-move sequence (neongammon points) for pre -> post.
     XG replays half-moves, so each must use a single die."""
     target = tuple(post)
     orders = [[d1] * k for k in (4, 3, 2, 1)] if d1 == d2 else [[d1, d2], [d2, d1]]
@@ -204,7 +204,7 @@ def load_rollout(path):
 
 def cmd_generate(args):
     template = args.template if os.path.isabs(args.template) \
-        else os.path.join(_BGSAGE_ROOT, args.template)
+        else os.path.join(_NEONGAMMON_ROOT, args.template)
     tpl = _templates(template)
     rollout_path = args.rollout if os.path.isabs(args.rollout) \
         else os.path.join(DATA_DIR, args.rollout)
@@ -238,7 +238,7 @@ def cmd_generate(args):
     print(f"{n_shards} shards (<= {args.per_file} games each) in {args.out_dir}")
     print("\nNext: XG Batch Analyze that folder at the target ply ('Save games "
           "after analyze' ON), then:")
-    print(f"  python bgsage/scripts/score_xg_pasko_benchmark.py score {args.out_dir} --models")
+    print(f"  python neongammon/scripts/score_xg_pasko_benchmark.py score {args.out_dir} --models")
 
 
 def _harvest_file(path, rows, levels):
@@ -292,13 +292,13 @@ def cmd_score(args):
     print(f"{'XG (harvested)':<28s} {er:>11.2f} {er/2:>8.2f}")
 
     if args.models:
-        from bgsage.weights import WeightConfigPair
+        from neongammon.weights import WeightConfigPair
         w9 = WeightConfigPair.from_model("stage9")
         w9.validate()
         engines = [("Stage 9 (production)", bgbot_cpp.BackgameAwarePairStrategy(w9.paths, w9.hiddens))]
         for name, rel in [("Pasko TD", "models/td_pasko.weights.best"),
                           ("Pasko SL", "models/sl_pasko.weights.best")]:
-            p = os.path.join(_BGSAGE_ROOT, rel)
+            p = os.path.join(_NEONGAMMON_ROOT, rel)
             if os.path.exists(p):
                 engines.append((name, bgbot_cpp.NNStrategy(p, 400, 244)))
         for name, strat in engines:
@@ -317,14 +317,14 @@ def main():
     g.add_argument("--rollout", default="pasko-benchmark-rollout")
     g.add_argument("--template", default="logs/pasko_xg/example.xg",
                    help="a real .xg file to clone record templates from")
-    g.add_argument("--out-dir", default=os.path.join(_BGSAGE_ROOT, "logs", "pasko_xg", "benchmark_full"))
+    g.add_argument("--out-dir", default=os.path.join(_NEONGAMMON_ROOT, "logs", "pasko_xg", "benchmark_full"))
     g.add_argument("--per-file", type=int, default=1000)
     g.add_argument("--limit", type=int, default=0, help="cap positions (0 = all)")
     g.set_defaults(func=cmd_generate)
 
     s = sub.add_parser("score", help="harvest analyzed shards + report PR")
     s.add_argument("path", help="a shard .xg file OR a directory of them")
-    s.add_argument("--models", action="store_true", help="also score Sage models")
+    s.add_argument("--models", action="store_true", help="also score Neongammon models")
     s.set_defaults(func=cmd_score)
 
     args = ap.parse_args()

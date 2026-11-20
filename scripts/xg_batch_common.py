@@ -7,13 +7,13 @@ through XG thousands of times:
 
 1. ``xg_mark_rollouts.py`` copies the Roller++-batch-analyzed ``.xg`` game files
    and injects batch-rollout marks (``TimeDelayMove`` / ``TimeDelayCube``) on
-   exactly the benchmark decisions that have Sage rollout references, writing
+   exactly the benchmark decisions that have Neongammon rollout references, writing
    staged files to ``data/.../xg_batch/rollout/``.
 2. The user queues that folder once in XG (Batch Rollout dialog) and lets it run.
    XG writes rollout results back into the staged files.
 3. ``xg_harvest_results.py`` parses the staged files and appends per-decision
    results to a key-indexed cache in ``data/.../xg_results/`` — separate from
-   all Sage score/reference data.
+   all Neongammon score/reference data.
 
 The harvest also has a ``rollerpp`` mode that reads the *existing* Roller++
 batch-analysis files directly (no new XG run) to cache XG Roller++ evaluations
@@ -39,8 +39,8 @@ for _p in (_SCRIPT_DIR, _PROJECT_ROOT / "python", _BUILD_DIR):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
-from bgsage import xg_file  # noqa: E402
-from bgsage.board import invert_probs  # noqa: E402
+from neongammon import xg_file  # noqa: E402
+from neongammon.board import invert_probs  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -220,9 +220,9 @@ def find_decision_record(index: GameFileIndex, paths: BenchmarkPaths,
 @dataclass
 class FlagPlan:
     indices: list[int] = field(default_factory=list)   # stored-move indices to flag
-    sage_present: int = 0                              # Sage candidates found in XG's list
-    sage_missing: int = 0                              # Sage candidates XG didn't store
-    sage_best_missing: bool = False                    # Sage's #1 not in XG's list
+    sage_present: int = 0                              # Neongammon candidates found in XG's list
+    sage_missing: int = 0                              # Neongammon candidates XG didn't store
+    sage_best_missing: bool = False                    # Neongammon's #1 not in XG's list
     extra_present: int = 0                             # level picks found in XG's list
     extra_missing: int = 0                             # level picks XG didn't store
 
@@ -239,9 +239,9 @@ def plan_checker_flags(decision: dict, move_rec: dict, threshold: float = 0.02,
                        xg_top: int = 0, extra_boards=None) -> FlagPlan:
     """Choose which of XG's stored moves to mark for rollout.
 
-    Policy: roll every move whose Sage reference equity is within ``threshold``
+    Policy: roll every move whose Neongammon reference equity is within ``threshold``
     of the best move (the "close" alternatives, where a rollout is most
-    informative), bounded to [``min_moves``, ``max_moves``] by rank. Sage's
+    informative), bounded to [``min_moves``, ``max_moves``] by rank. Neongammon's
     dataset moves are already sorted best-first, so the within-threshold set is
     the contiguous top of the list.
 
@@ -290,9 +290,9 @@ def plan_checker_flags(decision: dict, move_rec: dict, threshold: float = 0.02,
 
 
 def recover_checker_pick(decision: dict, err: float, tol: float = 1e-6):
-    """A level's chosen move recovered from its Sage-benchmark error.
+    """A level's chosen move recovered from its Neongammon-benchmark error.
 
-    The score caches store each level's equity error vs the Sage reference
+    The score caches store each level's equity error vs the Neongammon reference
     (best_eq - chosen_eq); the chosen move is the benchmark move whose equity
     equals best_eq - err. Returns the board tuple, or None if ambiguous (a tie).
     """
@@ -359,10 +359,10 @@ def checker_cache_record(decision: dict, move_rec: dict, xgr: bytes | None,
             if ctx["rolled"] > 0:  # a 0-game context carries no rollout data
                 # XG's checker-move rollout Result1 is from the POST-MOVE
                 # perspective (opponent on roll), so it is the negation of the
-                # mover-perspective equity Sage stores. Negate the equity and
-                # invert the probabilities to match Sage's convention (and XG's
+                # mover-perspective equity Neongammon stores. Negate the equity and
+                # invert the probabilities to match Neongammon's convention (and XG's
                 # own stored N-ply eval, which IS mover-perspective).
-                # Verified empirically: mean|-XG - Sage| = 0.008 vs 0.47 raw.
+                # Verified empirically: mean|-XG - Neongammon| = 0.008 vs 0.47 raw.
                 entry.update({
                     "eval_level": "rollout",
                     "equity": -float(ctx["result_nd"][6]),

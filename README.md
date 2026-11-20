@@ -1,11 +1,13 @@
-# The Open Sage Backgammon Bot Engine Library
+# Neongammon
 
-Open Sage is a "backgammon bot engine" - that is, a library that you can ask questions like "what's the best
+A fork of [markbgsage/bgsage](https://github.com/markbgsage/bgsage) (the Open Sage bot engine), focused on Apple Silicon.
+
+Neongammon is a "backgammon bot engine" - that is, a library that you can ask questions like "what's the best
 move in this situation, with all the analytics to back it up", or "is this a double, and if so, is it a take or a pass 
 (including analytics)?".
 
-> **This is an Apple Silicon fork.** This fork ([HendrikReh/bgsage](https://github.com/HendrikReh/bgsage)) of
-> [markbgsage/bgsage](https://github.com/markbgsage/bgsage) targets **macOS on Apple Silicon (arm64) only**, and is
+> **This is an Apple Silicon fork.** Neongammon ([HendrikReh/neongammon](https://github.com/HendrikReh/neongammon),
+> formerly `HendrikReh/bgsage`) is a fork of [markbgsage/bgsage](https://github.com/markbgsage/bgsage). It targets **macOS on Apple Silicon (arm64) only**, and is
 > optimised for it. Batched neural-network evaluation runs through Apple's Accelerate framework on the CPU's matrix unit
 > (SME on M4, AMX on M1-M3). Upstream's Windows, Linux and NVIDIA/CUDA code has been removed; the one build for
 > anything else is the Linux x86-64 image `scripts/modal_rollout.py` uses for cloud rollouts.
@@ -13,7 +15,7 @@ move in this situation, with all the analytics to back it up", or "is this a dou
 ## What it Contains
 
 Complete, seeded game and match simulation is available through
-`from bgsage import simulate_game, simulate_match, GameConfig`. It records
+`from neongammon import simulate_game, simulate_match, GameConfig`. It records
 positions, dice, cube actions and scores for custom research. See
 [SIMULATION.md](SIMULATION.md) for examples, policy customization and rules.
 
@@ -46,8 +48,8 @@ After a C++ change, rerun the `ninja` and `rm`/`cp` lines. Remove the old module
 copying over the installed `.so` makes every later `import bgbot_cpp` die with SIGKILL (exit 137, no output).
 
 Accelerate is on by default; `-DBGBOT_USE_ACCELERATE=OFF` builds the NEON delta kernels instead. For the
-measured speedups, and for comparing against GNUbg (set its location with `BGSAGE_GNUBG` or
-`bgsage.settings.set_gnubg_path`), see CLAUDE.md.
+measured speedups, and for comparing against GNUbg (set its location with `NEONGAMMON_GNUBG` or
+`neongammon.settings.set_gnubg_path`), see CLAUDE.md.
 
 ## What Evaluation Levels Does It Support?
 
@@ -72,14 +74,15 @@ It offers both Python and C++ interfaces for:
 
 ## How Does it Compare to XG?
 
-We tested money games and match play against eXtreme Gammon (XG), another popular backgammon analysis application. In particular, we tested Open Sage's 3T evaluations (truncated rollouts) to XG Roller ++ (an equivalent truncated rollout). The two bots were very close, with some weak evidence that Sage 3T is a bit stronger.
+We tested money games and match play against eXtreme Gammon (XG), another popular backgammon analysis application. In particular, upstream tested Open Sage's 3T evaluations (truncated rollouts) to XG Roller ++ (an equivalent truncated rollout). The two bots were very close, with some weak evidence that Open Sage 3T is a bit stronger.
 
 Details of the tests, and instructions on how to replicate them, are in XG_COMPARISON.md. These tests were run upstream;
 on the Mac, XG runs under CrossOver, and its Batch Analyze reads the files this repo writes.
 
 ## License
 
-Open Sage is released under the **Mozilla Public License 2.0** — see [LICENSE](LICENSE).
+Neongammon is released under the **Mozilla Public License 2.0** — see [LICENSE](LICENSE).
+Files that came from upstream keep their original copyright notices (Mark Higgins).
 
 That covers everything in this repository, including the **trained model weights** in
 `models/` and the bearoff database in `data/`. Those aren't source code, so to be
@@ -88,9 +91,9 @@ use them in a commercial product.
 
 In plain English:
 
-* **You can use Open Sage in a commercial, closed-source product.** Import it, link it,
+* **You can use Neongammon in a commercial, closed-source product.** Import it, link it,
   bundle the weights, ship it. Your own code stays yours, under whatever license you choose.
-* **If you modify a file that came from Open Sage and distribute it, publish that file's
+* **If you modify a file that came from Neongammon and distribute it, publish that file's
   source** under the MPL, so the improvement comes back to everyone. Files *you* write remain
   entirely yours, even when they sit right alongside ours.
 * **Private use carries no obligations at all.** Experiment, retrain, tinker — if you aren't

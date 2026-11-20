@@ -6,10 +6,10 @@ Each worker thread gets a batch of scenarios and evaluates them single-threaded.
 This maximizes CPU utilization across all cores.
 
 Usage:
-  python bgsage/scripts/run_contact_benchmark.py --ply 2
-  python bgsage/scripts/run_contact_benchmark.py --ply 3 --threads 32
-  python bgsage/scripts/run_contact_benchmark.py --ply 4 --model stage7
-  python bgsage/scripts/run_contact_benchmark.py --ply 1 --model stage5
+  python neongammon/scripts/run_contact_benchmark.py --ply 2
+  python neongammon/scripts/run_contact_benchmark.py --ply 3 --threads 32
+  python neongammon/scripts/run_contact_benchmark.py --ply 4 --model stage7
+  python neongammon/scripts/run_contact_benchmark.py --ply 1 --model stage5
 
 Supports both 5-NN (stage3-6) and 17-NN pair (stage7) models automatically.
 """
@@ -29,14 +29,14 @@ while project_dir != os.path.dirname(project_dir):
 build_dir = os.path.join(project_dir, 'build')
 
 sys.path.insert(0, build_dir)
-sys.path.insert(0, os.path.join(project_dir, 'bgsage', 'python'))
+sys.path.insert(0, os.path.join(project_dir, 'neongammon', 'python'))
 
 import bgbot_cpp
-from bgsage.data import load_benchmark_file
-from bgsage.weights import WeightConfig
+from neongammon.data import load_benchmark_file
+from neongammon.weights import WeightConfig
 
-DATA_DIR = os.path.join(project_dir, 'bgsage', 'data')
-MODELS_DIR = os.path.join(project_dir, 'bgsage', 'models')
+DATA_DIR = os.path.join(project_dir, 'neongammon', 'data')
+MODELS_DIR = os.path.join(project_dir, 'neongammon', 'models')
 
 SHARED_PAIRS = {'prim_prim': 'prim_anch', 'anch_prim': 'prim_anch', 'anch_anch': 'prim_anch'}
 

@@ -82,7 +82,7 @@ def classify_game_plan(board: list[int]) -> str:
 def classify_game_plans(board: list[int]) -> GamePlanResult:
     """Classify game plans for both the player on roll and the opponent.
 
-    Returns a :class:`~bgsage.types.GamePlanResult` with ``player`` and
+    Returns a :class:`~neongammon.types.GamePlanResult` with ``player`` and
     ``opponent`` fields, each one of: ``"purerace"``, ``"racing"``,
     ``"attacking"``, ``"priming"``, ``"anchoring"``.
     """

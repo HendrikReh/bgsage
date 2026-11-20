@@ -60,7 +60,7 @@ _PROJECT_ROOT = _SCRIPT_DIR.parent
 USD_PER_CORE_SEC = 0.0000131
 USD_PER_GIB_SEC = 0.00000222
 
-REMOTE_ROOT = "/root/bgsage"
+REMOTE_ROOT = "/root/neongammon"
 
 # --------------------------------------------------------------------------
 # Engine-side code (runs locally with --local, and inside the containers)
@@ -78,7 +78,7 @@ def make_rollout(root: str, model: str, n_trials: int, checker_ply: int,
     """Build the rollout strategy. Returns (strategy, keepalive objects)."""
     _engine_paths(root)
     import bgbot_cpp
-    from bgsage.weights import WeightConfig, bearoff_db_path
+    from neongammon.weights import WeightConfig, bearoff_db_path
 
     bgbot_cpp.init_escape_tables()
     w = WeightConfig.from_model(model)
@@ -141,7 +141,7 @@ image = (
         "ninja -C /tmp/bgbuild bgbot_cpp",
         f"cp /tmp/bgbuild/bgbot_cpp*.so {REMOTE_ROOT}/build/",
     )
-    .add_local_dir(_PROJECT_ROOT / "python" / "bgsage", f"{REMOTE_ROOT}/python/bgsage",
+    .add_local_dir(_PROJECT_ROOT / "python" / "neongammon", f"{REMOTE_ROOT}/python/neongammon",
                    ignore=["**/__pycache__"])
     .add_local_dir(_PROJECT_ROOT / "models", f"{REMOTE_ROOT}/models",
                    ignore=_weights_ignore)
@@ -149,7 +149,7 @@ image = (
                     f"{REMOTE_ROOT}/data/bearoff_1sided.db")
 )
 
-app = modal.App("bgsage-rollout", image=image)
+app = modal.App("neongammon-rollout", image=image)
 
 
 @app.cls(cpu=8.0, memory=4096, timeout=3 * 3600, retries=1, max_containers=50)

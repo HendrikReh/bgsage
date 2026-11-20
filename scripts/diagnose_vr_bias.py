@@ -56,7 +56,7 @@ def run_cube_rollout(weights, n_trials, n_threads, seed, enable_vr):
 
 def main():
     _setup_paths()
-    from bgsage.weights import WeightConfig
+    from neongammon.weights import WeightConfig
     weights = WeightConfig.default()
     weights.validate()
 

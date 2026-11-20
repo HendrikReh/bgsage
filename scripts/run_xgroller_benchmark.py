@@ -6,7 +6,7 @@ Benchmark XG Roller-style truncated rollouts on top-100 worst 1-ply scenarios.
 Compares: 1-ply, 2-ply, 3-ply, 4-ply, XGRoller, XGRoller+, XGRoller++ Checker, XGRoller++ Cube.
 
 Usage:
-  python bgsage/scripts/run_xgroller_benchmark.py [--top N] [--threads N]
+  python neongammon/scripts/run_xgroller_benchmark.py [--top N] [--threads N]
 """
 
 import os
@@ -19,13 +19,13 @@ project_dir = os.path.dirname(os.path.dirname(script_dir))
 build_dir = os.path.join(project_dir, 'build')
 
 sys.path.insert(0, build_dir)
-sys.path.insert(0, os.path.join(project_dir, 'bgsage', 'python'))
+sys.path.insert(0, os.path.join(project_dir, 'neongammon', 'python'))
 
 import bgbot_cpp
-from bgsage.data import load_benchmark_file, load_benchmark_scenarios_by_indices
-from bgsage.weights import WeightConfig
+from neongammon.data import load_benchmark_file, load_benchmark_scenarios_by_indices
+from neongammon.weights import WeightConfig
 
-DATA_DIR = os.path.join(project_dir, 'bgsage', 'data')
+DATA_DIR = os.path.join(project_dir, 'neongammon', 'data')
 
 
 def log(msg=""):

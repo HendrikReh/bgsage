@@ -5,9 +5,9 @@
 Starts from current .weights.best, saves best to .weights.best.
 
 Usage (from project root):
-    python bgsage/scripts/run_bg_train_round2.py --side player
-    python bgsage/scripts/run_bg_train_round2.py --side opponent
-    python bgsage/scripts/run_bg_train_round2.py --side player --alpha 1.0 --epochs 100000 --bench-interval 10000
+    python neongammon/scripts/run_bg_train_round2.py --side player
+    python neongammon/scripts/run_bg_train_round2.py --side opponent
+    python neongammon/scripts/run_bg_train_round2.py --side player --alpha 1.0 --epochs 100000 --bench-interval 10000
 """
 import argparse
 import gc
@@ -19,7 +19,7 @@ import numpy as np
 
 sys.path.insert(0, "build")
 import bgbot_cpp
-from bgsage import sl_train
+from neongammon import sl_train
 
 N_HIDDEN = 400
 N_INPUTS = 244
@@ -64,10 +64,10 @@ def main():
     bench_interval = args.bench_interval
 
     wname = f"sl_s9_{side}_bg"
-    wpath = f"bgsage/models/{wname}.weights"
-    best_path = f"bgsage/models/{wname}.weights.best"
-    train_file = f"bgsage/data/{side}-backgame-train-rollout"
-    bench_file = f"bgsage/data/{side}-backgame-benchmark-rollout"
+    wpath = f"neongammon/models/{wname}.weights"
+    best_path = f"neongammon/models/{wname}.weights.best"
+    train_file = f"neongammon/data/{side}-backgame-train-rollout"
+    bench_file = f"neongammon/data/{side}-backgame-benchmark-rollout"
 
     print(f"=== {side.title()} BG Round 2: {total_epochs} epochs @ alpha={alpha} ===\n", flush=True)
 

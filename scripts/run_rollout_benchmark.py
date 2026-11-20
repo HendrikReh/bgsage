@@ -8,8 +8,8 @@ use the unified trial function (run_trial_unified with n_branches=0),
 which skips all cubeful overhead -- equivalent to dedicated cubeless code.
 
 Usage:
-  python bgsage/scripts/run_rollout_benchmark.py [--top N] [--threads N] [--skip-3ply]
-  python bgsage/scripts/run_rollout_benchmark.py --model stage3  # specific model
+  python neongammon/scripts/run_rollout_benchmark.py [--top N] [--threads N] [--skip-3ply]
+  python neongammon/scripts/run_rollout_benchmark.py --model stage3  # specific model
 """
 
 import os
@@ -23,13 +23,13 @@ project_dir = os.path.dirname(os.path.dirname(script_dir))
 build_dir = os.path.join(project_dir, 'build')
 
 sys.path.insert(0, build_dir)
-sys.path.insert(0, os.path.join(project_dir, 'bgsage', 'python'))
+sys.path.insert(0, os.path.join(project_dir, 'neongammon', 'python'))
 
 import bgbot_cpp
-from bgsage.data import load_benchmark_file, load_benchmark_scenarios_by_indices
-from bgsage.weights import WeightConfig
+from neongammon.data import load_benchmark_file, load_benchmark_scenarios_by_indices
+from neongammon.weights import WeightConfig
 
-DATA_DIR = os.path.join(project_dir, 'bgsage', 'data')
+DATA_DIR = os.path.join(project_dir, 'neongammon', 'data')
 
 
 def main():

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MPL-2.0
-"""Score Sage's picks on a folder benchmark against XG AND against the
+"""Score Neongammon's picks on a folder benchmark against XG AND against the
 folder's rollout reference, side by side, on the same decisions.
 
-Why: on the snake folder the two rollout references disagree about Sage's
+Why: on the snake folder the two rollout references disagree about Neongammon's
 levels -- stage11 3-ply is the worst level under the S9-play reference and the
 best under the S11-play twin (CLAUDE.md, "Stage 11s"). XG is an independent
 referee for both decision sets.
@@ -13,13 +13,13 @@ Workflow
 1. ``export_folder_benchmark_xg.py generate --folders snake "snake s11play"``
    writes the one-decision ``.xg`` shards (``data/backgame_xg/<slug>/``).
 2. ``score_folder_vs_xg.py picks --folders snake "snake s11play"`` plays every
-   exported decision with Sage at 1/2/3-ply and caches the picks in
+   exported decision with Neongammon at 1/2/3-ply and caches the picks in
    ``data/backgame_xg_scores/sage_<model>_<level>_<slug>_picks.jsonl``
    (resumable: decisions already in the file are skipped). Independent of XG,
    so it can run while XG works.
 3. A copy of ``data/backgame_xg/`` is Batch-Analyzed in XG ("Save games after
    analyze" ON) at the chosen level.
-4. ``score_folder_vs_xg.py score --xg-dir <copy>`` grades every cached Sage
+4. ``score_folder_vs_xg.py score --xg-dir <copy>`` grades every cached Neongammon
    level and XG's own #1 against both references and prints PRs plus the
    paired level differences with their standard errors.
 
@@ -33,11 +33,11 @@ How XG is used as a reference
   the full level's scale: a 3-ply value regularly beats the 4-ply #1, so
   grading against the stored maximum charged XG's own #1 PR 61. XG always
   analyses the PLAYED move at the full level (every played move of the first
-  run sat there), so step 5 below re-asks XG with Sage's pick played.
+  run sat there), so step 5 below re-asks XG with Neongammon's pick played.
   A pick that is in neither set is not graded and is counted ("ungraded").
 
 5. ``score_folder_vs_xg.py complete --xg-dir <copy>`` writes one-decision
-   games with each Sage pick that XG left below its full level as the played
+   games with each Neongammon pick that XG left below its full level as the played
    move (``data/backgame_xg_completion/``); XG Batch-Analyzes them like step
    3, and ``score --completion-dir <analysed copy>`` folds them in.
 * Cube: XG's ND/DT/DP. Which sub-decisions are live is decided from XG's own
@@ -65,7 +65,7 @@ for _p in (_SCRIPT_DIR, _PROJECT_ROOT / "build", _PROJECT_ROOT / "python"):
 
 import export_folder_benchmark_xg as fx  # noqa: E402
 from benchmark_money import BLUNDER_THRESHOLD, PR_MULTIPLIER  # noqa: E402
-from bgsage import xg_file as xf  # noqa: E402
+from neongammon import xg_file as xf  # noqa: E402
 from score_backgame_pr import cube_subdecisions, load_reference  # noqa: E402
 
 DEFAULT_LEVELS = ("1ply", "2ply", "3ply")
@@ -89,8 +89,8 @@ def exported_entries(folder: str) -> list[dict]:
 
 
 def cmd_picks(args) -> None:
-    from bgsage import BgBotAnalyzer
-    from bgsage.weights import PRODUCTION_MODEL, WeightConfigPair
+    from neongammon import BgBotAnalyzer
+    from neongammon.weights import PRODUCTION_MODEL, WeightConfigPair
 
     model = args.model or PRODUCTION_MODEL
     weights = WeightConfigPair.from_model(model)
@@ -278,7 +278,7 @@ def paired(a: list[list[float]], b: list[list[float]]) -> tuple[float, float]:
 
 
 def cmd_score(args) -> None:
-    from bgsage.weights import PRODUCTION_MODEL
+    from neongammon.weights import PRODUCTION_MODEL
 
     model = args.model or PRODUCTION_MODEL
     summary = {"xg_dir": str(args.xg_dir), "model": model, "folders": {}}
@@ -290,7 +290,7 @@ def cmd_score(args) -> None:
         for level in args.levels:
             p = picks_path(args.scores_dir, model, level, folder)
             if not p.exists():
-                print(f"  (no Sage picks for {level}: run 'picks' first)")
+                print(f"  (no Neongammon picks for {level}: run 'picks' first)")
                 continue
             players[f"{model} {level}"] = {
                 r["key"]: r["pick"] for r in map(json.loads, p.read_text().splitlines())
@@ -363,9 +363,9 @@ DEFAULT_COMPLETION_DIR = _PROJECT_ROOT / "data" / "backgame_xg_completion"
 
 
 def cmd_complete(args) -> None:
-    """One-decision games with every Sage checker pick XG left below its full
+    """One-decision games with every Neongammon checker pick XG left below its full
     level as the played move, so XG analyses exactly those at full depth."""
-    from bgsage.weights import PRODUCTION_MODEL
+    from neongammon.weights import PRODUCTION_MODEL
     from export_pasko_benchmark_xg import _templates, derive_half_moves, write_xg
 
     model = args.model or PRODUCTION_MODEL
@@ -408,7 +408,7 @@ def cmd_complete(args) -> None:
                     f.write(json.dumps(fx.sidecar_row(gi, g), separators=(",", ":")) + "\n")
             fx.verify_shard(path, chunk)
         total += len(games)
-        print(f"{folder}: {len(games)} Sage picks below XG's full level -> {n_shards} "
+        print(f"{folder}: {len(games)} Neongammon picks below XG's full level -> {n_shards} "
               f"shard(s), verified")
     print(f"\n{total} games in {args.out_dir}. Batch-Analyze that folder in XG at the SAME "
           f"level as the first run ('Save games after analyze' ON), then:\n"

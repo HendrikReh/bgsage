@@ -24,7 +24,7 @@ sys.path.insert(0, build_dir)
 sys.path.insert(0, os.path.join(project_dir, 'python'))
 
 import bgbot_cpp  # noqa: E402
-from bgsage import flip_board  # noqa: E402
+from neongammon import flip_board  # noqa: E402
 
 with open(os.path.join(script_dir, 'data', 'encoding_golden.json')) as f:
     GOLDEN = json.load(f)['positions']

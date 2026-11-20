@@ -1,16 +1,16 @@
 # SPDX-License-Identifier: MPL-2.0
 # Copyright (C) 2026 Mark Higgins
-"""Run Sage-vs-Sage money games (optionally in parallel) and write each game
+"""Run Neongammon-vs-Neongammon money games (optionally in parallel) and write each game
 as a Backgammon Galaxy / XG-import compatible .txt transcript.
 
 Public entry point: ``run_sage_vs_sage_games(initial_seed, n_games, level,
 workers=6, out_dir=None)``.
 
-Each game is a money game with Jacoby + Beaver on, both sides played by Sage
+Each game is a money game with Jacoby + Beaver on, both sides played by Neongammon
 at the specified eval level. Per-game transcripts go to
 ``<out_dir>/seed_<N>.txt`` (one file per seed). Default ``out_dir`` is
-``bgsage/logs/sage_vs_sage`` (resolved from the script location — fully
-self-contained within the bgsage repo).
+``neongammon/logs/sage_vs_sage`` (resolved from the script location — fully
+self-contained within the neongammon repo).
 
 Usage:
 
@@ -35,17 +35,17 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
-# bgsage path setup — fully self-contained within the bgsage repo. Never
+# neongammon path setup — fully self-contained within the neongammon repo. Never
 # reaches into a parent project: weights, build artifacts, and log outputs
-# all live under bgsage/.
+# all live under neongammon/.
 # ---------------------------------------------------------------------------
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = _SCRIPT_DIR.parent          # = bgsage repo root
-_BGSAGE_PYTHON = _PROJECT_ROOT / "python"   # = bgsage/python
-_BUILD_DIR = _PROJECT_ROOT / "build"        # = bgsage/build
+_PROJECT_ROOT = _SCRIPT_DIR.parent          # = neongammon repo root
+_NEONGAMMON_PYTHON = _PROJECT_ROOT / "python"   # = neongammon/python
+_BUILD_DIR = _PROJECT_ROOT / "build"        # = neongammon/build
 
-for _p in (_BGSAGE_PYTHON, _BUILD_DIR):
+for _p in (_NEONGAMMON_PYTHON, _BUILD_DIR):
     sp = str(_p)
     if sp not in sys.path:
         sys.path.insert(0, sp)
@@ -84,7 +84,7 @@ def _make_analyzer(level: str, parallel_threads: int = 0):
     cached = _analyzer_cache.get(canonical)
     if cached is not None:
         return cached
-    from bgsage import BgBotAnalyzer
+    from neongammon import BgBotAnalyzer
 
     analyzer = BgBotAnalyzer(
         eval_level=canonical, cubeful=True, parallel_threads=parallel_threads,
@@ -125,7 +125,7 @@ class _State:
 
 
 def _initial_state() -> _State:
-    from bgsage import STARTING_BOARD
+    from neongammon import STARTING_BOARD
 
     return _State(
         board=list(STARTING_BOARD),
@@ -137,7 +137,7 @@ def _initial_state() -> _State:
 
 def _flip_state(state: _State) -> None:
     """Hand the turn to the next player; rotate board + cube perspective."""
-    from bgsage import flip_board
+    from neongammon import flip_board
 
     state.board = list(flip_board(state.board))
     if state.cube_owner == "player":
@@ -155,14 +155,14 @@ _WIN_TYPE_BY_MULT = {1: "single", 2: "gammon", 3: "backgammon"}
 
 
 def _check_game_over(board: list[int]) -> tuple[str, int] | None:
-    """bgsage.check_game_over returns ±1/±2/±3 from the mover's perspective.
+    """neongammon.check_game_over returns ±1/±2/±3 from the mover's perspective.
 
     Returns ``(win_type, multiplier)`` if the mover has won (positive code),
     or ``None`` otherwise. We never reach a "loss" state during simulation
     since the mover is the one that just played: any terminal position must
     be a mover win (their last move bore off the final checker).
     """
-    from bgsage import check_game_over
+    from neongammon import check_game_over
 
     code = check_game_over(board)
     if code > 0:
@@ -208,8 +208,8 @@ def _next_step(state: _State, events: list[_Event]) -> tuple[str, int]:
 
 
 def _play(level: str, rng: random.Random, parallel_threads: int = 0) -> _GameRecord:
-    """Play one Sage-vs-Sage money game (Jacoby + Beaver on)."""
-    from bgsage import possible_moves
+    """Play one Neongammon-vs-Neongammon money game (Jacoby + Beaver on)."""
+    from neongammon import possible_moves
 
     analyzer = _make_analyzer(level, parallel_threads=parallel_threads)
     state = _initial_state()
@@ -353,7 +353,7 @@ def _result_field(record: _GameRecord) -> tuple[str, int]:
 
 def _record_to_history_dict(record: _GameRecord) -> dict:
     """Convert a _GameRecord into the dict shape that text_export expects."""
-    from bgsage.text_export import compute_move_notation
+    from neongammon.text_export import compute_move_notation
 
     move_history = []
     for turn in _iterate_turns(record.events):
@@ -374,8 +374,8 @@ def _record_to_history_dict(record: _GameRecord) -> dict:
 
     result_str, points = _result_field(record)
     return {
-        "player1_name": "Sage",
-        "player2_name": "Sage",
+        "player1_name": "Neongammon",
+        "player2_name": "Neongammon",
         "mode": "unlimited",
         "result": result_str,
         "result_points": points,
@@ -384,7 +384,7 @@ def _record_to_history_dict(record: _GameRecord) -> dict:
 
 
 def _export_record(record: _GameRecord, path: Path) -> None:
-    from bgsage.text_export import export_history_to_txt
+    from neongammon.text_export import export_history_to_txt
 
     path.write_bytes(export_history_to_txt(_record_to_history_dict(record)))
 
@@ -427,7 +427,7 @@ def run_sage_vs_sage_games(
     workers: int = 6,
     out_dir: Path | str | None = None,
 ) -> list[Path]:
-    """Play ``n_games`` Sage-vs-Sage money games at the given eval level.
+    """Play ``n_games`` Neongammon-vs-Neongammon money games at the given eval level.
 
     Game ``i`` uses RNG seed ``initial_seed + i`` (i in ``0..n_games-1``).
     Returns the written transcript paths in seed order.

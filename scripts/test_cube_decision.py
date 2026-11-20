@@ -9,7 +9,7 @@ positions covering all three cube decision types:
   3. Double/Pass (player owns cube)
 
 Usage:
-    python bgsage/scripts/test_cube_decision.py [--build-dir build] [--model stage5]
+    python neongammon/scripts/test_cube_decision.py [--build-dir build] [--model stage5]
 """
 
 import sys
@@ -23,9 +23,9 @@ def main():
     parser.add_argument('--build-dir', type=str, default='build')
 
     project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    sys.path.insert(0, os.path.join(project_dir, 'bgsage', 'python'))
+    sys.path.insert(0, os.path.join(project_dir, 'neongammon', 'python'))
 
-    from bgsage.weights import WeightConfig
+    from neongammon.weights import WeightConfig
     WeightConfig.add_model_arg(parser)
     args = parser.parse_args()
 

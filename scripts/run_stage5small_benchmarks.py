@@ -36,13 +36,13 @@ build_dirs = [
 for d in reversed(build_dirs):
     if os.path.isdir(d):
         sys.path.insert(0, d)
-sys.path.insert(0, os.path.join(project_dir, 'bgsage', 'python'))
+sys.path.insert(0, os.path.join(project_dir, 'neongammon', 'python'))
 
 import bgbot_cpp
-from bgsage.data import load_benchmark_file, load_benchmark_scenarios_by_indices
-from bgsage.weights import WeightConfig
+from neongammon.data import load_benchmark_file, load_benchmark_scenarios_by_indices
+from neongammon.weights import WeightConfig
 
-DATA_DIR = os.path.join(project_dir, 'bgsage', 'data')
+DATA_DIR = os.path.join(project_dir, 'neongammon', 'data')
 THREADS = 16
 
 
@@ -104,10 +104,10 @@ def run_rollout_subprocess(label, w, create_kwargs, contact_indices, crashed_ind
 import os, sys, json, time
 for d in {repr([os.path.abspath(d) for d in build_dirs if os.path.isdir(d)])}:
     sys.path.insert(0, d)
-sys.path.insert(0, {repr(os.path.join(project_dir, 'bgsage', 'python'))})
+sys.path.insert(0, {repr(os.path.join(project_dir, 'neongammon', 'python'))})
 
 import bgbot_cpp
-from bgsage.data import load_benchmark_scenarios_by_indices
+from neongammon.data import load_benchmark_scenarios_by_indices
 
 bgbot_cpp.init_escape_tables()
 

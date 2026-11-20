@@ -15,7 +15,7 @@ from dataclasses import astuple
 
 import pytest
 
-from bgsage import BgBotAnalyzer, STARTING_BOARD, check_game_over, flip_board, possible_moves
+from neongammon import BgBotAnalyzer, STARTING_BOARD, check_game_over, flip_board, possible_moves
 
 CUBE_STATES = [
     dict(cube_value=1, cube_owner="centered"),

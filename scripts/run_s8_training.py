@@ -20,12 +20,12 @@ Full pipeline:
 Progress updates print every 10 minutes with estimated time remaining.
 
 Usage:
-    python bgsage/scripts/run_s8_training.py                    # Full pipeline
-    python bgsage/scripts/run_s8_training.py --sl-only          # Skip TD
-    python bgsage/scripts/run_s8_training.py --phase34-only     # Skip TD+scan, phases 3-4 only
-    python bgsage/scripts/run_s8_training.py --score-only       # Score existing weights
-    python bgsage/scripts/run_s8_training.py --benchmark-only   # Multi-ply + top-100 benchmarks
-    python bgsage/scripts/run_s8_training.py --nn race_race     # Train specific NN(s)
+    python neongammon/scripts/run_s8_training.py                    # Full pipeline
+    python neongammon/scripts/run_s8_training.py --sl-only          # Skip TD
+    python neongammon/scripts/run_s8_training.py --phase34-only     # Skip TD+scan, phases 3-4 only
+    python neongammon/scripts/run_s8_training.py --score-only       # Score existing weights
+    python neongammon/scripts/run_s8_training.py --benchmark-only   # Multi-ply + top-100 benchmarks
+    python neongammon/scripts/run_s8_training.py --nn race_race     # Train specific NN(s)
 """
 
 import os
@@ -42,14 +42,14 @@ from datetime import datetime
 # Path setup (handles both normal repo and worktree layout)
 # ---------------------------------------------------------------------------
 script_dir = os.path.dirname(os.path.abspath(__file__))
-bgsage_dir = os.path.dirname(script_dir)
+neongammon_dir = os.path.dirname(script_dir)
 
 # Resolve main project root: handles worktree layout
-_parts = os.path.normpath(bgsage_dir).replace('\\', '/').split('/')
+_parts = os.path.normpath(neongammon_dir).replace('\\', '/').split('/')
 if '.claude' in _parts:
     _idx = _parts.index('.claude')
-    bgsage_dir = '/'.join(_parts[:_idx])
-project_dir = os.path.dirname(bgsage_dir)
+    neongammon_dir = '/'.join(_parts[:_idx])
+project_dir = os.path.dirname(neongammon_dir)
 
 build_dirs = [
     os.path.join(project_dir, 'build'),
@@ -58,17 +58,17 @@ build_dirs = [
 for d in reversed(build_dirs):
     if os.path.isdir(d):
         sys.path.insert(0, d)
-sys.path.insert(0, os.path.join(project_dir, 'bgsage', 'python'))
+sys.path.insert(0, os.path.join(project_dir, 'neongammon', 'python'))
 
 import bgbot_cpp
-from bgsage import sl_train
-from bgsage.data import (load_benchmark_file, load_gnubg_training_data,
+from neongammon import sl_train
+from neongammon.data import (load_benchmark_file, load_gnubg_training_data,
                           load_benchmark_scenarios_by_indices,
                           board_from_gnubg_position_string)
-from bgsage.weights import WeightConfig
+from neongammon.weights import WeightConfig
 
-DATA_DIR = os.path.join(project_dir, 'bgsage', 'data')
-MODELS_DIR = os.path.join(project_dir, 'bgsage', 'models')
+DATA_DIR = os.path.join(project_dir, 'neongammon', 'data')
+MODELS_DIR = os.path.join(project_dir, 'neongammon', 'models')
 
 # ---------------------------------------------------------------------------
 # Stage 8 configuration
@@ -1157,10 +1157,10 @@ import os, sys, json, time
 
 for d in {repr([os.path.abspath(d) for d in reversed(build_dirs) if os.path.isdir(d)])}:
     sys.path.insert(0, d)
-sys.path.insert(0, {repr(os.path.join(project_dir, 'bgsage', 'python'))})
+sys.path.insert(0, {repr(os.path.join(project_dir, 'neongammon', 'python'))})
 
 import bgbot_cpp
-from bgsage.data import load_benchmark_scenarios_by_indices
+from neongammon.data import load_benchmark_scenarios_by_indices
 bgbot_cpp.init_escape_tables()
 
 weight_paths = {repr(weight_paths)}

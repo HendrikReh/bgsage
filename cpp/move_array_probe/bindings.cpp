@@ -2,8 +2,8 @@
 // Copyright (C) 2026 Mark Higgins
 #include "../pybind/move_arrays.h"
 
-PYBIND11_MODULE(_bgsage_move_array_probe, module) {
-    bgsage_python::bind_move_arrays(module);
+PYBIND11_MODULE(_neongammon_move_array_probe, module) {
+    neongammon_python::bind_move_arrays(module);
     module.def("possible_moves", [](const std::vector<int>& input, int first, int second) {
         if (input.size() != 26) throw pybind11::value_error("board must contain 26 integers");
         bgbot::Board board;

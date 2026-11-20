@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'python'))
 
 import pytest
 
-from bgsage import BgBotAnalyzer, flip_board
+from neongammon import BgBotAnalyzer, flip_board
 
 
 # --- Symmetry test positions -----------------------------------------------
@@ -239,7 +239,7 @@ def test_3T_3_1_2_matches_cube_action_on_flipped_board():
 # can_double guard regression: SP-owned cube must not saturate to -DP.
 # ---------------------------------------------------------------------------
 #
-# Background: discovered while validating a Sage-vs-XG run on seed_69 turn 15
+# Background: discovered while validating a Neongammon-vs-XG run on seed_69 turn 15
 # (cube=2 owned by user, dice 3-2). Pre-fix, `cubeful_evaluate_board` and
 # `cube_decision` collapsed every candidate to optimal=DP=+1.0 (SP cubeful =
 # -1.0) because the cube-action collapse logic in `cubeful_rollout_position` /

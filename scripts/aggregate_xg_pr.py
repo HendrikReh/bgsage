@@ -1,28 +1,28 @@
 # SPDX-License-Identifier: MPL-2.0
 # Copyright (C) 2026 Mark Higgins
 """Aggregate per-game PR stats across all .xg files in a folder, re-analyze
-every XG-flagged Sage decision at 2T (truncated2 / XGRoller+), then roll out
+every XG-flagged Neongammon decision at 2T (truncated2 / XGRoller+), then roll out
 the remaining 2T-vs-XG disagreements to produce a rollout-truth "new PR".
 
 Pipeline
 ========
 
 1. **PR aggregation.** For each .xg file in the folder, parse turns via
-   ``bgsage.xg_compare.parse_xg_game``, apply XG-style decision filters,
+   ``neongammon.xg_compare.parse_xg_game``, apply XG-style decision filters,
    then sum errors and decisions across BOTH players. Reports per-game total
    PR plus across-games mean/std/SEM and the aggregate PR from summed
    errors/decisions.
 
-2. **2T re-analysis + dispute detection.** For every decision where Sage's
+2. **2T re-analysis + dispute detection.** For every decision where Neongammon's
    3-ply play differs from XG's recommendation (i.e. XG flagged it as a
-   Sage error), the position is re-analyzed at 2T. **2T is used only to
-   identify what Sage would have played at 2T level** ("Sage's smart
+   Neongammon error), the position is re-analyzed at 2T. **2T is used only to
+   identify what Neongammon would have played at 2T level** ("Neongammon's smart
    pick" = 2T's #1). The error magnitude is then computed using **XG's
    own equities** — for cube decisions, XG's nd/dt/dp; for checker
-   decisions, Sage's 2T pick is looked up in XG's checker_analysis and
+   decisions, Neongammon's 2T pick is looked up in XG's checker_analysis and
    its XG equity is used. If 2T agrees with XG (same pick), the error is
-   zero and no Dispute is emitted. ``sage_choice`` stores Sage's 2T pick.
-   For checker decisions, both Sage's played move and XG's #1 are
+   zero and no Dispute is emitted. ``sage_choice`` stores Neongammon's 2T pick.
+   For checker decisions, both Neongammon's played move and XG's #1 are
    explicitly evaluated at 2T quality (the TINY filter inside
    ``checker_play`` may otherwise leave them at only 1-ply, biasing the
    moves[0] determination). The 2T evaluations are cached in
@@ -30,25 +30,25 @@ Pipeline
    cached entry's quality for the important boards is re-checked and
    upgraded if necessary.
 
-3. **Rollout truth.** For each disputed decision whose XG-measured Sage
-   error exceeds ``--threshold`` (default 0.005), run a full Sage rollout
+3. **Rollout truth.** For each disputed decision whose XG-measured Neongammon
+   error exceeds ``--threshold`` (default 0.005), run a full Neongammon rollout
    (1,296 trials, no truncation, 3-ply checker + 3-ply cube throughout) to
-   establish the true equity of each candidate. Compute Sage's and XG's
+   establish the true equity of each candidate. Compute Neongammon's and XG's
    error to the rollout-best as non-negative numbers, then the signed
-   "net Sage error" contribution ``sage_err - xg_err`` per decision:
-   negative when Sage was right and XG was wrong, positive when XG was
-   right and Sage was wrong, signed when both were wrong. Disputes below
-   the threshold are assumed to be cases where Sage was wrong and XG was
-   right, and contribute ``+xg_measured_error`` to net Sage error without
+   "net Neongammon error" contribution ``sage_err - xg_err`` per decision:
+   negative when Neongammon was right and XG was wrong, positive when XG was
+   right and Neongammon was wrong, signed when both were wrong. Disputes below
+   the threshold are assumed to be cases where Neongammon was wrong and XG was
+   right, and contribute ``+xg_measured_error`` to net Neongammon error without
    actually running a rollout.
 
    Sign of the resulting net PR: positive means XG is on net the better
-   player; negative means Sage is the better player.
+   player; negative means Neongammon is the better player.
 
 4. **Output.** Append each rollout result as a JSON line to
    ``rollout_disputes.jsonl`` in the same folder (resumable: existing
-   entries are skipped). Then print: per-case tallies, net Sage error,
-   the user's literal "new PR = net Sage error * 500", and a
+   entries are skipped). Then print: per-case tallies, net Neongammon error,
+   the user's literal "new PR = net Neongammon error * 500", and a
    per-decision-normalized variant for comparison against the original PR.
 
 PR = sum(equity errors) / decision count * 500.
@@ -59,8 +59,8 @@ Usage:
     python scripts/aggregate_xg_pr.py --skip-rollouts
     python scripts/aggregate_xg_pr.py --limit 5    # test on a few disputes
 
-The default folder is ``bgsage/logs/sage_vs_sage`` (resolved from the script
-location — fully self-contained within the bgsage repo), matching where
+The default folder is ``neongammon/logs/sage_vs_sage`` (resolved from the script
+location — fully self-contained within the neongammon repo), matching where
 ``run_sage_vs_sage_games.py`` writes its .txt files. After producing those
 files, run XG's Batch Analyze with "Save Games after analyze" checked; XG
 writes one .xg file per .txt next to it. Then run this script.
@@ -78,24 +78,24 @@ from dataclasses import dataclass
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
-# bgsage path setup — fully self-contained within the bgsage repo. Never
+# neongammon path setup — fully self-contained within the neongammon repo. Never
 # reaches into a parent project: weights, build artifacts, and log outputs
-# all live under bgsage/.
+# all live under neongammon/.
 # ---------------------------------------------------------------------------
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = _SCRIPT_DIR.parent          # = bgsage repo root
-_BGSAGE_PYTHON = _PROJECT_ROOT / "python"   # = bgsage/python
-_BUILD_DIR = _PROJECT_ROOT / "build"        # = bgsage/build
+_PROJECT_ROOT = _SCRIPT_DIR.parent          # = neongammon repo root
+_NEONGAMMON_PYTHON = _PROJECT_ROOT / "python"   # = neongammon/python
+_BUILD_DIR = _PROJECT_ROOT / "build"        # = neongammon/build
 
-for _p in (_BGSAGE_PYTHON, _BUILD_DIR):
+for _p in (_NEONGAMMON_PYTHON, _BUILD_DIR):
     sp = str(_p)
     if sp not in sys.path:
         sys.path.insert(0, sp)
 
 
-from bgsage.board import flip_board  # noqa: E402
-from bgsage.xg_compare import (  # noqa: E402
+from neongammon.board import flip_board  # noqa: E402
+from neongammon.xg_compare import (  # noqa: E402
     _is_trivial_take_pass,
     compute_game_pr_stats,
     parse_xg_game,
@@ -109,8 +109,8 @@ _ROLLOUT_N_TRIALS = 1296
 _ROLLOUT_TRUNCATION_DEPTH = 0
 _ROLLOUT_DECISION_PLY = 3
 
-# Re-analysis level used when Sage's 3-ply played move differs from XG's
-# recommendation. The result becomes Sage's "effective" choice, and the
+# Re-analysis level used when Neongammon's 3-ply played move differs from XG's
+# recommendation. The result becomes Neongammon's "effective" choice, and the
 # measured error driving threshold + PR is the re-eval-perspective equity
 # gap between that choice and XG's. A separate JSONL cache keyed by
 # (file, turn, kind) lets us resume. Cache filename derives from the level
@@ -170,7 +170,7 @@ def _get_two_t_analyzer(n_threads: int = 0):
     """
     global _two_t_analyzer
     if _two_t_analyzer is None:
-        from bgsage import BgBotAnalyzer
+        from neongammon import BgBotAnalyzer
         if _RE_EVAL_TRUNC_DEPTH is None and _RE_EVAL_ULTRA_LATE is None:
             _two_t_analyzer = BgBotAnalyzer(
                 eval_level=_TWO_T_EVAL_LEVEL, cubeful=True,
@@ -228,11 +228,11 @@ def _evaluate_single_board_at_2t(
     Works for any analyzer whose underlying engine is a rollout strategy —
     truncated2 (2T) or the full rollout. The returned equity reflects the
     analyzer's own configuration (trials, truncation, decision_ply, etc.).
-    Used when a specific candidate (e.g. the move Sage actually played) was
+    Used when a specific candidate (e.g. the move Neongammon actually played) was
     filtered out of the standard checker_play result and only has a 1-ply
     equity but we need its full-quality equity for a fair comparison.
     """
-    from bgsage.analyzer import resolve_owner
+    from neongammon.analyzer import resolve_owner
     inner = analyzer._analyzer
     if hasattr(inner, "_inner"):
         inner = inner._inner
@@ -293,7 +293,7 @@ def _get_or_compute_two_t_checker(
     important_boards=(),
 ) -> dict:
     """Get or compute the 2T ``checker_play`` result for a position. Any
-    board passed in ``important_boards`` (e.g. Sage's actual played move
+    board passed in ``important_boards`` (e.g. Neongammon's actual played move
     and XG's #1 recommendation) is guaranteed to be present in the moves
     list at full 2T quality — the TINY filter inside ``checker_play`` can
     silently drop candidates to 1-ply, which would skew the moves[0]
@@ -380,7 +380,7 @@ def _seed_sort_key(p: Path) -> tuple[int, str]:
 
 @dataclass
 class Dispute:
-    """One decision where Sage's chosen action differs from XG's recommendation.
+    """One decision where Neongammon's chosen action differs from XG's recommendation.
 
     ``board`` and ``cube_owner`` are always in the active turn-player's
     perspective (which equals the doubler for cube disputes and the mover
@@ -400,7 +400,7 @@ class Dispute:
     cube_owner: str             # turn_player's POV
     sage_choice: dict           # type-specific (see below)
     xg_choice: dict
-    xg_measured_error: float    # XG's own equity-loss for Sage's choice (>= 0)
+    xg_measured_error: float    # XG's own equity-loss for Neongammon's choice (>= 0)
 
 
 def _flip_owner(owner: str) -> str:
@@ -414,9 +414,9 @@ def _owner_relative_to(user_perspective: str, player: str) -> str:
 
 
 def _normalize_bar(board: list[int]) -> list[int]:
-    """Convert XG sign-coupled bar to bgsage's positive-count convention.
+    """Convert XG sign-coupled bar to neongammon's positive-count convention.
 
-    bgsage convention: indices 0 (P2 bar) and 25 (P1 bar) hold absolute
+    neongammon convention: indices 0 (P2 bar) and 25 (P1 bar) hold absolute
     counts, always ``>= 0`` (positive whether the bar belongs to P1 or P2).
     XG stores the bar sign-coupled to the owner — an opp's checker on bar
     shows as ``-1`` at index 0. Taking ``abs()`` at both bar indices
@@ -434,7 +434,7 @@ def _board_for_analysis(turn: dict) -> list[int] | None:
     previous turn's ``board_after`` for double/pass turns — both end up in
     user POV). For bot turns, flip to bot POV so the resulting board is in
     the active player's perspective, which is what the rollout/analyzer
-    expects. Also normalises bar sign to bgsage convention.
+    expects. Also normalises bar sign to neongammon convention.
     """
     board = turn.get("board_before")
     if board is None:
@@ -445,11 +445,11 @@ def _board_for_analysis(turn: dict) -> list[int] | None:
 
 
 def _sage_played_board(turn: dict) -> list[int] | None:
-    """Return Sage's played post-move board in mover's perspective.
+    """Return Neongammon's played post-move board in mover's perspective.
 
     ``board_after`` is in user POV; bot turns need a flip — matches the
     convention used by ``compute_checker_error``. Also normalises bar
-    sign to bgsage convention.
+    sign to neongammon convention.
     """
     played = turn.get("board_after")
     if played is None:
@@ -464,11 +464,11 @@ def _find_disputes_in_game(
     two_t_cache: dict, two_t_cache_path: Path, two_t_threads: int,
     progress_cb=None,
 ) -> list[Dispute]:
-    """Walk turns and emit a Dispute for each decision where Sage-3p differs
+    """Walk turns and emit a Dispute for each decision where Neongammon-3p differs
     from XG **AND** 2T re-analysis still differs from XG.
 
-    For every decision where the Sage 3-ply played choice does not match XG's
-    recommendation (i.e. XG flagged it as a Sage error), the position is
+    For every decision where the Neongammon 3-ply played choice does not match XG's
+    recommendation (i.e. XG flagged it as a Neongammon error), the position is
     re-analyzed at 2T (truncated2 / XGRoller+):
 
       - If 2T's choice matches XG's, the disagreement vanishes — no dispute.
@@ -525,12 +525,12 @@ def _find_disputes_in_game(
             )
             return cube_2t
 
-        # 1) Doubler dispute: Sage-3p flagged by XG → re-analyze at 2T.
-        # Framework: 2T determines what Sage's "smart pick" is; the error
-        # is then the XG-equity gap between XG's #1 and Sage's 2T pick.
+        # 1) Doubler dispute: Neongammon-3p flagged by XG → re-analyze at 2T.
+        # Framework: 2T determines what Neongammon's "smart pick" is; the error
+        # is then the XG-equity gap between XG's #1 and Neongammon's 2T pick.
         # If 2T agrees with XG, no dispute (error = 0). If 2T disagrees,
         # the error uses XG's equities (not 2T's), consistent with how
-        # XG itself measures errors. ``sage_choice`` stores Sage's 2T
+        # XG itself measures errors. ``sage_choice`` stores Neongammon's 2T
         # recommended action.
         if turn.get("is_cube_decision") and cube_analysis is not None:
             sage_3p_doubled = cube_action in ("double/take", "double/pass")
@@ -544,7 +544,7 @@ def _find_disputes_in_game(
                     two_t_doubled = min(dt_2t, dp_2t) > nd_2t
                     if two_t_doubled != xg_doubled:
                         # Compute error using XG's own equities for both
-                        # XG's pick and Sage's 2T pick.
+                        # XG's pick and Neongammon's 2T pick.
                         nd_xg = cube_analysis["equity_nd"]
                         dt_xg = cube_analysis["equity_dt"]
                         dp_xg = cube_analysis["equity_dp"]
@@ -585,7 +585,7 @@ def _find_disputes_in_game(
                     two_t_took = dt_2t <= dp_2t
                     if two_t_took != xg_took:
                         # Responder error in doubler-equity space using XG's
-                        # equities: the doubler-equity Sage's 2T pick gives
+                        # equities: the doubler-equity Neongammon's 2T pick gives
                         # XG, minus the best (minimum) per XG.
                         dt_xg = cube_analysis["equity_dt"]
                         dp_xg = cube_analysis["equity_dp"]
@@ -611,19 +611,19 @@ def _find_disputes_in_game(
                                     xg_measured_error=measured,
                                 ))
 
-        # 3) Checker dispute: Sage-3p flagged → re-analyze at 2T.
+        # 3) Checker dispute: Neongammon-3p flagged → re-analyze at 2T.
         # NB: the checker move happens AFTER any cube action on this turn,
-        # so we use the mid-turn cube state. Both Sage's played AND XG's
+        # so we use the mid-turn cube state. Both Neongammon's played AND XG's
         # #1 are passed as ``important_boards`` so the 2T cache helper
         # guarantees both are at 2T quality — needed so moves[0] is the
         # true 2T-best (the TINY filter inside checker_play would
         # otherwise drop them to 1-ply).
         #
-        # Framework: 2T determines Sage's "smart pick" (= moves[0] after
-        # upgrade). The error uses XG's equities — we find Sage's 2T pick
+        # Framework: 2T determines Neongammon's "smart pick" (= moves[0] after
+        # upgrade). The error uses XG's equities — we find Neongammon's 2T pick
         # in XG's checker_analysis and read its XG cubeful equity, then
-        # subtract from XG's #1's equity. ``sage_choice`` stores Sage's
-        # 2T pick (the move we attribute to Sage at the 2T level).
+        # subtract from XG's #1's equity. ``sage_choice`` stores Neongammon's
+        # 2T pick (the move we attribute to Neongammon at the 2T level).
         if turn.get("is_checker_decision"):
             checker_analysis = turn.get("checker_analysis") or []
             dice = turn.get("dice")
@@ -652,7 +652,7 @@ def _find_disputes_in_game(
                             two_t_best_tuple = tuple(two_t_best_board)
                             xg_tuple = tuple(xg_best_board)
                             if two_t_best_tuple != xg_tuple:
-                                # 2T disagrees with XG → find Sage's 2T pick
+                                # 2T disagrees with XG → find Neongammon's 2T pick
                                 # in XG's analysis to read its XG equity, then
                                 # compute error as XG's equity gap.
                                 xg_best_eq = float(checker_analysis[0]["equity"])
@@ -695,7 +695,7 @@ def _find_disputes_in_game(
 def _build_rollout_analyzer(seed: int = 42, n_threads: int = 0,
                             n_trials: int = _ROLLOUT_N_TRIALS):
     """Full rollout: n_trials (default 1,296), no truncation, 3-ply throughout."""
-    from bgsage import BgBotAnalyzer
+    from neongammon import BgBotAnalyzer
     import bgbot_cpp
     return BgBotAnalyzer(
         eval_level="rollout",
@@ -765,7 +765,7 @@ def _rollout_checker(analyzer, dispute: Dispute) -> dict:
     sage_board = dispute.sage_choice["board"]
     xg_board = dispute.xg_choice["board"]
 
-    # Ensure Sage's played move and XG's pick are both at rollout quality.
+    # Ensure Neongammon's played move and XG's pick are both at rollout quality.
     # If checker_play's TINY filter excluded either, evaluate them explicitly
     # via the rollout strategy's cubeful_evaluate_board.
     sage_eq, sage_eval = _rollout_quality_equity(
@@ -779,7 +779,7 @@ def _rollout_checker(analyzer, dispute: Dispute) -> dict:
 
     # Build the canonical set of rollout-quality equities to determine the
     # true best. Start with every rollout-survivor's equity, then layer in
-    # the (possibly upgraded) sage and xg equities — Sage's or XG's pick
+    # the (possibly upgraded) sage and xg equities — Neongammon's or XG's pick
     # might actually be the rollout-best once properly evaluated.
     rollout_eqs: dict[tuple, float] = {}
     for m in moves:
@@ -913,8 +913,8 @@ def _run_rollout_for_dispute(analyzer, dispute: Dispute, cube_cache: dict) -> di
 
 
 def _below_threshold_stub(dispute: Dispute, threshold: float) -> dict:
-    """When XG-measured Sage error <= threshold, skip the rollout and assume
-    Sage was wrong / XG was right. Contributes +xg_measured_error to net."""
+    """When XG-measured Neongammon error <= threshold, skip the rollout and assume
+    Neongammon was wrong / XG was right. Contributes +xg_measured_error to net."""
     err = float(dispute.xg_measured_error)
     return {
         "skipped_below_threshold": True,
@@ -950,7 +950,7 @@ def _load_done_rollouts(path: Path, threshold: float = 0.0) -> dict[str, dict]:
     they should be rolled out, not skipped. This lets the user switch
     between thresholds without manually pruning the JSONL. Real rollout
     results are always reused regardless of threshold (rollout truth beats
-    an assumed-Sage-wrong skip).
+    an assumed-Neongammon-wrong skip).
     """
     done: dict[str, dict] = {}
     if not path.exists():
@@ -1065,10 +1065,10 @@ def main() -> None:
         type=float,
         default=0.005,
         help=(
-            "Skip the rollout when XG's measured Sage error is <= this value "
+            "Skip the rollout when XG's measured Neongammon error is <= this value "
             "(default: 0.005). Skipped disputes are assumed to be cases where "
-            "Sage was wrong and XG was right, contributing +xg_measured_error "
-            "to net Sage error."
+            "Neongammon was wrong and XG was right, contributing +xg_measured_error "
+            "to net Neongammon error."
         ),
     )
     parser.add_argument(
@@ -1085,7 +1085,7 @@ def main() -> None:
         choices=_RE_EVAL_LEVEL_CHOICES,
         default=_DEFAULT_RE_EVAL_LEVEL,
         help=(
-            f"Eval level used to re-evaluate positions where Sage 3-ply "
+            f"Eval level used to re-evaluate positions where Neongammon 3-ply "
             f"disagrees with XG (default: {_DEFAULT_RE_EVAL_LEVEL})."
         ),
     )
@@ -1250,7 +1250,7 @@ def main() -> None:
         n_to_skip = len(todo) - n_to_roll
         print(
             f"Threshold {args.threshold:.4f}: "
-            f"{n_to_roll} will be rolled out, {n_to_skip} skipped (assumed Sage wrong)."
+            f"{n_to_roll} will be rolled out, {n_to_skip} skipped (assumed Neongammon wrong)."
         )
         if args.dry_run:
             print(f"\n--dry-run: would roll out {n_to_roll} disputes. Stopping.")
@@ -1309,7 +1309,7 @@ def main() -> None:
     # Summary across rolled-out disputes only.
     #
     # The "rollout is the ground truth" framing: for each dispute that was
-    # actually rolled out, we measure both Sage's and XG's chosen moves
+    # actually rolled out, we measure both Neongammon's and XG's chosen moves
     # against the rollout's best, using rollout-derived equities (NOT XG's
     # estimates). Cases skipped below the threshold are excluded — they
     # carry no rollout information.
@@ -1354,7 +1354,7 @@ def main() -> None:
 
     print()
     print("Decision outcomes vs rollout best (using rollout equities):")
-    print(f"  Sage matched rollout best:    {pct(cases.get('sage_best', 0))}")
+    print(f"  Neongammon matched rollout best:    {pct(cases.get('sage_best', 0))}")
     print(f"  XG matched rollout best:      {pct(cases.get('xg_best', 0))}")
     print(f"  Both matched (tied):          {pct(cases.get('both_best', 0))}")
     print(f"  Neither matched:              {pct(cases.get('both_wrong', 0))}")
@@ -1363,10 +1363,10 @@ def main() -> None:
     avg_xg = sum(xg_errs) / n
     print()
     print("Average rollout-equity error (per disputed decision):")
-    print(f"  Sage: {avg_sage:.4f}    (sum {sum(sage_errs):.4f} over {n} disputes)")
+    print(f"  Neongammon: {avg_sage:.4f}    (sum {sum(sage_errs):.4f} over {n} disputes)")
     print(f"  XG:   {avg_xg:.4f}    (sum {sum(xg_errs):.4f} over {n} disputes)")
-    print(f"  Diff (Sage - XG):    {(avg_sage - avg_xg):+.4f}")
-    print("  Sign: positive = XG is the better player; negative = Sage is better.")
+    print(f"  Diff (Neongammon - XG):    {(avg_sage - avg_xg):+.4f}")
+    print("  Sign: positive = XG is the better player; negative = Neongammon is better.")
 
 
 if __name__ == "__main__":

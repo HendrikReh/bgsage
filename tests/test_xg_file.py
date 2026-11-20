@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MPL-2.0
 # Copyright (C) 2026 Mark Higgins
-"""Tests for bgsage.xg_file — XG archive container + record access.
+"""Tests for neongammon.xg_file — XG archive container + record access.
 
 These validate against real batch-analyzed .xg files in data/money_benchmark/xg
 (local build artifacts). All tests are skipped when that data is not present.
@@ -17,7 +17,7 @@ _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT / "python"))
 sys.path.insert(0, str(_ROOT / "build"))
 
-from bgsage import xg_file  # noqa: E402
+from neongammon import xg_file  # noqa: E402
 
 _XG_DIR = _ROOT / "data" / "money_benchmark" / "xg"
 _STAGE1 = _ROOT / "data" / "money_benchmark" / "build" / "stage1"
@@ -79,7 +79,7 @@ def test_all_stage1_decisions_locate():
 
 def test_move_record_fields_match_xg_compare():
     """Record-level equities must agree with the xg_compare turn parser."""
-    from bgsage.xg_compare import parse_xg_game
+    from neongammon.xg_compare import parse_xg_game
 
     raw = _SAMPLE.read_bytes()
     turns = [t for t in parse_xg_game(raw) if t.get("checker_analysis")]

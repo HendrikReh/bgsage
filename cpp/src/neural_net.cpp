@@ -2573,10 +2573,13 @@ BackgameAwarePairStrategy::BackgameAwarePairStrategy(
     // non-massive positions below a massive root worse than per-node routing
     // does (measured 2026-09-05: neighbourhood ER 30.0 vs 25.9, and the
     // massive folder no better at 2/3-ply pinned than per-node). The
-    // BGSAGE_NO_ROOT_ROUTING environment variable disables root routing
+    // NEONGAMMON_NO_ROOT_ROUTING environment variable disables root routing
     // process-wide (A/B scoring: the cube path builds its strategy inside
     // C++, out of reach of the Python set_root_pinned control).
-    if (snake_ && !std::getenv("BGSAGE_NO_ROOT_ROUTING")) root_pinned_ = {22};
+    // (BGSAGE_NO_ROOT_ROUTING is the name from before the bgsage -> neongammon
+    // rename and is still honoured.)
+    if (snake_ && !std::getenv("NEONGAMMON_NO_ROOT_ROUTING") &&
+        !std::getenv("BGSAGE_NO_ROOT_ROUTING")) root_pinned_ = {22};
     blended_backgame_ = !phase_containment && (n == NUM_BACKGAME_PAIR_NNS_HYBRID);
     categorized_backgame_ = phase_containment || (n == NUM_BACKGAME_PAIR_NNS_CATEGORIZED);
     nns_.resize(n);

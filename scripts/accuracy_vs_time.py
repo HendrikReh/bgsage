@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: MPL-2.0
 """
-Checker-play accuracy against thinking time, Open Sage vs GNUbg.
+Checker-play accuracy against thinking time, Neongammon vs GNUbg.
 
 Each engine picks its move for every Benchmark PR decision the way it does
 in real use, and the CPU time of that pick is measured:
 
-* Open Sage: ``possible_moves`` + ``MultiPlyStrategy.best_move_index`` (the
+* Neongammon: ``possible_moves`` + ``MultiPlyStrategy.best_move_index`` (the
   filter chain BgBotAnalyzer uses: 1-ply 5/0.08, plus a 3-ply step at 4-ply,
   PubEval opponent prefilter, bearoff database), one thread per process.
 * GNUbg: its own ``hint`` with its default move filters, cubeless,
@@ -17,7 +17,7 @@ Levels use the XG convention (1-ply = raw net) for both engines; GNUbg gets
 ``plies - 1``. Accuracy is the Benchmark PR: rollout equity lost against the
 best rolled-out candidate, x500 (a pick outside the rolled-out set is charged
 the worst candidate, as in score_benchmark_pr.py). The reference is Stage 5's
-rollout over Stage 5's 2-ply filter set, so it leans towards Open Sage.
+rollout over Stage 5's 2-ply filter set, so it leans towards Neongammon.
 
 Usage:
   python scripts/accuracy_vs_time.py --engine sage --plies 1 2 3
@@ -72,14 +72,14 @@ def charge(dec, chosen):
 
 
 # --------------------------------------------------------------------------
-# Open Sage
+# Neongammon
 
 _SAGE = None
 
 
 def _sage_init(model, plies):
     global _SAGE
-    from bgsage.weights import WeightConfig, bearoff_db_path
+    from neongammon.weights import WeightConfig, bearoff_db_path
     bgbot_cpp.init_escape_tables()
     w = WeightConfig.from_model(model)
     w.validate()
@@ -122,7 +122,7 @@ def run_sage(decisions, plies, model, workers, chunk_size):
 # GNUbg
 
 def _gnubg_bin():
-    from bgsage.settings import gnubg_path
+    from neongammon.settings import gnubg_path
     return gnubg_path()
 
 
@@ -272,7 +272,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[1])
     ap.add_argument('--engine', choices=['sage', 'gnubg'])
     ap.add_argument('--plies', type=int, nargs='+', default=[1, 2])
-    ap.add_argument('--model', default=None, help='Open Sage model (default: production)')
+    ap.add_argument('--model', default=None, help='Neongammon model (default: production)')
     ap.add_argument('--sample', type=int, default=1,
                     help='score every Nth decision of the rolled-out sample')
     ap.add_argument('--workers', type=int, default=10,
@@ -288,7 +288,7 @@ def main():
     if args.engine is None:
         ap.error('--engine is required')
 
-    from bgsage.weights import PRODUCTION_MODEL
+    from neongammon.weights import PRODUCTION_MODEL
     model = args.model or PRODUCTION_MODEL
     decisions = load_decisions(args.sample)
     print(f'{len(decisions)} decisions (sample 1/{args.sample} of the 1-in-{DECISION_STEP} set)')

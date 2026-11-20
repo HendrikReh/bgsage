@@ -29,7 +29,7 @@ def main() -> None:
 
     sys.path.insert(0, build_dir)
     sys.path.insert(0, std_build)
-    sys.path.insert(0, os.path.join(project_dir, 'bgsage', 'python'))
+    sys.path.insert(0, os.path.join(project_dir, 'neongammon', 'python'))
 
     import bgbot_cpp
 
