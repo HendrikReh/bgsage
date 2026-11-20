@@ -10,7 +10,7 @@
 | 2. Decision-only N-ply cube path | done in [#42](https://github.com/HendrikReh/bgsage/pull/42) (`BgBotAnalyzer.cube_decision`) |
 | 3. Model reuse in the single-position analyzer | done in [#43](https://github.com/HendrikReh/bgsage/pull/43) |
 | 4. Thread budget of one, work per worker | done in [#44](https://github.com/HendrikReh/bgsage/pull/44) |
-| 5. One scoring routine for single and batch checker play | done in this PR (`score_checker_position`) |
+| 5. One scoring routine for single and batch checker play | done in [#45](https://github.com/HendrikReh/bgsage/pull/45) (`score_checker_position`) |
 
 Found along the way, not done: `MultiPlyStrategy`'s default N-ply tree hands the engine its raw base, so its bearoff database applies at the root only, not to bearoff positions inside the tree (affects the N-ply `batch_evaluate` / `batch_post_move_evaluate` and the analyzer's cubeless N-ply path). Fixing it changes results.
 
