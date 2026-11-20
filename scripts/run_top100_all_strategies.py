@@ -19,22 +19,10 @@ import time
 # Setup import paths — find the main project root (contains build/)
 script_dir = os.path.dirname(os.path.abspath(__file__))
 project_dir = os.path.dirname(os.path.dirname(script_dir))
-if not os.path.isdir(os.path.join(project_dir, 'build')):
-    # Worktree: try the main repo
-    project_dir = r'C:\Users\mghig\Dropbox\agents\bgbot'
 build_dirs = [
-    os.path.join(project_dir, 'build_msvc'),
     os.path.join(project_dir, 'build_cpu_build'),
     os.path.join(project_dir, 'build'),
 ]
-
-if sys.platform == 'win32':
-    cuda_x64 = r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64'
-    if os.path.isdir(cuda_x64):
-        os.add_dll_directory(cuda_x64)
-    for build_dir in build_dirs:
-        if os.path.isdir(build_dir):
-            os.add_dll_directory(build_dir)
 
 for build_dir in reversed(build_dirs):
     if os.path.isdir(build_dir):

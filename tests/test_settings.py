@@ -31,9 +31,9 @@ def test_auto_detection_is_the_fallback():
     assert settings.gnubg_path() == '/detected/gnubg'
 
 
-def test_nothing_found_falls_back_to_windows_default(monkeypatch):
+def test_nothing_found_falls_back_to_plain_gnubg(monkeypatch):
     monkeypatch.setattr(settings, 'detect_gnubg_path', lambda: None)
-    assert settings.gnubg_path() == settings.GNUBG_WINDOWS_DEFAULT
+    assert settings.gnubg_path() == settings.GNUBG_DEFAULT
 
 
 def test_settings_file_beats_detection(isolated):

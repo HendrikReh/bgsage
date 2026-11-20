@@ -86,7 +86,7 @@ So each engine scores best against its own analysis — the same pattern the Dis
 
 The rollout-PR data set is built entirely by `scripts/benchmark_money.py`, run
 from the `bgsage/` repo root — it resolves its Python path and the compiled
-`bgbot_cpp.pyd` from inside `bgsage/`, so the only prerequisite is a local Open
+`bgbot_cpp` extension from inside `bgsage/`, so the only prerequisite is a local Open
 Sage build (no external services). The build is three adaptive-precision passes,
 each an independently resumable stage of `benchmark_money.py build`, so you can
 run them one at a time, all locally. The `--n-games 100` below is just an example
@@ -325,12 +325,12 @@ python scripts/score_backgame_pr.py --category containment --level truncated3
 
 `--category` takes any of the thirteen family names (`21 backgame` … `54 backgame`, `containment`, `snake`, `massive backgame`); `--level` the same levels as the money scorer. The report gives the family's PR, its checker and cube parts, the blunder count, and — because a pick outside the reference's rolled candidates is only ever valued at filter precision — the share of the error that sits on such picks, which should be near zero before a headline number is trusted.
 
-To score XG, export the decisions as native `.xg` games, Batch-Analyze one copy of them per XG level, and harvest XG's chosen decision from the analysed files. With XG running on a Windows desktop the whole pass is scripted — `xg_batch_win.py` drives the Batch Analyze dialog through its Win32 controls (choose every file of a level's folder, select the level's analysis profile for each player, **Save Games after analyze** on, Start):
+To score XG, export the decisions as native `.xg` games, Batch-Analyze one copy of them per XG level, and harvest XG's chosen decision from the analysed files. Batch Analyze runs by hand in XG (under CrossOver on the Mac): choose every file of a level's folder, select the level's analysis profile for each player, turn **Save Games after analyze** on, and Start.
 
 ```bash
 python scripts/export_folder_benchmark_xg.py generate      # data/backgame_xg/<family>/bench_shard_NNN.xg (+ sidecars)
 python scripts/xg_folder_batch.py stamp                    # one flat folder per XG level: data/backgame_xg_flat/<tag>/
-python scripts/xg_folder_batch.py analyze --level xg3ply   # XG: Batch Analyze all 81 shards of that level
+# XG: Batch Analyze all 81 shards of that level's folder
 python scripts/xg_folder_batch.py wait --level xg3ply      # until every shard has been rewritten
 python scripts/xg_folder_batch.py score --level xg3ply     # -> data/backgame_xg_scores/xg_xg3ply_<family>.json
 ```

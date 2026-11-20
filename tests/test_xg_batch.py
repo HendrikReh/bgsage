@@ -11,7 +11,6 @@ against a real XG batch rollout (mean|-XG - Sage| = 0.008); the tests below pin
 the behaviour with synthetic records so it can't silently regress.
 """
 
-import os
 import struct
 import sys
 from pathlib import Path
@@ -22,12 +21,6 @@ _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT / "python"))
 sys.path.insert(0, str(_ROOT / "build"))
 sys.path.insert(0, str(_ROOT / "scripts"))
-if sys.platform == "win32":
-    _cuda = r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64"
-    if os.path.isdir(_cuda):
-        os.add_dll_directory(_cuda)
-    if (_ROOT / "build").is_dir():
-        os.add_dll_directory(str(_ROOT / "build"))
 
 from bgsage import xg_file  # noqa: E402
 import xg_batch_common as xbc  # noqa: E402

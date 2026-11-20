@@ -9,7 +9,7 @@ positions covering all three cube decision types:
   3. Double/Pass (player owns cube)
 
 Usage:
-    python bgsage/scripts/test_cube_decision.py [--build-dir build_msvc] [--model stage5]
+    python bgsage/scripts/test_cube_decision.py [--build-dir build] [--model stage5]
 """
 
 import sys
@@ -20,7 +20,7 @@ import time
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--build-dir', type=str, default='build_msvc')
+    parser.add_argument('--build-dir', type=str, default='build')
 
     project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     sys.path.insert(0, os.path.join(project_dir, 'bgsage', 'python'))
@@ -34,13 +34,6 @@ def main():
     sys.path.insert(0, build_dir)
     sys.path.insert(0, build_dir_std)
 
-    cuda_x64 = r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64'
-    if os.path.isdir(cuda_x64):
-        os.add_dll_directory(cuda_x64)
-    if os.path.isdir(build_dir):
-        os.add_dll_directory(build_dir)
-    if os.path.isdir(build_dir_std):
-        os.add_dll_directory(build_dir_std)
 
     import bgbot_cpp
 

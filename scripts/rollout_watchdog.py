@@ -3,12 +3,11 @@
 """Watchdog wrapper: keep restarting aggregate_xg_pr.py until it exits clean.
 
 The rollout script is fully resumable via its JSONL output, so if the
-heavy rollout python process dies for any reason (Windows process cleanup,
-session signal, transient bgbot_cpp issue), the watchdog restarts it and
+heavy rollout python process dies for any reason (session signal, transient bgbot_cpp issue), the watchdog restarts it and
 the new run picks up where the previous left off — wasted compute is
 limited to the in-flight rollout at death time.
 
-Run via the standard Start-Process detach. Each restart appends a banner
+Run it detached (nohup ... &). Each restart appends a banner
 to the same log so you can see when restarts happened.
 
 Usage (from the bgsage repo root):

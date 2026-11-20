@@ -22,10 +22,6 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT.parent / "build"))
 sys.path.insert(0, str(ROOT / "python"))
 
-import os
-cuda = r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64"
-if os.path.exists(cuda):
-    os.add_dll_directory(cuda)
 
 import bgbot_cpp
 from bgsage import BgBotAnalyzer, STARTING_BOARD

@@ -94,14 +94,6 @@ for _p in (_SCRIPT_DIR, _BGSAGE_PYTHON, _BUILD_DIR):
     if _sp not in sys.path:
         sys.path.insert(0, _sp)
 
-import os  # noqa: E402
-
-if sys.platform == "win32":
-    _cuda_x64 = r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64"
-    if os.path.isdir(_cuda_x64):
-        os.add_dll_directory(_cuda_x64)
-    if _BUILD_DIR.is_dir():
-        os.add_dll_directory(str(_BUILD_DIR))
 
 # benchmark_money supplies all the variant-agnostic machinery. Its bgsage imports
 # are deferred, so importing it here does NOT load the engine.

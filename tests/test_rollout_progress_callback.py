@@ -58,10 +58,6 @@ _PREAMBLE = """
 import os, sys
 sys.path.insert(0, {build!r})
 sys.path.insert(0, {pkg!r})
-if sys.platform == "win32":
-    _cuda = r"C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v13.1\\bin\\x64"
-    if os.path.isdir(_cuda):
-        os.add_dll_directory(_cuda)
 
 from bgsage import BgBotAnalyzer
 

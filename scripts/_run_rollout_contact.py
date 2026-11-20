@@ -7,21 +7,10 @@ import time
 import json
 import argparse
 
-build_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'build'))
-if not os.path.isdir(build_dir):
-    build_dir = os.path.abspath(r'C:\Users\mghig\Dropbox\agents\bgbot\build')
-
-if sys.platform == 'win32':
-    cuda_x64 = r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64'
-    if os.path.isdir(cuda_x64):
-        os.add_dll_directory(cuda_x64)
-    if os.path.isdir(build_dir):
-        os.add_dll_directory(build_dir)
+build_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'build'))
 sys.path.insert(0, build_dir)
 
 python_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'python'))
-if not os.path.isdir(python_dir):
-    python_dir = os.path.abspath(r'C:\Users\mghig\Dropbox\agents\bgbot\bgsage\python')
 sys.path.insert(0, python_dir)
 
 import bgbot_cpp
@@ -46,8 +35,7 @@ def main():
     w = WeightConfig.default()
     w.validate()
 
-    # Always use main repo data dir (worktrees don't have data/)
-    data_dir = os.path.abspath(r'C:\Users\mghig\Dropbox\agents\bgbot\bgsage\data')
+    data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data'))
 
     contact_file = os.path.join(data_dir, 'contact.bm')
     scenarios = load_benchmark_file(contact_file, step=args.step)

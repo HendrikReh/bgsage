@@ -9,7 +9,6 @@ import argparse
 import hashlib
 import importlib.util
 import json
-import os
 from pathlib import Path
 import platform
 import random
@@ -61,11 +60,6 @@ def main():
         reference_path = args.reference_engine.resolve()
         if not reference_path.is_relative_to(ROOT):
             raise ValueError('Reference extension must be snapshotted inside this repository')
-        if sys.platform == 'win32' and os.environ.get('CUDA_PATH'):
-            for suffix in ('bin/x64', 'bin'):
-                directory = Path(os.environ['CUDA_PATH']) / suffix
-                if directory.is_dir():
-                    dll_handles.append(os.add_dll_directory(str(directory)))
         reference_spec = importlib.util.spec_from_file_location('bgbot_cpp', reference_path)
         baseline = importlib.util.module_from_spec(reference_spec)
         reference_spec.loader.exec_module(baseline)
@@ -88,7 +82,7 @@ def main():
     if args.reference_engine:
         paths.append(reference_path)
     if args.extension:
-        paths += [ROOT / name for name in ('CMakeLists.txt', 'cpp/CMakeLists_cpu.txt', 'cpp/pybind/bindings.cpp')]
+        paths += [ROOT / name for name in ('CMakeLists.txt', 'cpp/CMakeLists.txt', 'cpp/pybind/bindings.cpp')]
     digest = lambda: {str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest() for path in paths}
     before = digest()
     rng, board, positions = random.Random(78915), START, []

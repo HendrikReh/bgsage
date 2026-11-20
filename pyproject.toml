@@ -20,9 +20,7 @@ dependencies = [
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "Operating System :: POSIX :: Linux",
     "Operating System :: MacOS",
-    "Operating System :: Microsoft :: Windows",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -75,30 +73,17 @@ sdist.include = [
 ]
 
 # ---------------------------------------------------------------------------
-# cibuildwheel: build wheels for Py 3.10-3.13 on Linux/macOS/Windows
+# cibuildwheel: macOS arm64 wheels for CPython 3.10-3.14
 # ---------------------------------------------------------------------------
 [tool.cibuildwheel]
 build = "cp310-* cp311-* cp312-* cp313-* cp314-*"
 skip = [
-    "*-musllinux_*",    # glibc only
-    "*_i686",           # no 32-bit
-    "*-win32",          # no 32-bit Windows
     "pp*",              # no PyPy
 ]
 build-verbosity = 1
 # Smoke-test the built wheel: import the package, run a trivial analysis.
 test-command = "python -c \"from bgsage import BgBotAnalyzer, STARTING_BOARD, GameConfig, simulate_game; a = BgBotAnalyzer(); r = a.checker_play(STARTING_BOARD, 3, 1); b = [0]*26; b[1]=1; b[24]=-1; g = simulate_game(players=(a,a), config=GameConfig(start_board=tuple(b))); assert g['winner'] == 1; print('ok', r.moves[0].equity)\""
 
-[tool.cibuildwheel.linux]
-# manylinux_2_28 gives us GCC 12+ which supports -mavx2/-mfma out of the box.
-# The compiled binary requires AVX2 (Haswell+, 2013+).
-manylinux-x86_64-image = "manylinux_2_28"
-archs = ["x86_64"]
-
 [tool.cibuildwheel.macos]
-# This fork ships Apple Silicon only (NEON + Accelerate). Upstream built a
-# universal set: archs = ["x86_64", "arm64"] (x86_64 uses AVX2).
+# Apple Silicon only (NEON + Accelerate).
 archs = ["arm64"]
-
-[tool.cibuildwheel.windows]
-archs = ["AMD64"]

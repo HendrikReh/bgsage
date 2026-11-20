@@ -7,8 +7,8 @@ move in this situation, with all the analytics to back it up", or "is this a dou
 > **This is an Apple Silicon fork.** This fork ([HendrikReh/bgsage](https://github.com/HendrikReh/bgsage)) of
 > [markbgsage/bgsage](https://github.com/markbgsage/bgsage) targets **macOS on Apple Silicon (arm64) only**, and is
 > optimised for it. Batched neural-network evaluation runs through Apple's Accelerate framework on the CPU's matrix unit
-> (SME on M4, AMX on M1-M3). Windows, Linux, x86 and NVIDIA/CUDA code inherited from upstream is still in the tree, but it is
-> not tested or supported here.
+> (SME on M4, AMX on M1-M3). Upstream's Windows, Linux and NVIDIA/CUDA code has been removed; the one build for
+> anything else is the Linux x86-64 image `scripts/modal_rollout.py` uses for cloud rollouts.
 
 ## What it Contains
 
@@ -19,7 +19,7 @@ positions, dice, cube actions and scores for custom research. See
 
 It is a joint Python/C++ library that includes:
 * A neural network-based backgammon bot.
-* Neural network training framework using both self play and supervised learning, including training code, benchmark scoring, with customizable inputs. Supervised learning runs on the GPU: on Apple Silicon through Apple's MLX framework (`pip install mlx`), on NVIDIA GPUs through upstream's CUDA trainer.
+* Neural network training framework using both self play and supervised learning, including training code, benchmark scoring, with customizable inputs. Supervised learning runs on the Apple GPU through Apple's MLX framework (`pip install mlx`).
 * The post-training weights for several different versions of the bot engine.
 * Multi-ply and rollout calculations that efficiently parallelize on the CPU. Full technical specifications of the algorithms are in MULTI-PLY.md (N-ply search and the cubeful evaluation engine) and ROLLOUT.md (truncated and full rollouts with variance reduction).
 * Test framework.
@@ -45,7 +45,7 @@ PYTHONPATH="$PWD/build:$PWD/python" python -m pytest -q tests
 After a C++ change, rerun the `ninja` and `rm`/`cp` lines. Remove the old module before copying: on macOS,
 copying over the installed `.so` makes every later `import bgbot_cpp` die with SIGKILL (exit 137, no output).
 
-Accelerate is on by default; `-DBGBOT_USE_ACCELERATE=OFF` builds the portable kernels instead. For the
+Accelerate is on by default; `-DBGBOT_USE_ACCELERATE=OFF` builds the NEON delta kernels instead. For the
 measured speedups, and for comparing against GNUbg (set its location with `BGSAGE_GNUBG` or
 `bgsage.settings.set_gnubg_path`), see CLAUDE.md.
 
@@ -75,7 +75,7 @@ It offers both Python and C++ interfaces for:
 We tested money games and match play against eXtreme Gammon (XG), another popular backgammon analysis application. In particular, we tested Open Sage's 3T evaluations (truncated rollouts) to XG Roller ++ (an equivalent truncated rollout). The two bots were very close, with some weak evidence that Sage 3T is a bit stronger.
 
 Details of the tests, and instructions on how to replicate them, are in XG_COMPARISON.md. These tests were run upstream;
-replicating them needs XG, which runs on Windows, so it is outside this fork's scope.
+on the Mac, XG runs under CrossOver, and its Batch Analyze reads the files this repo writes.
 
 ## License
 

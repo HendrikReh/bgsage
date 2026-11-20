@@ -33,17 +33,8 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 project_dir = os.path.dirname(os.path.dirname(script_dir))
 
 build_dirs = [
-    os.path.join(project_dir, 'build_msvc'),
     os.path.join(project_dir, 'build'),
 ]
-
-if sys.platform == 'win32':
-    cuda_bin = r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64'
-    if os.path.isdir(cuda_bin):
-        os.add_dll_directory(cuda_bin)
-    for d in build_dirs:
-        if os.path.isdir(d):
-            os.add_dll_directory(d)
 
 for d in reversed(build_dirs):
     if os.path.isdir(d):
@@ -441,7 +432,7 @@ def main():
 
     if not args.score_only:
         if not sl_train.gpu_available():
-            print('ERROR: no GPU SL trainer (CUDA, or MLX on Apple Silicon: pip install mlx)')
+            print('ERROR: no GPU SL trainer (MLX is not installed: pip install mlx)')
             sys.exit(1)
         print(f'GPU SL trainer: {sl_train.backend()}')
         print()

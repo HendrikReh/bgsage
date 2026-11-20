@@ -1,9 +1,8 @@
 # SPDX-License-Identifier: MPL-2.0
 # Copyright (C) 2026 Mark Higgins
-"""Tests for bgsage.sl_train (the CUDA / Apple MLX supervised-learning trainer).
+"""Tests for bgsage.sl_train (the Apple MLX supervised-learning trainer).
 
-The MLX trainer must reproduce cpp/src/cuda_nn.cu: these tests run it for an
-epoch or two on small random data and compare the resulting weights with a
+These tests run the MLX trainer for an epoch or two on small random data and compare the resulting weights with a
 float64 NumPy implementation of the same update rules, using the same shuffle.
 """
 
@@ -30,7 +29,7 @@ def _sigmoid(z):
 
 
 def reference_train(params, x, y, sw, alpha, epochs, batch_size, seed):
-    """float64 transcription of cuda_supervised_train's epoch loop."""
+    """float64 transcription of the trainer's epoch loop."""
     w_h, b_h, w_o, b_o = (np.asarray(p, dtype=np.float64).copy() for p in params)
     rng = np.random.default_rng(seed)
     n = len(x)
@@ -108,5 +107,5 @@ def test_random_init_training_runs(tmp_path):
 
 
 def test_backend_reports_a_trainer():
-    assert sl_train.backend() in ('cuda', 'mlx', None)
+    assert sl_train.backend() in ('mlx', None)
     assert sl_train.gpu_available() == (sl_train.backend() is not None)

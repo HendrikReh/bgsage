@@ -12,9 +12,6 @@ import os
 # Add the build directory to find the compiled C++ module
 _BUILD_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'build')
 if os.path.isdir(_BUILD_DIR):
-    # On Windows, we need to add DLL directory for MinGW runtime
-    if sys.platform == 'win32':
-        os.add_dll_directory(os.path.abspath(_BUILD_DIR))
     sys.path.insert(0, os.path.abspath(_BUILD_DIR))
 
 import bgbot_cpp

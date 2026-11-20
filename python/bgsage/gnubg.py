@@ -30,8 +30,8 @@ from .types import (
 
 
 def __getattr__(name):
-    # GNUBG_CLI used to be a hardcoded Windows path; it now reports the binary
-    # resolved by bgsage.settings (configure it there, not by assignment).
+    # GNUBG_CLI reports the binary resolved by bgsage.settings (configure it
+    # there, not by assignment).
     if name == 'GNUBG_CLI':
         return settings.gnubg_path()
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
@@ -71,7 +71,7 @@ def _run_gnubg(cmd, timeout=60, gnubg_path=None):
         )
         if result.returncode != 0:
             raise RuntimeError(
-                f"gnubg-cli failed (rc={result.returncode}):\n"
+                f"gnubg failed (rc={result.returncode}):\n"
                 f"stderr: {result.stderr}\nstdout: {result.stdout}\n"
                 f"command:\n{cmd}")
         return result.stdout

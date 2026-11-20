@@ -111,7 +111,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import struct
 import sys
 import time
@@ -120,21 +119,11 @@ from pathlib import Path
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _PROJECT_ROOT = _SCRIPT_DIR.parent          # = bgsage repo root
-_BUILD_DIRS = (_PROJECT_ROOT / "build", _PROJECT_ROOT / "build_msvc")
-
-# Final sys.path order: python, build, build_msvc (fallback), scripts.
-for _p in (_SCRIPT_DIR, _BUILD_DIRS[1], _BUILD_DIRS[0], _PROJECT_ROOT / "python"):
+# Final sys.path order: python, build, scripts.
+for _p in (_SCRIPT_DIR, _PROJECT_ROOT / "build", _PROJECT_ROOT / "python"):
     _sp = str(_p)
     if _sp not in sys.path:
         sys.path.insert(0, _sp)
-
-if sys.platform == "win32":
-    _cuda_x64 = r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64"
-    if os.path.isdir(_cuda_x64):
-        os.add_dll_directory(_cuda_x64)
-    for _d in _BUILD_DIRS:
-        if _d.is_dir():
-            os.add_dll_directory(str(_d))
 
 from bgsage import possible_moves, xg_file as xf  # noqa: E402
 from benchmark_money import BLUNDER_THRESHOLD, PR_MULTIPLIER, _scored  # noqa: E402

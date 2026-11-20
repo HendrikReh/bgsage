@@ -19,16 +19,12 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import time
 from pathlib import Path
 
-# Setup paths and CUDA DLL
+# Setup paths
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-_CUDA_DLL = r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64"
-if os.path.isdir(_CUDA_DLL):
-    os.add_dll_directory(_CUDA_DLL)
 sys.path.insert(0, str(_REPO_ROOT / "build"))
 sys.path.insert(0, str(_REPO_ROOT / "bgsage" / "python"))
 

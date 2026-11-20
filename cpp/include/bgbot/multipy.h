@@ -479,7 +479,7 @@ private:
     };
 
 public:
-    // Access thread-local cache (MSVC-compatible: function-local thread_local).
+    // Access thread-local cache (function-local thread_local).
     static PosCache& get_cache();
 private:
 

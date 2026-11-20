@@ -41,16 +41,7 @@ import time
 project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 root_dir = os.path.dirname(project_dir)
 sys.path.insert(0, os.path.join(project_dir, 'python'))
-sys.path.insert(0, os.path.join(root_dir, 'build_msvc'))
 sys.path.insert(0, os.path.join(root_dir, 'build'))
-
-cuda_x64 = r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64'
-if os.path.isdir(cuda_x64):
-    os.add_dll_directory(cuda_x64)
-for d in [os.path.join(root_dir, 'build_msvc'), os.path.join(root_dir, 'build')]:
-    if os.path.isdir(d):
-        os.add_dll_directory(d)
-
 
 
 # ---------------------------------------------------------------------------

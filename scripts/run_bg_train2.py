@@ -17,9 +17,6 @@ import numpy as np
 
 sys.path.insert(0, "build")
 
-cuda_path = r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64"
-if os.path.isdir(cuda_path):
-    os.add_dll_directory(cuda_path)
 
 import bgbot_cpp
 from bgsage import sl_train

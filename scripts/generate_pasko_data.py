@@ -63,16 +63,7 @@ _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _BGSAGE_ROOT = os.path.dirname(_SCRIPT_DIR)                 # .../bgbot/bgsage
 _PARENT_ROOT = os.path.dirname(_BGSAGE_ROOT)               # .../bgbot
 
-if sys.platform == 'win32':
-    _cuda = r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64'
-    if os.path.isdir(_cuda):
-        os.add_dll_directory(_cuda)
-    for _d in (os.path.join(_PARENT_ROOT, 'build'), os.path.join(_BGSAGE_ROOT, 'build')):
-        if os.path.isdir(_d):
-            os.add_dll_directory(_d)
-
-# Prefer bgsage/build (kept fresh by the MSVC copy step); the parent build/ may
-# be held open by a running backend, so it is only a fallback.
+# Prefer bgsage/build; the parent build/ is only a fallback.
 sys.path.insert(0, os.path.join(_PARENT_ROOT, 'build'))
 sys.path.insert(0, os.path.join(_BGSAGE_ROOT, 'build'))
 sys.path.insert(0, os.path.join(_BGSAGE_ROOT, 'python'))

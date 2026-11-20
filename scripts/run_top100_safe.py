@@ -17,23 +17,11 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 # project_dir is the main bgbot directory (parent of the bgsage submodule)
 # Handle both normal repo layout and worktree layout
 _candidate = os.path.dirname(os.path.dirname(script_dir))  # normal: bgsage/../ = bgbot
-if not os.path.isdir(os.path.join(_candidate, 'build')):
-    # Worktree: try the main repo
-    _candidate = r'C:\Users\mghig\Dropbox\agents\bgbot'
 project_dir = _candidate
 build_dirs = [
-    os.path.join(project_dir, 'build_msvc'),
     os.path.join(project_dir, 'build_cpu_build'),
     os.path.join(project_dir, 'build'),
 ]
-
-if sys.platform == 'win32':
-    cuda_x64 = r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64'
-    if os.path.isdir(cuda_x64):
-        os.add_dll_directory(cuda_x64)
-    for build_dir in build_dirs:
-        if os.path.isdir(build_dir):
-            os.add_dll_directory(build_dir)
 
 for build_dir in reversed(build_dirs):
     if os.path.isdir(build_dir):
@@ -70,12 +58,6 @@ def run_rollout_subprocess(level_name, create_kwargs, w, contact_indices, crashe
 import os, sys, json, time
 sys.path.insert(0, {repr(os.path.join(project_dir, 'build'))})
 sys.path.insert(0, {repr(os.path.join(project_dir, 'bgsage', 'python'))})
-if sys.platform == 'win32':
-    for d in {repr([os.path.abspath(d) for d in build_dirs if os.path.isdir(d)])}:
-        os.add_dll_directory(d)
-    cuda_x64 = r'C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v13.1\\bin\\x64'
-    if os.path.isdir(cuda_x64):
-        os.add_dll_directory(cuda_x64)
 
 import bgbot_cpp
 from bgsage.data import load_benchmark_scenarios_by_indices

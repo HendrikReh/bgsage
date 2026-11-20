@@ -59,7 +59,6 @@ import argparse
 import gzip
 import hashlib
 import json
-import os
 import random
 import sys
 import threading
@@ -85,13 +84,6 @@ for _p in (_BGSAGE_PYTHON, _BUILD_DIR):
     _sp = str(_p)
     if _sp not in sys.path:
         sys.path.insert(0, _sp)
-
-if sys.platform == "win32":
-    _cuda_x64 = r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64"
-    if os.path.isdir(_cuda_x64):
-        os.add_dll_directory(_cuda_x64)
-    if _BUILD_DIR.is_dir():
-        os.add_dll_directory(str(_BUILD_DIR))
 
 
 # ---------------------------------------------------------------------------

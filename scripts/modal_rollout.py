@@ -135,9 +135,6 @@ image = (
     .add_local_dir(_PROJECT_ROOT / "cpp", f"{REMOTE_ROOT}/cpp", copy=True,
                    ignore=["move_array_probe"])
     .run_commands(
-        # cpp/CMakeLists.txt is the upstream CUDA build; inside the image the
-        # CPU list file takes its place (it resolves sources relative to itself).
-        f"cp {REMOTE_ROOT}/cpp/CMakeLists_cpu.txt {REMOTE_ROOT}/cpp/CMakeLists.txt",
         f"mkdir -p {REMOTE_ROOT}/build",
         f"cmake -S {REMOTE_ROOT}/cpp -B /tmp/bgbuild -G Ninja -DCMAKE_BUILD_TYPE=Release"
         " -DBGBOT_BUILD_APPS=OFF -Dpybind11_DIR=$(python -m pybind11 --cmakedir)",

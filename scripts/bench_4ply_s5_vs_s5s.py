@@ -5,13 +5,11 @@
 Shows which moves survive each filter step and the final best move.
 """
 
-import os
 import sys
 import time
 
 sys.path.insert(0, "build")
 sys.path.insert(0, "bgsage/python")
-os.add_dll_directory(r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64")
 
 import bgbot_cpp
 from bgsage.weights import WeightConfig

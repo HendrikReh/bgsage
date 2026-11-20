@@ -3,8 +3,8 @@
 """
 Run GPU-accelerated supervised learning training for backgammon neural networks.
 
-Uses CUDA/cuBLAS for forward pass, backprop, and weight updates on GPU.
-Benchmarking is done on CPU by copying weights back each epoch.
+Trains on the Apple GPU through MLX (bgsage.sl_train); benchmarking runs on
+the CPU after every epoch.
 
 Usage:
     python run_gpu_sl_training.py --type contact --epochs 1000 --alpha 1.0
@@ -24,14 +24,6 @@ from datetime import datetime
 script_dir = os.path.dirname(os.path.abspath(__file__))
 project_dir = os.path.dirname(os.path.dirname(script_dir))
 build_dir = os.path.join(project_dir, 'build')
-
-if sys.platform == 'win32':
-    # Add CUDA DLL directory
-    cuda_bin = r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64'
-    if os.path.isdir(cuda_bin):
-        os.add_dll_directory(cuda_bin)
-    if os.path.isdir(build_dir):
-        os.add_dll_directory(build_dir)
 
 sys.path.insert(0, build_dir)
 sys.path.insert(0, os.path.join(project_dir, 'bgsage', 'python'))
@@ -572,9 +564,9 @@ def main():
     print(f'Log file: {log_path}')
     print()
 
-    # Verify CUDA is available
+    # Verify the MLX trainer is available
     if not sl_train.gpu_available():
-        print('ERROR: no GPU SL trainer (CUDA, or MLX on Apple Silicon: pip install mlx). Cannot run GPU training.')
+        print('ERROR: no GPU SL trainer (MLX is not installed: pip install mlx). Cannot run GPU training.')
         sys.exit(1)
     print(f'GPU SL trainer: {sl_train.backend()}')
     print()

@@ -7,7 +7,6 @@ These validate against real batch-analyzed .xg files in data/money_benchmark/xg
 """
 
 import json
-import os
 import struct
 import sys
 from pathlib import Path
@@ -17,12 +16,6 @@ import pytest
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT / "python"))
 sys.path.insert(0, str(_ROOT / "build"))
-if sys.platform == "win32":
-    _cuda = r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64"
-    if os.path.isdir(_cuda):
-        os.add_dll_directory(_cuda)
-    if (_ROOT / "build").is_dir():
-        os.add_dll_directory(str(_ROOT / "build"))
 
 from bgsage import xg_file  # noqa: E402
 

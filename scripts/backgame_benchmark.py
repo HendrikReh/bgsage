@@ -92,8 +92,8 @@ Usage::
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
-import os
 import random
 import re
 import sys
@@ -116,13 +116,6 @@ for _p in (_BGSAGE_PYTHON, _BUILD_DIR, _SCRIPT_DIR):
     _sp = str(_p)
     if _sp not in sys.path:
         sys.path.insert(0, _sp)
-
-if sys.platform == "win32":
-    _cuda_x64 = r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64"
-    if os.path.isdir(_cuda_x64):
-        os.add_dll_directory(_cuda_x64)
-    if _BUILD_DIR.is_dir():
-        os.add_dll_directory(str(_BUILD_DIR))
 
 # The PR "does this count as a decision?" rules live in benchmark_money.py; import
 # them rather than restating them, so the two benchmarks can never drift apart on
@@ -432,39 +425,12 @@ def read_xgp_position(path: Path) -> StartPosition:
 # ---------------------------------------------------------------------------
 
 
-#: How long to keep retrying an atomic rename before giving up on one
-#: checkpoint. On Windows a rename over a file another process has open fails
-#: with WinError 5, and this repo lives under Dropbox, whose sync agent opens
-#: files it is uploading (a virus scanner does the same). The lock is brief, so
-#: retrying rides it out. Seen in the wild 2026-08-28: it killed a worker 34
-#: games into a 10,000-decision run.
-_REPLACE_RETRY_SECONDS = 30.0
-
-
 def _atomic_write(path: Path, text: str) -> bool:
-    """Write ``text`` to ``path`` via a temp file + rename. True if it landed.
-
-    Returns False rather than raising when the rename keeps failing: a missed
-    checkpoint only costs the games since the last good write (they replay on
-    resume), which is never worth killing a run that is hours in.
-    """
+    """Write ``text`` to ``path`` via a temp file + rename. True if it landed."""
     tmp = path.with_name(path.name + ".tmp")
     tmp.write_text(text, encoding="utf-8")
-    deadline = time.monotonic() + _REPLACE_RETRY_SECONDS
-    delay = 0.1
-    while True:
-        try:
-            tmp.replace(path)
-            return True
-        except PermissionError:
-            if time.monotonic() >= deadline:
-                print(f"  WARNING: could not replace {path.name} after "
-                      f"{_REPLACE_RETRY_SECONDS:.0f}s (file locked by another "
-                      f"process?) - continuing; the next game retries.",
-                      flush=True)
-                return False
-            time.sleep(delay)
-            delay = min(delay * 2, 2.0)
+    tmp.replace(path)
+    return True
 
 
 def _board_str(board) -> str:
@@ -778,13 +744,7 @@ class _FolderLock:
     def __enter__(self) -> "_FolderLock":
         handle = open(self._path, "a+b")
         try:
-            if sys.platform == "win32":
-                import msvcrt
-                handle.seek(0)
-                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
-            else:
-                import fcntl
-                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError as exc:
             handle.close()
             raise WorkerBusy(
@@ -797,13 +757,7 @@ class _FolderLock:
         if self._handle is None:
             return
         try:
-            if sys.platform == "win32":
-                import msvcrt
-                self._handle.seek(0)
-                msvcrt.locking(self._handle.fileno(), msvcrt.LK_UNLCK, 1)
-            else:
-                import fcntl
-                fcntl.flock(self._handle.fileno(), fcntl.LOCK_UN)
+            fcntl.flock(self._handle.fileno(), fcntl.LOCK_UN)
         except OSError:
             pass        # dying anyway; the OS drops the lock with the handle
         self._handle.close()

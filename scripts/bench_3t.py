@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import time
 from pathlib import Path
@@ -36,13 +35,6 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent          # bgsage repo root
 _BUILD_DIR = _REPO_ROOT / "build"
 _PY_PKG = _REPO_ROOT / "python"
 _REFPOS_DEFAULT = _REPO_ROOT.parent / "refpos.txt"           # parent (bgbot) folder
-
-if hasattr(os, "add_dll_directory"):
-    _cuda_x64 = r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64"
-    if os.path.isdir(_cuda_x64):
-        os.add_dll_directory(_cuda_x64)
-    if _BUILD_DIR.is_dir():
-        os.add_dll_directory(str(_BUILD_DIR))
 
 sys.path.insert(0, str(_BUILD_DIR))
 sys.path.insert(0, str(_PY_PKG))

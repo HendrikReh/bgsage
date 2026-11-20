@@ -11,7 +11,6 @@ Usage (from project root):
 """
 import argparse
 import gc
-import os
 import shutil
 import sys
 import time
@@ -19,7 +18,6 @@ import time
 import numpy as np
 
 sys.path.insert(0, "build")
-os.add_dll_directory(r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64")
 import bgbot_cpp
 from bgsage import sl_train
 

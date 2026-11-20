@@ -23,18 +23,8 @@ if '.claude' in _parts:
 project_dir = os.path.dirname(bgsage_dir)
 
 build_dirs = [
-    os.path.join(project_dir, 'build_msvc'),
     os.path.join(project_dir, 'build'),
-    os.path.join(project_dir, 'build_msvc_s7'),
 ]
-
-if sys.platform == 'win32':
-    cuda_bin = r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64'
-    if os.path.isdir(cuda_bin):
-        os.add_dll_directory(cuda_bin)
-    for d in build_dirs:
-        if os.path.isdir(d):
-            os.add_dll_directory(d)
 
 for d in reversed(build_dirs):
     if os.path.isdir(d):

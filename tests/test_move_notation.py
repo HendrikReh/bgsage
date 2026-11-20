@@ -12,9 +12,6 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'build'))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'python'))
-_CUDA_BIN = r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64"
-if hasattr(os, "add_dll_directory") and os.path.isdir(_CUDA_BIN):
-    os.add_dll_directory(_CUDA_BIN)
 
 import pytest
 

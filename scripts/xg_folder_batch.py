@@ -13,12 +13,9 @@ them in place, so this script
               ``data/backgame_xg_flat/<tag>/<folder-slug>__bench_shard_NNN.xg``
               (sidecars alongside), so a single Batch Analyze selection covers
               all 81 shards of a level; the pristine tree is never analysed;
-* ``analyze`` drives XG's Batch Analyze dialog deterministically through
-              ``xg_batch_win.py`` (pywinauto; XG must be running on this
-              desktop): Analyze > Batch Analyze, choose every file of the level
-              folder, select the level's analysis profile for every player,
-              "Save Games after analyze" on, Start -- and returns once the run
-              has started;
+* then, by hand in XG (CrossOver): Analyze > Batch Analyze, choose every
+              file of the level folder, select the level's analysis profile
+              for every player, "Save Games after analyze" on, Start;
 * ``wait``    polls the level folder until every shard has been rewritten by
               XG and nothing has changed for a few minutes;
 * ``score``   hands the folder to ``export_folder_benchmark_xg.py score``.
@@ -27,10 +24,9 @@ Level tags follow ``stamp_xg_levels.py``: xg2ply, xg3ply, xg4ply, xgroller,
 xgrollerplus, xgrollerpp (XG's 2-ply, 3-ply, 4-ply, XG Roller, XG Roller+,
 XG Roller++ -- Sage 2P, 3P, 4P, 1T, 2T, 3T).
 
-    py -3.14 scripts/xg_folder_batch.py stamp
-    py -3.14 scripts/xg_folder_batch.py analyze --level xg3ply
-    py -3.14 scripts/xg_folder_batch.py wait --level xg3ply
-    py -3.14 scripts/xg_folder_batch.py score --level xg3ply
+    python scripts/xg_folder_batch.py stamp
+    python scripts/xg_folder_batch.py wait --level xg3ply    # after starting Batch Analyze
+    python scripts/xg_folder_batch.py score --level xg3ply
 """
 from __future__ import annotations
 
@@ -80,27 +76,6 @@ def stamp(levels: list[str], force: bool) -> None:
         print(f"{tag}: {len(shards)} shards -> {out}")
 
 
-def analyze(tag: str, no_start: bool = False) -> None:
-    """Drive XG's Batch Analyze dialog deterministically (``xg_batch_win.py``):
-    choose every shard of the level folder, select the level's profile for
-    every player row, set the check boxes, Start."""
-    import xg_batch_win as win  # noqa: E402  (pywinauto driver, same dir)
-    folder = FLAT / tag
-    files = sorted(folder.glob("*.xg"))
-    if not files:
-        raise SystemExit(f"{folder} has no shards; run `stamp` first")
-    print(f"{tag}: Batch Analyze on {len(files)} files with profile {LEVELS[tag]!r} ...", flush=True)
-    win.dismiss_message()
-    dlg = win.open_batch_dialog()
-    n = win.choose_files(dlg, folder.resolve())
-    win.set_level(dlg, LEVELS[tag])
-    win.set_checkboxes(dlg)
-    if no_start:
-        print(f"{tag}: {n} files chosen, profile set -- not started"); return
-    win.start(dlg)
-    print(f"{tag}: started on {n} files at {time.strftime('%H:%M:%S')}", flush=True)
-
-
 def wait(tag: str, quiet_minutes: float, poll_seconds: float, started_after: float | None) -> None:
     """Block until every shard of the level has been rewritten (mtime after the
     run started) and no shard has changed for ``quiet_minutes``."""
@@ -139,11 +114,9 @@ def main(argv=None) -> None:
     s = sub.add_parser("stamp", help="flat per-level copies of the generated shards")
     s.add_argument("--levels", nargs="+", default=list(LEVELS))
     s.add_argument("--force", action="store_true")
-    for name in ("analyze", "wait", "score"):
+    for name in ("wait", "score"):
         p = sub.add_parser(name)
         p.add_argument("--level", required=True, choices=list(LEVELS))
-        if name == "analyze":
-            p.add_argument("--no-start", action="store_true")
         if name == "wait":
             p.add_argument("--quiet-minutes", type=float, default=5.0)
             p.add_argument("--poll-seconds", type=float, default=60.0)
@@ -152,8 +125,6 @@ def main(argv=None) -> None:
     args = ap.parse_args(argv)
     if args.cmd == "stamp":
         stamp(args.levels, args.force)
-    elif args.cmd == "analyze":
-        analyze(args.level, args.no_start)
     elif args.cmd == "wait":
         wait(args.level, args.quiet_minutes, args.poll_seconds, args.started_after)
     else:

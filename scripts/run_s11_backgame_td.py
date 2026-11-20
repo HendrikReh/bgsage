@@ -53,7 +53,6 @@ Usage (long-running — launch detached per the CLAUDE.md pattern)::
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 import time
 from pathlib import Path
@@ -64,13 +63,6 @@ for _p in (_PROJECT_ROOT / "python", _PROJECT_ROOT / "build", _SCRIPT_DIR):
     _sp = str(_p)
     if _sp not in sys.path:
         sys.path.insert(0, _sp)
-
-if sys.platform == "win32":
-    _cuda = r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64"
-    if os.path.isdir(_cuda):
-        os.add_dll_directory(_cuda)
-    if (_PROJECT_ROOT / "build").is_dir():
-        os.add_dll_directory(str(_PROJECT_ROOT / "build"))
 
 import bgbot_cpp  # noqa: E402
 
