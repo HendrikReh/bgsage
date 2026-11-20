@@ -15,6 +15,8 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
 ## [Unreleased]
 
+## [2.0.20261120] - 2026-11-20
+
 ### Added
 
 - **`BgBotAnalyzer.cube_decision()`**: the cube decision without the
@@ -792,6 +794,7 @@ The fork's first release.
   module before copying it, because `cp` over a loaded `.so` makes macOS kill
   the next import ([#12](https://github.com/HendrikReh/neongammon/pull/12)).
 
-[Unreleased]: https://github.com/HendrikReh/neongammon/compare/v2.0.20261119...HEAD
+[Unreleased]: https://github.com/HendrikReh/neongammon/compare/v2.0.20261120...HEAD
+[2.0.20261120]: https://github.com/HendrikReh/neongammon/compare/v2.0.20261119...v2.0.20261120
 [2.0.20261119]: https://github.com/HendrikReh/neongammon/compare/v2.0.20261118...v2.0.20261119
 [2.0.20261118]: https://github.com/HendrikReh/neongammon/releases/tag/v2.0.20261118
