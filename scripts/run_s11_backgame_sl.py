@@ -52,11 +52,6 @@ for _p in (_PROJECT_ROOT / "python", _PROJECT_ROOT / "build"):
     _sp = str(_p)
     if _sp not in sys.path:
         sys.path.insert(0, _sp)
-if sys.platform == "win32":
-    _cuda = r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64"
-    if os.path.isdir(_cuda):
-        os.add_dll_directory(_cuda)
-    os.add_dll_directory(str(_PROJECT_ROOT / "build"))
 
 import bgbot_cpp  # noqa: E402
 from bgsage import sl_train
@@ -188,7 +183,7 @@ def train_category(category: str, args: argparse.Namespace) -> None:
             chunk = min(CHUNK, n_epochs - done)
             total_epochs += chunk
             done += chunk
-            # print_interval must be > 0 (0 crashes CUDA on Python 3.14).
+            # print_interval must be > 0 (0 is not allowed).
             sl_train.supervised_train_preencoded(
                 inputs=train_inputs, targets=train_probs, weights_path=wpath,
                 n_hidden=N_HIDDEN, n_inputs=N_INPUTS, alpha=alpha, epochs=chunk,

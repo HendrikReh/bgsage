@@ -2216,9 +2216,8 @@ RolloutResult RolloutStrategy::run_trials_parallel(
         std::atomic<int> completed_trials{0};
         const int report_interval = progress ? std::max(1, n_trials / 100) : 0;
 
-        // Use persistent thread pool to avoid thread churn. Creating
-        // ephemeral threads per rollout exhausts Windows TLS slots and
-        // fragments memory after thousands of create/destroy cycles.
+        // Use the persistent thread pool to avoid creating and destroying
+        // threads for every rollout (thousands of cycles in a benchmark run).
         multipy_parallel_run(n_threads, [&]() {
             // Clear thread-local N-ply cache to prevent stale entries from
             // previous evaluations (other strategies sharing the same pool

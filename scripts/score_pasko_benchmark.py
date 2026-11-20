@@ -28,13 +28,6 @@ _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _BGSAGE_ROOT = os.path.dirname(_SCRIPT_DIR)
 _PARENT_ROOT = os.path.dirname(_BGSAGE_ROOT)
 
-if sys.platform == 'win32':
-    _cuda = r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64'
-    if os.path.isdir(_cuda):
-        os.add_dll_directory(_cuda)
-    for _d in (os.path.join(_PARENT_ROOT, 'build'), os.path.join(_BGSAGE_ROOT, 'build')):
-        if os.path.isdir(_d):
-            os.add_dll_directory(_d)
 # Prefer bgsage/build (kept fresh); parent build/ is a fallback.
 sys.path.insert(0, os.path.join(_PARENT_ROOT, 'build'))
 sys.path.insert(0, os.path.join(_BGSAGE_ROOT, 'build'))

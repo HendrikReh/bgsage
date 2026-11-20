@@ -9,28 +9,15 @@
 #include <numeric>
 #include <utility>
 #include <cstdint>
-#if defined(_MSC_VER)
-  #include <intrin.h>
-#endif
 
 namespace bgbot {
 
 // ======================== Bit helpers ========================
-// Portable lowest/highest set bit and popcount (C++17 has no <bit>).
+// Lowest/highest set bit and popcount (C++17 has no <bit>).
 // lowest_bit / highest_bit require m != 0.
-#if defined(_MSC_VER)
-static inline int lowest_bit(uint32_t m) {
-    unsigned long i; _BitScanForward(&i, m); return static_cast<int>(i);
-}
-static inline int highest_bit(uint32_t m) {
-    unsigned long i; _BitScanReverse(&i, m); return static_cast<int>(i);
-}
-static inline int popcount64(uint64_t m) { return static_cast<int>(__popcnt64(m)); }
-#else
 static inline int lowest_bit(uint32_t m) { return __builtin_ctz(m); }
 static inline int highest_bit(uint32_t m) { return 31 - __builtin_clz(m); }
 static inline int popcount64(uint64_t m) { return __builtin_popcountll(m); }
-#endif
 
 // ======================== Escape Lookup Tables (GNUbg-style) ========================
 // Precomputed tables mapping a 12-bit bitmap of blocked points to escape roll counts.

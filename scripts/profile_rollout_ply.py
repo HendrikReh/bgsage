@@ -9,17 +9,6 @@ build_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 
 sys.path.insert(0, build_dir)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'python'))
 
-# Add DLL search directories for Windows
-if hasattr(os, 'add_dll_directory'):
-    os.add_dll_directory(build_dir)
-    # Add CUDA toolkit if available
-    for cuda_dir in [
-        r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64',
-        r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin',
-    ]:
-        if os.path.isdir(cuda_dir):
-            os.add_dll_directory(cuda_dir)
-
 import bgbot_cpp
 from bgsage.weights import WeightConfig, PRODUCTION_MODEL
 

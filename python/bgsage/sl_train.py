@@ -1,18 +1,10 @@
 # SPDX-License-Identifier: MPL-2.0
 # Copyright (C) 2026 Mark Higgins
-"""GPU supervised-learning (SL) training of one network, CUDA or Apple MLX.
+"""GPU supervised-learning (SL) training of one network on Apple MLX.
 
 The training scripts call :func:`supervised_train` and
-:func:`supervised_train_preencoded`, which take the same arguments and return
-the same dict as ``bgbot_cpp.cuda_supervised_train`` /
-``bgbot_cpp.cuda_supervised_train_preencoded``:
-
-* **CUDA** (``bgbot_cpp.cuda_available()``): forwards to the C++ trainer.
-* **MLX** (Apple Silicon, ``pip install mlx``): the same algorithm on the Apple
-  GPU, implemented here.
-
-:func:`backend` reports which one is used. The MLX trainer reproduces
-``cpp/src/cuda_nn.cu`` step for step:
+:func:`supervised_train_preencoded`, which run on the Apple GPU through MLX
+(``pip install mlx``). The update rules:
 
 * N_inputs -> N_hidden (sigmoid) -> 5 (sigmoid); sigmoid-MSE output delta
   ``(t - p) * p * (1 - p)``, scaled by the per-sample weight when given, and
@@ -24,11 +16,9 @@ the same dict as ``bgbot_cpp.cuda_supervised_train`` /
   weights are written to ``save_path + ".best"``; ``save_path`` is written every
   ``print_interval`` epochs and after the last one.
 * Weights start from ``weights_path``, or from ``bgbot_cpp.NeuralNetwork``'s
-  random init with the same ``seed`` (the identical initial weights CUDA gets).
+  random init with the same ``seed``.
 
-Not bit-identical to CUDA: the shuffle order comes from NumPy rather than
-``std::mt19937``, MLX's sigmoid does not clamp at +-15 the way the CUDA kernel
-does (a difference below 3e-7), and float summation order differs between GPUs.
+The shuffle order comes from NumPy.
 """
 
 from __future__ import annotations
@@ -60,16 +50,12 @@ def mlx_available() -> bool:
 
 
 def backend() -> str | None:
-    """``"cuda"``, ``"mlx"`` or ``None`` (no GPU trainer available)."""
-    if bgbot_cpp.cuda_available():
-        return "cuda"
-    if mlx_available():
-        return "mlx"
-    return None
+    """``"mlx"``, or ``None`` when MLX is unavailable."""
+    return "mlx" if mlx_available() else None
 
 
 def gpu_available() -> bool:
-    """True when either GPU trainer can run (the scripts' old cuda_available() gate)."""
+    """True when the MLX trainer can run."""
     return backend() is not None
 
 
@@ -109,7 +95,7 @@ def _initial_weights(weights_path: str, n_hidden: int, n_inputs: int, seed: int)
                 f"{weights_path} is {w[0].shape[0]}h x {w[0].shape[1]} inputs, "
                 f"expected {n_hidden}h x {n_inputs}")
         return w
-    # Same random init as the CUDA trainer: NeuralNetwork(nh, ni, eps=0.1, seed).
+    # Random init: NeuralNetwork(nh, ni, eps=0.1, seed), as the C++ trainers use.
     nn = bgbot_cpp.NeuralNetwork(n_hidden, n_inputs, 0.1, seed)
     fd, tmp = tempfile.mkstemp(suffix=".weights")
     os.close(fd)
@@ -237,7 +223,7 @@ def _mlx_supervised_train(inputs, targets, weights_path, n_hidden, n_inputs, alp
 
 
 # ---------------------------------------------------------------------------
-# Public entry points (same signatures as the bgbot_cpp CUDA bindings)
+# Public entry points
 # ---------------------------------------------------------------------------
 
 def supervised_train_preencoded(inputs, targets, weights_path="", n_hidden=120,
@@ -246,25 +232,15 @@ def supervised_train_preencoded(inputs, targets, weights_path="", n_hidden=120,
                                 benchmark_scenarios=None, sample_weights=None, label=""):
     """SL training on pre-encoded inputs ``[N, n_inputs]`` and targets ``[N, 5]``.
 
-    Same arguments and return dict as ``bgbot_cpp.cuda_supervised_train_preencoded``
-    (``best_score``, ``best_epoch``, ``epochs_completed``, ``total_seconds``,
-    ``weights_path``, ``best_weights_path``). Uses CUDA when available, else MLX.
+    Returns a dict with ``best_score``, ``best_epoch``, ``epochs_completed``,
+    ``total_seconds``, ``weights_path`` and ``best_weights_path``.
     """
-    kind = backend()
-    if kind == "cuda":
-        return bgbot_cpp.cuda_supervised_train_preencoded(
-            inputs=inputs, targets=targets, weights_path=weights_path,
-            n_hidden=n_hidden, n_inputs=n_inputs, alpha=alpha, epochs=epochs,
-            batch_size=batch_size, seed=seed, print_interval=print_interval,
-            save_path=save_path, benchmark_scenarios=benchmark_scenarios,
-            sample_weights=sample_weights, label=label)
-    if kind == "mlx":
-        return _mlx_supervised_train(
-            inputs, targets, weights_path, n_hidden, n_inputs, alpha, epochs,
-            batch_size, seed, print_interval, save_path, benchmark_scenarios,
-            sample_weights, label)
-    raise RuntimeError("No GPU SL trainer: CUDA is unavailable and MLX is not "
-                       "installed (pip install mlx on Apple Silicon)")
+    if not mlx_available():
+        raise RuntimeError("No GPU SL trainer: MLX is not installed (pip install mlx)")
+    return _mlx_supervised_train(
+        inputs, targets, weights_path, n_hidden, n_inputs, alpha, epochs,
+        batch_size, seed, print_interval, save_path, benchmark_scenarios,
+        sample_weights, label)
 
 
 def supervised_train(boards, targets, weights_path="", n_hidden=120, n_inputs=196,
@@ -272,16 +248,9 @@ def supervised_train(boards, targets, weights_path="", n_hidden=120, n_inputs=19
                      save_path="", benchmark_scenarios=None, sample_weights=None, label=""):
     """SL training on boards ``[N, 26]`` (encoded on the CPU first) and targets ``[N, 5]``.
 
-    Same arguments and return dict as ``bgbot_cpp.cuda_supervised_train``.
+    Same arguments and return dict as :func:`supervised_train_preencoded`.
     """
     kind = backend()
-    if kind == "cuda":
-        return bgbot_cpp.cuda_supervised_train(
-            boards=boards, targets=targets, weights_path=weights_path,
-            n_hidden=n_hidden, n_inputs=n_inputs, alpha=alpha, epochs=epochs,
-            batch_size=batch_size, seed=seed, print_interval=print_interval,
-            save_path=save_path, benchmark_scenarios=benchmark_scenarios,
-            sample_weights=sample_weights, label=label)
     boards = np.ascontiguousarray(boards, dtype=np.int32)
     if boards.ndim != 2 or boards.shape[1] != 26:
         raise RuntimeError("boards must be shape [N, 26]")

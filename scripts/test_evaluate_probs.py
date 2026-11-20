@@ -5,7 +5,7 @@
 Displays a table of the 5 probabilities, equity, and computation time for each.
 
 Usage:
-    python bgsage/scripts/test_evaluate_probs.py [--checkers 0,0,0,...] [--build-dir build_msvc]
+    python bgsage/scripts/test_evaluate_probs.py [--checkers 0,0,0,...] [--build-dir build]
     python bgsage/scripts/test_evaluate_probs.py --ply 4 --model stage3
 """
 
@@ -19,7 +19,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--checkers', type=str, default=None,
                         help='Comma-separated 26-element board array')
-    parser.add_argument('--build-dir', type=str, default='build_msvc',
+    parser.add_argument('--build-dir', type=str, default='build',
                         help='Directory containing bgbot_cpp .pyd')
     parser.add_argument('--skip-rollout', action='store_true',
                         help='Skip rollout evaluations')
@@ -41,14 +41,6 @@ def main():
     sys.path.insert(0, build_dir)
     sys.path.insert(0, build_dir_std)
 
-    # Add CUDA bin and build dir to DLL search path
-    cuda_x64 = r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64'
-    if os.path.isdir(cuda_x64):
-        os.add_dll_directory(cuda_x64)
-    if os.path.isdir(build_dir):
-        os.add_dll_directory(build_dir)
-    if os.path.isdir(build_dir_std):
-        os.add_dll_directory(build_dir_std)
 
     import bgbot_cpp
 

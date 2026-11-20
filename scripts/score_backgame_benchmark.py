@@ -16,7 +16,6 @@ import os
 import sys
 
 sys.path.insert(0, "build")
-os.add_dll_directory(r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64")
 import bgbot_cpp
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "python"))

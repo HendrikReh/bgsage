@@ -30,11 +30,6 @@ repo_dir = os.path.dirname(script_dir)
 build_dir = os.path.join(repo_dir, "build")
 sys.path.insert(0, build_dir)
 sys.path.insert(0, os.path.join(repo_dir, "python"))
-if sys.platform == "win32":
-    cuda = r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64"
-    if os.path.isdir(cuda):
-        os.add_dll_directory(cuda)
-    os.add_dll_directory(build_dir)
 
 import bgbot_cpp  # noqa: E402
 

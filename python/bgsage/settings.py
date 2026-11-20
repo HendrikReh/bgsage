@@ -9,9 +9,8 @@ The GNUbg path is resolved in this order (first hit wins):
 2. The ``BGSAGE_GNUBG`` environment variable.
 3. ``"gnubg_path"`` in the user settings file (see :func:`settings_file`),
    written by ``set_gnubg_path(path, persist=True)`` or by hand.
-4. Auto-detection: the default Windows install
-   (``C:\\Program Files (x86)\\gnubg\\gnubg-cli.exe``), then ``gnubg-cli`` or
-   ``gnubg`` on PATH.
+4. Auto-detection: ``gnubg`` on PATH, then the Homebrew locations
+   (``/opt/homebrew/bin/gnubg``, ``/usr/local/bin/gnubg``).
 
 Example::
 
@@ -26,12 +25,12 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import sys
 from pathlib import Path
 
 GNUBG_ENV_VAR = "BGSAGE_GNUBG"
 SETTINGS_ENV_VAR = "BGSAGE_SETTINGS"
-GNUBG_WINDOWS_DEFAULT = r"C:\Program Files (x86)\gnubg\gnubg-cli.exe"
+GNUBG_DEFAULT = "gnubg"
+GNUBG_HOMEBREW_PATHS = ("/opt/homebrew/bin/gnubg", "/usr/local/bin/gnubg")
 
 _override: str | None = None
 
@@ -40,16 +39,12 @@ def settings_file() -> Path:
     """Location of the user settings file (JSON).
 
     ``BGSAGE_SETTINGS`` overrides it; otherwise
-    ``%APPDATA%\\bgsage\\settings.json`` on Windows and
-    ``$XDG_CONFIG_HOME/bgsage/settings.json`` (default ``~/.config``) elsewhere.
+    ``$XDG_CONFIG_HOME/bgsage/settings.json`` (default ``~/.config``).
     """
     env = os.environ.get(SETTINGS_ENV_VAR)
     if env:
         return Path(env).expanduser()
-    if sys.platform == "win32":
-        base = Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming")
-    else:
-        base = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
+    base = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
     return base / "bgsage" / "settings.json"
 
 
@@ -77,20 +72,20 @@ def save_settings(data: dict) -> Path:
 
 def detect_gnubg_path() -> str | None:
     """Find an installed GNUbg binary without consulting any setting."""
-    if os.path.isfile(GNUBG_WINDOWS_DEFAULT):
-        return GNUBG_WINDOWS_DEFAULT
-    for name in ("gnubg-cli", "gnubg"):
-        found = shutil.which(name)
-        if found:
-            return found
+    found = shutil.which(GNUBG_DEFAULT)
+    if found:
+        return found
+    for path in GNUBG_HOMEBREW_PATHS:
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            return path
     return None
 
 
 def gnubg_path() -> str:
     """The GNUbg binary to run, resolved as described in the module docstring.
 
-    When nothing is configured or found, returns the Windows default path so
-    that running it fails with a FileNotFoundError naming a real location.
+    When nothing is configured or found, returns ``"gnubg"``, so running it
+    fails with a FileNotFoundError naming the binary.
     """
     if _override:
         return _override
@@ -100,7 +95,7 @@ def gnubg_path() -> str:
     saved = load_settings().get("gnubg_path")
     if isinstance(saved, str) and saved:
         return os.path.expanduser(saved)
-    return detect_gnubg_path() or GNUBG_WINDOWS_DEFAULT
+    return detect_gnubg_path() or GNUBG_DEFAULT
 
 
 def set_gnubg_path(path: str | os.PathLike | None, *, persist: bool = False) -> None:

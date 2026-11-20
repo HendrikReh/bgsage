@@ -7,28 +7,28 @@ Neural-network backgammon engine with C++ core and Python interface. Licensed un
 **This fork (HendrikReh/bgsage) targets macOS on Apple Silicon (arm64) only.**
 The development machine is an M4 Pro Mac mini (10P+4E cores, 20-core GPU,
 64 GB). Upstream (markbgsage/bgsage) was developed on Windows with an NVIDIA
-GPU; that heritage is still in the code and in this file.
+GPU; this fork removed its Windows, MSVC, CUDA and Linux build code on
+2026-11-20.
 
 - **Optimise for Apple Silicon freely**: NEON, Accelerate (SME/AMX), Metal or
   MLX. A portable fallback is not a requirement for new code.
-- **Windows, Linux, x86 and CUDA are not supported here.** Don't spend effort
-  testing or keeping the MSVC, Linux/Docker, AVX2 or CUDA paths working, and
-  don't block on their CI jobs.
-- **Don't delete the inherited Windows/Linux/CUDA code unasked.** It keeps
-  merges from upstream easy; removing it is the user's call.
-- **GPU training**: the CUDA SL trainer (`cuda_nn.cu`) is a stub on macOS
-  (`cuda_available()` is False). SL training runs on the Apple GPU through
-  MLX instead (`bgsage.sl_train`, `pip install mlx`); every training script
-  calls it.
+- **Windows, Linux, x86 and CUDA are not supported.** Don't add code,
+  configuration or docs for them.
+- **One exception, Modal**: `scripts/modal_rollout.py` builds the engine on
+  Linux x86-64 cloud containers, so the AVX2 kernels in `neural_net.cpp` and
+  the x86-64 branch of `cpp/CMakeLists.txt` stay, marked "Modal only". Keep
+  them compiling; nothing else uses them.
+- **GPU training** runs on the Apple GPU through MLX (`bgsage.sl_train`,
+  `pip install mlx`); every training script calls it.
+- **Upstream merges** now conflict wherever upstream touches the removed code;
+  resolve those by keeping this fork's side.
 - **Inherited numbers**: training times and many benchmark timings below were
   measured on upstream's Windows box (RTX 4070S, 16 threads). Re-measure on
   the Mac before quoting them for this fork.
 - **XG workflows**: eXtreme Gammon runs on the Mac under CrossOver, and its
   Batch Analyze reads both the `.txt` transcripts and the `.xg` files this
-  repo writes, so the Python side of the XG tooling works here (see "XG as
-  referee for the Benchmark PR sample", and `scripts/xg_h2h.py` for
-  head-to-head games). The GUI driver `xg_batch_win.py` is Windows-only and
-  untested under CrossOver; run Batch Analyze by hand.
+  repo writes (see "XG as referee for the Benchmark PR sample", and
+  `scripts/xg_h2h.py` for head-to-head games). Run Batch Analyze by hand.
 
 ## Repo Boundary Rule
 
@@ -70,10 +70,9 @@ path" and is the primary working directory for the session.
 ```
 cpp/                         # C++ core (all performance-critical code)
   include/bgbot/            # Public headers
-  src/                      # Implementation (.cpp/.cu)
+  src/                      # Implementation (.cpp)
   pybind/bindings.cpp       # pybind11 Python bindings
-  CMakeLists.txt            # Upstream full build (CUDA + CPU); not used in this fork
-  CMakeLists_cpu.txt        # CPU build, the one used on Apple Silicon (included by ../CMakeLists.txt)
+  CMakeLists.txt            # Engine build (included by ../CMakeLists.txt and mobile/CMakeLists.txt)
 python/bgsage/               # Python package
   analyzer.py               # Public API: checker + cube analysis
   types.py                  # Dataclasses (Probabilities, MoveAnalysis, etc.)
@@ -82,7 +81,7 @@ python/bgsage/               # Python package
   data.py                   # .bm file loading, training data parsing
   gnubg.py                  # GNUbg CLI wrapper for reference evaluation
   settings.py               # User settings (GNUbg binary path; see "GNUbg Path" below)
-  sl_train.py               # GPU SL trainer: CUDA, or Apple MLX (see "Training Pipeline")
+  sl_train.py               # GPU SL trainer on Apple MLX (see "Training Pipeline")
   matchinfo.py              # Match play take points, dead cube take points, gammon prices
   text_export.py            # Galaxy/XG-compatible text export + move notation
   xg_compare.py             # Parse XG .xg files; compute per-game PR stats vs XG
@@ -150,7 +149,6 @@ by one tempo. Being on roll is an advantage.
 | `cube.h/cpp` | Doubling cube (Janowski method) |
 | `pubeval.h/cpp` | PubEval linear evaluator (reference opponent) |
 | `bearoff.h/cpp` | One-sided bearoff database + BearoffStrategy wrapper |
-| `cuda_nn.h/cu` | GPU training (CUDA/cuBLAS) — upstream only; a stub on macOS |
 
 ## Production Model
 
@@ -740,10 +738,9 @@ python scripts/generate_bearoff_db.py  # ~4 seconds, outputs data/bearoff_1sided
    `GnuBgAnalyzer(gnubg_path=...)` / `post_move_analytics(..., gnubg_path=...)`
 2. the `BGSAGE_GNUBG` environment variable
 3. `"gnubg_path"` in the user settings file: `~/.config/bgsage/settings.json`
-   (`$XDG_CONFIG_HOME` respected), `%APPDATA%\bgsage\settings.json` on Windows,
-   or wherever `BGSAGE_SETTINGS` points
-4. auto-detection: `C:\Program Files (x86)\gnubg\gnubg-cli.exe`, then
-   `gnubg-cli` or `gnubg` on PATH
+   (`$XDG_CONFIG_HOME` respected), or wherever `BGSAGE_SETTINGS` points
+4. auto-detection: `gnubg` on PATH, then `/opt/homebrew/bin/gnubg` and
+   `/usr/local/bin/gnubg`
 
 ```python
 from bgsage import settings
@@ -983,13 +980,7 @@ natural approaches:
    harvested and warns if XG ever answers a decision two ways. Upstream's
    replay runners (`play_sage_vs_xg.py`, `run_sage_vs_xg_games.py`) are
    retired stubs: they allowed non-standard openings, accepted incomplete
-   XG decisions and skipped failed games. On Windows, `scripts/xg_batch_win.py`
-   drives XG's Batch Analyze dialog with pywinauto (Win32 backend:
-   `TBatchDlg`'s Choose / Start buttons, check boxes and per-player
-   "Analyze Level" profile combo; the Delphi action-bar menu opens by
-   clicking "Analyze" ~353 px from the window's left edge), and
-   `xg_folder_batch.py` uses it for the folder-benchmark shards; neither is
-   tested under CrossOver.
+   XG decisions and skipped failed games.
 
 2. **Sage plays itself; XG scores it** — Sage plays both sides of many
    games, each game is exported as text, and XG's *Batch Analyze* feature
@@ -1076,11 +1067,9 @@ The .xg file MUST contain exactly one game; `ValueError` otherwise.
 
 ## Building
 
-### macOS on Apple Silicon (the supported build)
-
-Configure from the repo root: the top-level `CMakeLists.txt` includes
-`cpp/CMakeLists_cpu.txt` (`cpp/CMakeLists.txt` is the CUDA build, and CMake
-has no `-f` option to pick another list file). Needs `cmake`, `ninja`,
+Configure from the repo root: the top-level `CMakeLists.txt` (the wheel
+build) includes `cpp/CMakeLists.txt`, the engine build. `cmake -S cpp` builds
+the engine alone, with the benchmark/profiler executables. Needs `cmake`, `ninja`,
 `pybind11` and `numpy` for the Python that will import the module; a venv in
 `build/venv` (gitignored) works:
 
@@ -1108,7 +1097,7 @@ writes into the same file, and macOS then kills every later
 because the kernel's cached code signature no longer matches the file. `rm`
 first, so the copy is a new file.
 
-NEON intrinsics are used instead of AVX2, and no `-ffast-math`.
+NEON intrinsics, and no `-ffast-math`.
 
 **Accelerate (Apple Silicon only, on by default).** The batched candidate
 kernels — every `batch_evaluate_candidates_*` and the cubeful engine's
@@ -1116,13 +1105,11 @@ kernels — every `batch_evaluate_candidates_*` and the cubeful engine's
 Apple arm64 runs each layer as one dense `cblas_sgemm` through Accelerate.
 Accelerate executes these on the CPU's matrix unit (SME on M4, AMX on M1-M3),
 which beats the sparse delta kernels even though ~77% of the inputs are zero.
-The hidden-layer sigmoid on this path is the exact Cephes one the x86 AVX2
-kernels and the CUDA trainer use, not the lookup table the other NEON kernels
-use: the table clamps to exactly 0/1 beyond ±8 (up to 3e-4 error per hidden
-unit), which moves equities by up to ~0.003 against x86 builds. So Apple
-Accelerate builds now match x86 builds more closely than before, but not
-bit-for-bit. `-DBGBOT_USE_ACCELERATE=OFF` restores the portable kernels
-(bit-identical to the pre-Accelerate engine).
+The hidden-layer sigmoid on this path is the exact Cephes one, not the lookup
+table the other NEON kernels use: the table clamps to exactly 0/1 beyond ±8
+(up to 3e-4 error per hidden unit), which moves equities by up to ~0.003.
+`-DBGBOT_USE_ACCELERATE=OFF` restores the NEON delta kernels (bit-identical to
+the pre-Accelerate engine).
 
 Measured 2026-11-17 on an M4 Pro (10P+4E cores), together with the encoder
 optimisation below (which is bit-identical on every platform). Wall time of
@@ -1190,36 +1177,10 @@ and shared by analyzers and `BatchModels`, which loads it only when a batch
 has positions. Constructing a 3-ply analyzer takes 17-20 ms instead of
 35-41 ms; analysis times are unchanged (`tests/test_analyzer_model_reuse.py`).
 
-### Upstream builds (not supported in this fork)
-
-Kept for reference and upstream merges; nobody tests them here.
-
-#### Windows (MSVC — required for Python 3.14)
-
-**Python 3.14 is compiled with MSVC.** MinGW-compiled pybind11 modules crash due
-to incompatible C runtime. Always use MSVC.
-
-```powershell
-# One-time CMake configure
-cd build_msvc
-cmake ..\cpp -G Ninja -DCMAKE_BUILD_TYPE=Release `
-  -Dpybind11_DIR=<path-to-pybind11>/share/cmake/pybind11
-
-# Build
-ninja bgbot_cpp
-```
-
-Need `#define NOMINMAX` before `#include <windows.h>` (std::min/max conflict).
-
-#### Linux / Docker (CPU-only)
-
-Use `CMakeLists_cpu.txt`. Flags: `-mavx2 -mfma -ffast-math -march=native`.
-
 ### Dependencies
 
-- C++17, pybind11
-- CUDA 13.1 toolkit (upstream GPU training only; not available on macOS)
-- Python >= 3.10
+- C++17 (Apple clang), pybind11, CMake, Ninja
+- Python >= 3.10, NumPy; MLX for SL training
 
 ## Input Encodings
 
@@ -1243,9 +1204,9 @@ unnatural minima. TD gives realistic probability distributions that SL refines.
 1. **TD Self-Play (CPU)**: 25k-200k games @ alpha=0.1. Serial only (parallel TD deprecated).
 2. **Supervised Learning (GPU)**: Backprop against GNUbg rolled-out probabilities,
    batch size 128 (4096 in the S11 scripts). Scripts call
-   `bgsage.sl_train.supervised_train` / `supervised_train_preencoded`: CUDA/cuBLAS
-   when `bgbot_cpp.cuda_available()`, otherwise **Apple MLX** on the Mac GPU
-   (`pip install mlx`). See "GPU SL trainer (`bgsage.sl_train`)" below.
+   `bgsage.sl_train.supervised_train` / `supervised_train_preencoded`, which
+   run on the Mac GPU through **Apple MLX** (`pip install mlx`). See "GPU SL
+   trainer (`bgsage.sl_train`)" below.
 
 **Key training rules:**
 - All contact NNs train on ALL contact+crashed data, NOT game-plan subsets
@@ -1255,22 +1216,20 @@ unnatural minima. TD gives realistic probability distributions that SL refines.
 ### GPU SL trainer (`bgsage.sl_train`)
 
 `supervised_train(boards, targets, ...)` and
-`supervised_train_preencoded(inputs, targets, ...)` take exactly the keyword
-arguments and return the dict of `bgbot_cpp.cuda_supervised_train` /
-`cuda_supervised_train_preencoded`. All training scripts call them (and
-`sl_train.gpu_available()` in place of `cuda_available()`).
-`sl_train.backend()` is `"cuda"` when the CUDA build finds a GPU, else `"mlx"`
-when MLX has Metal, else `None`.
+`supervised_train_preencoded(inputs, targets, ...)` return a dict with
+`best_score`, `best_epoch`, `epochs_completed`, `total_seconds`,
+`weights_path` and `best_weights_path`. All training scripts call them, and
+gate on `sl_train.gpu_available()`. `sl_train.backend()` is `"mlx"` when MLX
+has Metal, else `None`.
 
-The MLX path transcribes `cpp/src/cuda_nn.cu`: same sigmoid-MSE delta
+The update rules are upstream's CUDA trainer's: sigmoid-MSE delta
 `(t-p)·p·(1-p)` (times the per-sample weight), backprop through the
 pre-update output weights, SGD at `alpha / batch_rows` (the partial last batch
-uses its own row count), one epoch = one shuffled pass, CPU benchmark scoring
-after every epoch with best-score weights saved as `.best`, and the same
-random init (`bgbot_cpp.NeuralNetwork(nh, ni, 0.1, seed)`). It is not
-bit-identical to CUDA: NumPy draws the shuffle, MLX's sigmoid doesn't clamp at
-±15, and GPU summation order differs. `tests/test_sl_train.py` holds the MLX
-weights to a float64 NumPy transcription of the update rules (2e-5).
+uses its own row count), one epoch = one shuffled pass (NumPy draws it), CPU
+benchmark scoring after every epoch with best-score weights saved as `.best`,
+and random init from `bgbot_cpp.NeuralNetwork(nh, ni, 0.1, seed)`.
+`tests/test_sl_train.py` holds the MLX weights to a float64 NumPy
+transcription of the update rules (2e-5).
 
 Measured 2026-11-17 on the M4 Pro (CPU busy with a rollout job): the snake-net
 recipe (`run_s11_containment_sl.py --family-data s11-bg-snake-rollout`, from
@@ -1302,8 +1261,9 @@ python scripts/modal_rollout.py data/<name>-data --limit 20        # small test
 python scripts/modal_rollout.py data/<name>-data --containers 100 --max-usd 300
 ```
 
-The image builds the engine from `cpp/` with the inherited Linux x86-64 flags
-(AVX2/FMA, `-ffast-math`) — the one place this fork uses the Linux build. It
+The image builds the engine from `cpp/` for Linux x86-64 (AVX2/FMA,
+`-ffast-math`) — the one place this fork builds for anything but Apple
+Silicon, and the reason the AVX2 kernels are still in the tree. It
 picks marginally different moves from the Accelerate build, so values are not
 bit-identical, only statistically equal. Measured 2026-11-18 on
 `s11-bg-containment-rollout` rows: 40 boards rolled out locally reproduce the
@@ -1353,7 +1313,6 @@ Run from the bgsage repo root:
 nohup build/venv/bin/python -u scripts/run_stage5small_training.py \
   > logs/training.log 2> logs/training_err.log &
 ```
-(Upstream launched it on Windows with PowerShell `Start-Process ... -WindowStyle Hidden`.)
 
 **Output buffering note:** Even with `-u`, C++ stdout from `bgbot_cpp` functions
 (TD training, SL training) is internally buffered until the C++ function returns.
@@ -1544,8 +1503,8 @@ the chain, evaluating survivors at each step's ply level through the cubeful
 evaluation engine's dead-cube path (`cubeless_tree_probs`; the old recursion
 only in hybrid / full-depth-opponent modes).
 
-**Optimizations**: Accelerate/SME group evaluation and NEON on Apple Silicon (AVX2 FMA
-intrinsics in the upstream x86 build), fast sigmoid LUT, open-addressing position
+**Optimizations**: Accelerate/SME group evaluation and NEON on Apple Silicon,
+fast sigmoid LUT, open-addressing position
 cache, incremental delta evaluation, transposed weight matrix.
 
 ## Rollout
@@ -2388,8 +2347,8 @@ model (like S7 or S8), so future training runs can follow the same process.
 
 ### Prerequisites
 
-- CUDA GPU available (for SL training) — upstream only; not available on Apple Silicon
-- C++ build with pair strategy support (`td_train_gameplan_pair`, `cuda_supervised_train`,
+- MLX installed (`pip install mlx`) for the SL phases
+- C++ build with pair strategy support (`td_train_gameplan_pair`,
   `score_benchmarks_pair`, `create_multipy_pair`, `create_rollout_pair`)
 - Training data in `data/`: `contact-train-data`, `crashed-train-data`, `purerace-train-data`
 - Benchmark files in `data/`: `purerace.bm`, `racing.bm`, `attacking.bm`, `priming.bm`,
@@ -2420,8 +2379,7 @@ Copy `scripts/run_s8_training.py` and update these constants:
 
 Training is long-running (~30-50 hours depending on hidden size, measured
 upstream on Windows + RTX 4070S). Launch it as a detached process from the
-bgsage repo root. Its SL phases need the CUDA trainer, which this fork doesn't
-have on Apple Silicon yet (see "Platform Scope"):
+bgsage repo root; its SL phases run through MLX:
 
 ```bash
 nohup build/venv/bin/python -u scripts/run_s9_training.py \
@@ -2792,11 +2750,11 @@ about 245k/167k/94k train rows for deep/middle/double, benchmarks held out
 and deduplicated against train. Every row in those piles passes S11 detection
 (0 dropped), and ``pasko-gated-remainder`` is entirely duplicates of the gated
 sets. ``scripts/run_s11_backgame_sl.py`` then trains each category NN with the
-S9 backgame recipe (GPU ``cuda_supervised_train_preencoded``, 2,500-epoch
+S9 backgame recipe (GPU ``sl_train.supervised_train_preencoded``, 2,500-epoch
 chunks at batch 4096, 100k ep @ a=3.1 then 250k @ a=1.0, best-ER
 checkpointing), warm-started from the TD bootstrap by default, writing
 ``models/sl_s11_bg_<cat>.weights.best`` — the exact filenames the ``stage11``
-registry loads. ~2 h per category on the RTX 4070S.
+registry loads. ~2 h per category on upstream's RTX 4070S.
 
 **Measured path lengths** (why truncated games are short): under S9 1-ply play
 from the deep seeds, the region exits after a median of ~9 half-moves — mostly

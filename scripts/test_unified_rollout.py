@@ -39,15 +39,6 @@ def main():
     build_dir = os.path.join(project_dir, args_pre.build_dir)
     build_dir_std = os.path.join(project_dir, 'build')
 
-    if sys.platform == 'win32':
-        cuda_x64 = r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64'
-        if os.path.isdir(cuda_x64):
-            os.add_dll_directory(cuda_x64)
-        if os.path.isdir(build_dir):
-            os.add_dll_directory(build_dir)
-        if os.path.isdir(build_dir_std):
-            os.add_dll_directory(build_dir_std)
-
     sys.path.insert(0, build_dir)
     sys.path.insert(0, build_dir_std)
     sys.path.insert(0, os.path.join(project_dir, 'bgsage', 'python'))

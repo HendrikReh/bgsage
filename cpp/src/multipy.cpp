@@ -17,11 +17,6 @@
 #include <deque>
 #include <mutex>
 
-#ifdef _WIN32
-#define NOMINMAX
-#include <windows.h>
-#endif
-
 namespace bgbot {
 
 // ======================== Static Data ========================
@@ -44,26 +39,10 @@ public:
     explicit MultiPlyThreadPool(int n_threads) {
         constexpr int kMinThreads = 1;
         n_threads_ = std::max(kMinThreads, n_threads);
-#ifdef _WIN32
-        // Use 8 MB stacks on Windows to handle deep N-ply recursion on
-        // crashed positions (90+ legal moves, 3+ ply depth).
-        handles_.reserve(n_threads_);
-        for (int i = 0; i < n_threads_; ++i) {
-            HANDLE h = CreateThread(
-                nullptr, 8 * 1024 * 1024,
-                [](LPVOID param) -> DWORD {
-                    static_cast<MultiPlyThreadPool*>(param)->worker_loop();
-                    return 0;
-                },
-                this, 0, nullptr);
-            handles_.push_back(h);
-        }
-#else
         threads_.reserve(n_threads_);
         for (int i = 0; i < n_threads_; ++i) {
             threads_.emplace_back([this]() { worker_loop(); });
         }
-#endif
     }
 
     ~MultiPlyThreadPool() {
@@ -72,18 +51,9 @@ public:
             stopping_ = true;
         }
         queue_cv_.notify_all();
-#ifdef _WIN32
-        if (!handles_.empty()) {
-            WaitForMultipleObjects(
-                static_cast<DWORD>(handles_.size()),
-                handles_.data(), TRUE, INFINITE);
-            for (HANDLE h : handles_) CloseHandle(h);
-        }
-#else
         for (auto& t : threads_) {
             if (t.joinable()) t.join();
         }
-#endif
     }
 
     template<typename F>
@@ -208,11 +178,7 @@ private:
     }
 
     int n_threads_;
-#ifdef _WIN32
-    std::vector<HANDLE> handles_;
-#else
     mutable std::vector<std::thread> threads_;
-#endif
     mutable std::mutex queue_mutex_;
     mutable std::condition_variable queue_cv_;
     mutable std::deque<WorkItem> queue_;

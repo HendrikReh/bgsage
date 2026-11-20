@@ -47,18 +47,8 @@ if '.claude' in _parts:
 project_dir = os.path.dirname(bgsage_dir)
 
 build_dirs = [
-    os.path.join(project_dir, 'build_msvc_s7'),  # S7 worktree build (highest priority)
     os.path.join(project_dir, 'build'),
-    os.path.join(project_dir, 'build_msvc'),
 ]
-
-if sys.platform == 'win32':
-    cuda_bin = r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64'
-    if os.path.isdir(cuda_bin):
-        os.add_dll_directory(cuda_bin)
-    for d in build_dirs:
-        if os.path.isdir(d):
-            os.add_dll_directory(d)
 
 for d in reversed(build_dirs):
     if os.path.isdir(d):
@@ -598,14 +588,12 @@ def main():
             print(f'\nResults saved to: {results_path}')
         return
 
-    # CUDA is only needed for SL training, not TD training
-    needs_cuda = not (args.sl_only is False and args.gpw_scan_only is False)
-    # Actually: check if we'll do any SL work
+    # The GPU is only needed for SL training, not TD training
     needs_sl = not args.score_only  # we might do SL after TD
     if needs_sl and sl_train.gpu_available():
         print(f'GPU SL trainer: {sl_train.backend()}')
     elif needs_sl:
-        print('NOTE: no GPU SL trainer — TD training will proceed, but SL training needs CUDA or MLX (pip install mlx).')
+        print('NOTE: no GPU SL trainer — TD training will proceed, but SL training needs MLX (pip install mlx).')
     print()
 
     # TD training
@@ -631,10 +619,10 @@ def main():
     benchmarks = load_benchmarks()
     all_results = {}
 
-    # SL training requires CUDA
+    # SL training requires the MLX trainer
     if not sl_train.gpu_available():
-        print('\nNo GPU SL trainer (CUDA or MLX) — skipping SL training.')
-        print('Run with --sl-only once one is available (pip install mlx on Apple Silicon).')
+        print('\nNo GPU SL trainer (MLX) — skipping SL training.')
+        print('Run with --sl-only once MLX is installed (pip install mlx).')
         scores = score_stage7()
         return
 

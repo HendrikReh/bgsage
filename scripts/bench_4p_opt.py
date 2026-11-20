@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import time
 from dataclasses import dataclass, asdict
@@ -27,11 +26,6 @@ from typing import Any
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "build"))
 sys.path.insert(0, str(REPO / "python"))
-
-if sys.platform == "win32":
-    cuda = r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64"
-    if os.path.isdir(cuda):
-        os.add_dll_directory(cuda)
 
 import bgbot_cpp  # noqa: E402
 from bgsage import BgBotAnalyzer  # noqa: E402

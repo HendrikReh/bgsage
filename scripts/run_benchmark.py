@@ -17,8 +17,6 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 project_dir = os.path.dirname(os.path.dirname(script_dir))
 build_dir = os.path.join(project_dir, 'build')
 
-if sys.platform == 'win32' and os.path.isdir(build_dir):
-    os.add_dll_directory(build_dir)
 sys.path.insert(0, build_dir)
 sys.path.insert(0, os.path.join(project_dir, 'bgsage', 'python'))
 

@@ -38,12 +38,6 @@ _BUILD_DIR = _PROJECT_ROOT / "build"
 for _p in (_SCRIPT_DIR, _PROJECT_ROOT / "python", _BUILD_DIR):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
-if sys.platform == "win32":
-    _cuda_x64 = r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64"
-    if os.path.isdir(_cuda_x64):
-        os.add_dll_directory(_cuda_x64)
-    if _BUILD_DIR.is_dir():
-        os.add_dll_directory(str(_BUILD_DIR))
 
 from bgsage import xg_file  # noqa: E402
 from bgsage.board import invert_probs  # noqa: E402

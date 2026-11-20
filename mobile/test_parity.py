@@ -30,7 +30,7 @@ def main():
     from bgsage import BgBotAnalyzer, STARTING_BOARD
     from bgsage.weights import default_weights, bearoff_db_path
     assert Path(cpp.__file__).parent.resolve() == build, "Reference extension came from a different build"
-    binary = build / ("bgsage_mobile.dll" if sys.platform == "win32" else "libbgsage_mobile.dylib" if sys.platform == "darwin" else "libbgsage_mobile.so")
+    binary = build / "libbgsage_mobile.dylib"
     lib = C.CDLL(str(binary))
     lib.bgsage_mobile_create.argtypes = [C.c_char_p, C.POINTER(C.c_char_p), C.POINTER(C.c_int), C.c_int, C.c_char_p]
     lib.bgsage_mobile_create.restype = C.c_void_p

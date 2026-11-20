@@ -5,7 +5,6 @@ After fix (flag=True): trial moves are picked by cubeful equity per branch's
 cube state. Expect probs to shift between money and match in the gammon-
 favored direction.
 """
-import os
 import sys
 import time
 from pathlib import Path
@@ -13,9 +12,6 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "build"))
 sys.path.insert(0, str(REPO / "python"))
-cuda = r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64"
-if os.path.isdir(cuda):
-    os.add_dll_directory(cuda)
 
 from bgsage import BgBotAnalyzer
 

@@ -17,15 +17,6 @@ import os
 import sys
 import time
 
-# DLL setup for Windows (CUDA + build dir)
-if hasattr(os, "add_dll_directory"):
-    cuda_x64 = r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64"
-    if os.path.isdir(cuda_x64):
-        os.add_dll_directory(cuda_x64)
-    for d in ("build", "build_msvc"):
-        if os.path.isdir(d):
-            os.add_dll_directory(os.path.abspath(d))
-
 sys.path.insert(0, "build")
 sys.path.insert(0, "bgsage/python")
 

@@ -1,8 +1,7 @@
 # SPDX-License-Identifier: MPL-2.0
 # Copyright (C) 2026 Mark Higgins
-import sys, os, shutil, gc
+import sys, shutil, gc
 sys.path.insert(0, 'build')
-os.add_dll_directory(r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64')
 import bgbot_cpp
 from bgsage import sl_train
 import numpy as np

@@ -15,21 +15,9 @@ import time
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 project_dir = os.path.dirname(os.path.dirname(script_dir))
-if not os.path.isdir(os.path.join(project_dir, 'build')):
-    project_dir = r'C:\Users\mghig\Dropbox\agents\bgbot'
-
 build_dirs = [
-    os.path.join(project_dir, 'build_msvc'),
     os.path.join(project_dir, 'build'),
 ]
-
-if sys.platform == 'win32':
-    cuda_bin = r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64'
-    if os.path.isdir(cuda_bin):
-        os.add_dll_directory(cuda_bin)
-    for d in build_dirs:
-        if os.path.isdir(d):
-            os.add_dll_directory(d)
 
 for d in reversed(build_dirs):
     if os.path.isdir(d):
@@ -102,11 +90,7 @@ def run_rollout_subprocess(label, model_name, kwargs, ci, ki,
         'import os, sys, json, time',
         f'for d in {repr(abs_build_dirs)}:',
         '    sys.path.insert(0, d)',
-        '    if sys.platform == "win32": os.add_dll_directory(d)',
         f'sys.path.insert(0, {repr(abs_python_path)})',
-        'if sys.platform == "win32":',
-        '    cuda = "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.1/bin/x64"',
-        '    if os.path.isdir(cuda): os.add_dll_directory(cuda)',
         'import bgbot_cpp',
         'from bgsage.data import load_benchmark_scenarios_by_indices',
         'from bgsage.weights import WeightConfig',

@@ -11,8 +11,9 @@
 #include <stdexcept>
 #include <algorithm>
 
-// Platform-specific SIMD headers
-#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+// SIMD headers: NEON on Apple Silicon. The AVX2 kernels exist only for the
+// Modal rollout image (Linux x86-64, scripts/modal_rollout.py).
+#if defined(__x86_64__)
   #include <immintrin.h>
   #define BGBOT_USE_AVX2 1
 #elif defined(__aarch64__) || defined(__arm64__)
@@ -21,7 +22,7 @@
 #endif
 
 // Apple arm64 builds route batched evaluation through Accelerate's BLAS
-// (BGBOT_USE_ACCELERATE, set by CMakeLists_cpu.txt together with
+// (BGBOT_USE_ACCELERATE, set by cpp/CMakeLists.txt together with
 // ACCELERATE_NEW_LAPACK when the deployment target allows it; see
 // NeuralNetwork::forward_group).
 #if defined(BGBOT_USE_ACCELERATE)
@@ -171,11 +172,7 @@ static inline void sigmoid_inplace_neon(float* v, size_t n) {
 
 // SIMD dot product: compute sum of a[i]*b[i] for i=0..n-1
 // Both a and b must be at least n floats. No alignment required.
-#ifdef _MSC_VER
-__forceinline
-#else
 __attribute__((always_inline)) inline
-#endif
 float simd_dot(const float* __restrict a, const float* __restrict b, int n) {
 #if defined(BGBOT_USE_AVX2)
     __m256 sum0 = _mm256_setzero_ps();

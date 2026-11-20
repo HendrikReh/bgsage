@@ -18,15 +18,6 @@ import os
 import sys
 import time
 
-# Add CUDA DLLs and build directory before importing bgbot_cpp
-if sys.platform == "win32":
-    cuda_bin = r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64"
-    if os.path.isdir(cuda_bin):
-        os.add_dll_directory(cuda_bin)
-    build_dir = os.path.join(os.path.dirname(__file__), "..", "..", "build")
-    if os.path.isdir(build_dir):
-        os.add_dll_directory(os.path.abspath(build_dir))
-
 sys.path.insert(0, "build")
 sys.path.insert(0, "bgsage/python")
 

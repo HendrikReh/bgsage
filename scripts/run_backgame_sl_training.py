@@ -8,9 +8,6 @@ Usage:
 """
 import argparse, gc, os, shutil, sys, time
 sys.path.insert(0, 'build')
-cuda_path = r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64'
-if os.path.isdir(cuda_path):
-    os.add_dll_directory(cuda_path)
 import bgbot_cpp
 from bgsage import sl_train
 import numpy as np
@@ -104,7 +101,7 @@ def run():
             chunk = min(2500, n_epochs - epochs_done)
             total_epochs += chunk
             epochs_done += chunk
-            # print_interval must be > 0 (0 crashes with CUDA on Python 3.14)
+            # print_interval must be > 0 (0 is not allowed).
             sl_train.supervised_train_preencoded(
                 inputs=train_inputs, targets=train_probs, weights_path=wpath,
                 n_hidden=N_HIDDEN, n_inputs=N_INPUTS, alpha=alpha, epochs=chunk,

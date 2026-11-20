@@ -11,8 +11,6 @@ import os
 import sys
 import time
 
-# Ensure bgbot_cpp can find CUDA DLLs and is importable
-os.add_dll_directory('C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.1/bin/x64')
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'build'))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'python'))
 

@@ -1189,8 +1189,7 @@ This unified approach keeps thread-local caches warm across prefill and trials.
 
 The implementation uses `multipy_parallel_run` — a persistent thread pool shared
 with `MultiPlyStrategy`. This avoids the overhead of creating and destroying
-threads for each rollout call, which on Windows can exhaust TLS (Thread-Local
-Storage) slots after thousands of cycles.
+threads for each rollout call (thousands of cycles in a benchmark run).
 
 ### Cancellation
 

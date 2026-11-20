@@ -1073,8 +1073,6 @@ Threads that hit a COMPUTING entry spin briefly, then fall back to local computa
 A persistent thread pool (`MultiPlyThreadPool`) is created once and reused across
 all evaluations.
 
-- **Windows:** 8 MB stack per thread (required for deep recursion on crashed
-  positions that generate hundreds of legal moves)
 - **Thread count:** `min(hardware_concurrency, target)` where target depends on ply
   depth
 

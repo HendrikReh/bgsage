@@ -31,15 +31,7 @@ if '.claude' in _parts:
     _idx = _parts.index('.claude')
     bgsage_dir = '/'.join(_parts[:_idx])
 project_dir = os.path.dirname(bgsage_dir)
-build_dirs = [os.path.join(project_dir, 'build_msvc'), os.path.join(project_dir, 'build')]
-
-if sys.platform == 'win32':
-    cuda_bin = r'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64'
-    if os.path.isdir(cuda_bin):
-        os.add_dll_directory(cuda_bin)
-    for d in build_dirs:
-        if os.path.isdir(d):
-            os.add_dll_directory(d)
+build_dirs = [os.path.join(project_dir, 'build')]
 
 for d in reversed(build_dirs):
     if os.path.isdir(d):
@@ -514,12 +506,6 @@ def _run_rollout_subprocess(level_name, create_kwargs, weight_paths, hidden_size
     """Run a single rollout level in a subprocess (stage9 strategy)."""
     code = f'''
 import os, sys, json, time
-if sys.platform == 'win32':
-    for d in {repr([os.path.abspath(d) for d in build_dirs if os.path.isdir(d)])}:
-        os.add_dll_directory(d)
-    cuda_x64 = r'C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v13.1\\bin\\x64'
-    if os.path.isdir(cuda_x64):
-        os.add_dll_directory(cuda_x64)
 for d in {repr([os.path.abspath(d) for d in reversed(build_dirs) if os.path.isdir(d)])}:
     sys.path.insert(0, d)
 sys.path.insert(0, {repr(os.path.join(bgsage_dir, 'python'))})

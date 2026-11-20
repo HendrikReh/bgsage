@@ -51,8 +51,6 @@ def _setup_paths() -> None:
     root_dir = os.path.dirname(project_dir)
 
     build_dirs = [
-        os.path.join(project_dir, "build_msvc"),
-        os.path.join(root_dir, "build_msvc"),
         os.path.join(project_dir, "build"),
         os.path.join(root_dir, "build"),
     ]
@@ -61,14 +59,6 @@ def _setup_paths() -> None:
     for path in reversed(search_paths):
         if os.path.isdir(path):
             sys.path.insert(0, path)
-
-    if hasattr(os, "add_dll_directory"):
-        cuda_x64 = r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64"
-        if os.path.isdir(cuda_x64):
-            os.add_dll_directory(cuda_x64)
-        for build_dir in build_dirs:
-            if os.path.isdir(build_dir):
-                os.add_dll_directory(build_dir)
 
 
 def _get_weights():

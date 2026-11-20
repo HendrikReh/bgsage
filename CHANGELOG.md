@@ -126,6 +126,29 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
     Stage 11, Stage 5, a custom database path and no database, including a
     root-routed snake and a bearoff position.
 
+### Removed
+
+- **Upstream's Windows, Linux and CUDA code.** The fork now builds for Apple
+  Silicon only.
+  - C++: the CUDA SL trainer (`cuda_nn.cu`, its stub and header) and the
+    `cuda_available` / `cuda_supervised_train*` bindings; the MSVC and Win32
+    branches in `encoding.cpp`, `multipy.cpp` and `neural_net.cpp`.
+  - Build: upstream's CUDA `cpp/CMakeLists.txt` and the MSVC flags.
+    `cpp/CMakeLists_cpu.txt` is now `cpp/CMakeLists.txt`.
+  - Packaging: the Linux and Windows cibuildwheel targets and classifiers,
+    and the upstream-only PyPI job in `wheels.yml`.
+  - Python: `bgsage.sl_train` is MLX-only. GNUbg auto-detection looks for
+    `gnubg` on PATH and in Homebrew's locations, not the Windows install path.
+  - Scripts: the PowerShell scripts, the pywinauto XG driver
+    (`xg_batch_win.py`, `xg_folder_chain.py`, `xg_folder_batch.py analyze`),
+    the AWS Fargate rollout scripts, and the Windows CUDA-DLL and
+    `build_msvc` path setup in about 120 scripts and tests.
+  - Docs: the Windows/Linux build instructions and CUDA trainer notes.
+  - Kept: the x86-64 AVX2 kernels and CMake branch the Modal rollout image
+    (`scripts/modal_rollout.py`) builds on Linux, marked "Modal only".
+    Historical numbers keep their "measured upstream on RTX 4070S / Windows"
+    labels.
+
 ### Fixed
 
 - **Evaluations with and without the bearoff database no longer share cache

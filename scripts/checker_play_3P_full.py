@@ -5,7 +5,6 @@ Shows for each move: notation, cubeful equity, cubeless equity, full 5-output
 probability distribution, equity diff vs best, and the eval level the bot
 actually scored that move at (after the filter chain).
 """
-import os
 import sys
 import time
 from pathlib import Path
@@ -13,11 +12,6 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "build"))
 sys.path.insert(0, str(REPO / "python"))
-
-if sys.platform == "win32":
-    cuda = r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64"
-    if os.path.isdir(cuda):
-        os.add_dll_directory(cuda)
 
 from bgsage import BgBotAnalyzer
 from bgsage.text_export import compute_move_notation
