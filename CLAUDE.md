@@ -316,6 +316,13 @@ cube = analyzer.cube_action(board, cube_value=1, cube_owner="centered",
 # See "2-Ply Detail Fields" below for structure
 nd_rolls = cube.details["nd"]   # No Double scenario
 dt_rolls = cube.details["dt"]   # Double/Take scenario
+
+# The decision alone (no probs / cubeless equity): skips the second, cubeless
+# N-ply search cube_action runs for those fields, about 60% of the call at
+# 2-4 ply. Same equities and flags; simulate_game uses it when a policy has it.
+d = analyzer.cube_decision(board, cube_value=1, cube_owner="centered")
+# d: CubeDecisionResult with .equity_nd/dt/dp, .should_double, .should_take,
+#   .optimal_equity, .optimal_action, .is_beaver, .eval_level
 ```
 
 **2-Ply Detail Fields** (`incl_2ply_details=True`, requires >= 2-ply):
@@ -627,6 +634,7 @@ results = batch_post_move_evaluate(positions, eval_level="1ply", weights=weights
 | `CheckerPlayResult` | `checker_play()` | `.moves` (list[MoveAnalysis]), `.board`, `.die1`, `.die2` |
 | `MoveAnalysis` | In CheckerPlayResult | `.board`, `.equity`, `.cubeless_equity`, `.probs`, `.equity_diff` |
 | `PostMoveAnalysis` | `post_move_analytics()`, `batch_post_move_evaluate()` | `.probs`, `.cubeless_equity`, `.cubeful_equity` |
+| `CubeDecisionResult` | `cube_decision()` | `.equity_nd/dt/dp`, `.should_double`, `.should_take`, `.optimal_equity`, `.optimal_action`, `.is_beaver` |
 | `CubeActionResult` | `cube_action()` | `.equity_nd/dt/dp`, `.should_double`, `.should_take`, `.optimal_action`, `.probs`, `.details` (optional dict with `"nd"`/`"dt"` keys, with `incl_2ply_details`) |
 | `PositionEval` | `batch_evaluate()` | `.probs`, `.cubeless_equity`, `.cubeful_equity`, `.equity_nd/dt/dp`, `.optimal_action` |
 | `GamePlanResult` | `classify_game_plans()` | `.player`, `.opponent` |

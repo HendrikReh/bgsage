@@ -985,10 +985,12 @@ hash table.
 cube-state fingerprint. The fingerprint covers every field of every cube
 state (cube value, owner, match away scores, Crawford, Jacoby, beaver,
 max-cube cap, cube-x override), and its seed folds in two pieces of caller
-context: the **evaluator identity** (`Strategy::eval_identity()` — wrappers
-like `BearoffStrategy` resolve to the wrapped strategy, so equivalent
-evaluators share entries while distinct models never collide, even across
-strategy objects sharing a pool thread) and the **deep-prefilter flag** (the
+context: the **evaluator identity** (`Strategy::eval_identity()`: distinct
+models never collide, even across strategy objects sharing a pool thread; a
+`BearoffStrategy` mixes the identity of its database's data, new on every
+load or generate, into the wrapped strategy's, so an evaluation with the
+database never serves one without it, while nested wrappers over the same
+database share entries) and the **deep-prefilter flag** (the
 same node evaluated with and without the deep prune has different values).
 So two calls that reach the same board under different cube contexts,
 models, or prune contexts can never alias.
