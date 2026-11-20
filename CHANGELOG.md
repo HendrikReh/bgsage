@@ -16,6 +16,34 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
 ## [Unreleased]
 
+### Added
+
+- **`BgBotAnalyzer.cube_decision()`**: the cube decision without the
+  cubeless probabilities.
+  - At 2-ply and deeper, `cube_action` runs a second, cubeless N-ply search
+    for `probs` and `cubeless_equity` after the cube tree has decided.
+    `cube_decision` skips it (`decision_only=True` on
+    `bgbot_cpp.cube_decision_nply_unified`) and returns a
+    `CubeDecisionResult`.
+  - Equities and flags are exactly `cube_action`'s. At 1-ply and the
+    rollout levels it is `cube_action` minus those fields.
+  - `simulate_game` uses it when a policy offers it and keeps `cube_action`
+    for custom players. Seeded games are unchanged.
+  - Median per call, Stage 11, 20 money positions:
+
+    | Call | `cube_action` | `cube_decision` |
+    |---|---|---|
+    | 2-ply, 1 thread | 2.21 ms | 0.84 ms |
+    | 3-ply, 1 thread | 16.1 ms | 6.3 ms |
+    | 3-ply, 4 threads | 9.7 ms | 3.8 ms |
+    | 4-ply, 4 threads | 214 ms | 75 ms |
+
+    Five simulated 2-ply money games take 0.74-0.76 s instead of 0.88-0.90 s.
+  - `tests/test_cube_decision.py` checks the parity at 1-4 ply for money
+    (with and without Jacoby and the beaver), match, Crawford, a cube cap,
+    a bearoff position and a root-routed snake, and checks seeded
+    simulation records.
+
 ### Fixed
 
 - **Evaluations with and without the bearoff database no longer share cache
