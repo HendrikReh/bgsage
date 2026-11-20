@@ -1,6 +1,6 @@
 # Changelog
 
-Changes in Neongammon ([HendrikReh/neongammon](https://github.com/HendrikReh/neongammon),
+Changes in NeonGammon ([HendrikReh/neongammon](https://github.com/HendrikReh/neongammon),
 called `bgsage` until 2026-11-20) on top of upstream [markbgsage/bgsage](https://github.com/markbgsage/bgsage).
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
@@ -47,7 +47,7 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
 ### Changed
 
-- **The project is now Neongammon** (it was `bgsage`). Breaking for imports.
+- **The project is now NeonGammon** (it was `bgsage`). Breaking for imports.
   - Repository: `HendrikReh/bgsage` -> `HendrikReh/neongammon`. GitHub
     redirects the old URLs, clones and remotes; `git remote set-url origin
     https://github.com/HendrikReh/neongammon.git` updates a checkout.

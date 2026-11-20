@@ -1,4 +1,4 @@
-# neongammon — Neongammon Bot Engine Library
+# neongammon — NeonGammon Bot Engine Library
 
 Neural-network backgammon engine with C++ core and Python interface. Licensed under MPL-2.0.
 
@@ -846,8 +846,8 @@ of a few hundredths (Stages 8-11 span 3.17-3.24 at 2-ply) may be noise. And
 the numbers are not comparable with the full-set PRs quoted elsewhere in this
 file.
 
-**The pure-race gap.** The one clear gap to GNUbg is the pure race (979
-decisions). Split by whether the pre-move position is in the bearoff database
+**The pure-race gap.** The one clear gap to GNUbg on this reference is the
+pure race (979 decisions); against XG it disappears (end of this paragraph). Split by whether the pre-move position is in the bearoff database
 (both sides home), stage11 PR at 1-ply / 2-ply:
 
 | Race decisions | n | raw net | with bearoff DB | GNUbg |
@@ -868,6 +868,24 @@ machine; XG is (next section). It agrees with the swap, which `stage11` now
 carries, in direction but not significantly: the 2-ply race gain is one
 decision (paired comparison in the next section).
 
+**Against XG there is no race gap (2026-11-20).** Scored against XG 4-ply
+(`export_benchmark_pr_xg.py sage --gnubg`), `stage11` with the S5 200h race
+net and GNUbg are level outside the database. PR, and the paired difference
+on the same 608 decisions:
+
+| Reference | stage11 1P / 2P | GNUbg 1P / 2P | stage11 - GNUbg, 1P | 2P |
+|---|---|---|---|---|
+| XG 4-ply | 0.51 / 0.51 | 0.57 / 0.50 | -0.06 +- 0.19 | +0.00 +- 0.18 |
+| Stage 5 rollout | 0.81 / 0.64 | 0.57 / 0.52 | +0.25 +- 0.09 | +0.12 +- 0.08 |
+
+So the gap in the first table comes from the reference, not from the race
+net: the Stage 5 rollout's own best moves cost 0.34 against XG there, and
+XG's #1 costs 0.37 against the rollout. Against XG, 2-ply is no better than
+1-ply (+0.00 +- 0.09). stage11 makes more small errors than GNUbg (vs XG at
+1-ply it is worse on 96 decisions and better on 60), and GNUbg makes fewer
+but larger ones. A larger one-sided database would help little: only 21% of
+these races have every checker within the 10-point.
+
 Retraining the pure-race net on our own targets did NOT help (2026-11-18).
 `scripts/harvest_race_positions.py` + `modal_rollout.py` produced 330k race
 positions rolled out under Stage 9 play (~$22), and `scripts/run_purerace_sl.py`
@@ -886,7 +904,7 @@ race net; the candidates are in `models/race_diag/`.
 one-decision `.xg` games (`generate --subset race|contact|all`; the record
 templates are cloned from any XG-analysed game, `data/benchmark_pr_xg/template.xg`),
 XG Batch-Analyzes them, `score` reads XG's ranked moves back into
-`xg_reference.jsonl`, and `sage` scores Neongammon (1-ply / 2-ply, `--race-net` for
+`xg_reference.jsonl`, and `sage` scores NeonGammon (1-ply / 2-ply, `--race-net` for
 other race nets) and optionally GNUbg (`--gnubg`) against BOTH the Stage 5
 rollout and XG. XG's reference value for a move is the cubeless equity of its
 own evaluation, at whatever depth XG's filter left it (4-ply for the leaders),
@@ -911,7 +929,7 @@ rates stage11 2-ply above the Stage 5 rollout's own best moves (-0.68 +-
 Stage 5, so check improvements against XG. XG's own #1 does not score 0
 because XG ranks moves cubeful (centred cube, Jacoby off) while the reference
 is cubeless; read the XG column from ~0.6 up. In the bearoff races XG agrees
-with the exact database (Neongammon with the DB scores 0.00 there), while the Stage 5
+with the exact database (NeonGammon with the DB scores 0.00 there), while the Stage 5
 rollout's best moves cost 0.13: that is the rollout reference's noise.
 
 **The race-net swap, paired (2026-11-18).** `sage --race-net "s6
@@ -945,16 +963,16 @@ adds the PubEval opponent prefilter BgBotAnalyzer uses; the older 5-NN-only
 `score_benchmark_pr_nply` binding has none (Stage 5 2-ply 4.104 vs 4.097 on
 an 8k-decision set; 1-ply identical).
 
-## Comparing Neongammon to XG via .xg Files
+## Comparing NeonGammon to XG via .xg Files
 
-The goal is to benchmark Neongammon's evaluations against XG (eXtreme Gammon),
+The goal is to benchmark NeonGammon's evaluations against XG (eXtreme Gammon),
 historically considered the strongest backgammon engine. There are two
 natural approaches:
 
-1. **Head-to-head play** — Neongammon and XG play games against each other;
+1. **Head-to-head play** — NeonGammon and XG play games against each other;
    tally points. XG has no API, so `scripts/xg_h2h.py` gets XG's moves out
    of its own Batch Analyze, replaying every game to a fixed point:
-   - Neongammon plays its seat and predicts XG's.
+   - NeonGammon plays its seat and predicts XG's.
    - Each round writes the XG decisions still unanswered as one-decision
      `.xg` games; you Batch-Analyze the round's folder once.
    - The next `round` reads XG's #1 moves and cube recommendations back
@@ -963,14 +981,14 @@ natural approaches:
    - A game is finished when every XG decision in it is XG's own answer.
    Dice are drawn per (game pair, turn), so a changed move never changes a
    later roll, and a finished game is the game live play would have
-   produced (`tests/test_xg_h2h.py` checks this with a Neongammon level standing
+   produced (`tests/test_xg_h2h.py` checks this with a NeonGammon level standing
    in for XG). The opening is standard (no doubles, higher die moves
    first), each dice sequence is played twice with the seats swapped, and
    no game is ever skipped. The rules are money, Jacoby on, Beaver off.
-   `report --luck` subtracts each roll's luck, from Neongammon's 2-ply analytics,
+   `report --luck` subtracts each roll's luck, from NeonGammon's 2-ply analytics,
    times the cube; every roll's luck averages zero whatever evaluator
    measures it, so the adjusted mean stays unbiased. In a stand-in test
-   (Neongammon 1-ply vs 2-ply, 8 games) that cut the per-game standard error from
+   (NeonGammon 1-ply vs 2-ply, 8 games) that cut the per-game standard error from
    0.89 to 0.11 points.
 
    ```bash
@@ -985,10 +1003,10 @@ natural approaches:
    retired stubs: they allowed non-standard openings, accepted incomplete
    XG decisions and skipped failed games.
 
-2. **Neongammon plays itself; XG scores it** — Neongammon plays both sides of many
+2. **NeonGammon plays itself; XG scores it** — NeonGammon plays both sides of many
    games, each game is exported as text, and XG's *Batch Analyze* feature
    scores the lot in a single pass. The Performance Rating (PR = equity
-   error per decision × 500) measures how often Neongammon's chosen moves and
+   error per decision × 500) measures how often NeonGammon's chosen moves and
    cube actions deviate from XG's recommendations. Batch Analyze can chew
    through hundreds of files without intervention, so this is what we use.
 
@@ -996,7 +1014,7 @@ natural approaches:
 
 Three steps; the middle one is manual because it goes through XG's GUI.
 
-**1. Generate Neongammon-vs-Neongammon transcripts** with
+**1. Generate NeonGammon-vs-NeonGammon transcripts** with
 [scripts/run_sage_vs_sage_games.py](scripts/run_sage_vs_sage_games.py):
 
 ```bash
@@ -1857,7 +1875,7 @@ cubeful equity is still minus the opponent's cube analysis.
   | 3-ply | 1.97 (17) | 1.04 (19) | 1.15 (20) | -0.93 +- 0.14 |
   | 4-ply | 1.98 (12) | 0.94 (12) | 0.95 (15) | -1.04 +- 0.11 |
 
-  The gain holds on both seed halves and against the Neongammon reference. A
+  The gain holds on both seed halves and against the NeonGammon reference. A
   (value, slope) grid fitted on one seed half at 2-ply lands at 0.72-0.74 +
   0.00175/pip, next to the 1-ply value (out of fold 1.11). The analyzer's
   2-ply cube tree scores 0.77 (8) on the same positions. Before 2026-11-19
@@ -1912,7 +1930,7 @@ Caveats:
 - Match play is excluded because the same values do not help on the 5-point
   match benchmark: 1-ply 2.35 -> 2.38, 2-ply 1.58 -> 1.82. 0.75 at 2-ply gave
   1.32 there, but without a held-out check.
-- Every reference above is a Neongammon rollout, which makes its own in-trial
+- Every reference above is a NeonGammon rollout, which makes its own in-trial
   cube decisions at 3-ply with 0.68. The XG check below is the independent
   one.
 
@@ -1922,16 +1940,16 @@ the money benchmark's cube positions as one-decision `.xg` games:
 the opponent owns the cube are skipped, because the mover has no decision
 there. XG Batch-Analyzes them ("World Class": 4-ply, XG Roller+ for close
 decisions). `score --xg-dir` reads XG's ND / DT / DP back into
-`xg_reference.jsonl`. `sage --xg-dir` scores Neongammon old and new against both
+`xg_reference.jsonl`. `sage --xg-dir` scores NeonGammon old and new against both
 references, with paired differences.
 
 All 2,196 positions (2,842 decisions) were analysed: 1,503 at 4-ply, 685 by
 XG Roller+ and 8 at 2-ply. XG's equities come out normalised (DP = 1.0,
-player-owned cubes included). XG's own cube PR against the Neongammon reference is
+player-owned cubes included). XG's own cube PR against the NeonGammon reference is
 0.44, so the two references are close. Cube PR old -> new, blunders in
 brackets:
 
-| Level | vs Neongammon reference | vs XG | paired new - old vs XG |
+| Level | vs NeonGammon reference | vs XG | paired new - old vs XG |
 |---|---|---|---|
 | 1-ply | 3.21 (29) -> 2.36 (39) | 2.74 (33) -> 2.00 (42) | -0.73 +- 0.19 |
 | 2-ply | 2.92 (18) -> 1.30 (19) | 2.30 (15) -> 1.02 (18) | -1.28 +- 0.15 |
@@ -1965,7 +1983,7 @@ cube ownership gave no optimum that held across halves.
 Fitted on one half of the seeds against XG and scored on the other, both ways
 round (cube PR, blunders in brackets):
 
-| Out of fold | vs XG | vs Neongammon reference |
+| Out of fold | vs XG | vs NeonGammon reference |
 |---|---|---|
 | 1-ply, flat cube life (refitted the same way) | 2.07 (40) | 2.49 (37) |
 | 1-ply, pip slope | 1.68 (33) | 1.98 (35) |
@@ -1984,7 +2002,7 @@ the diagonal of the (value, slope) grid at both levels, and 0.00150 vs
 Against the previous flat values (same positions as the fit, so in
 sample):
 - 1-ply, flat 0.75: XG cube set 2.00 (42) -> 1.62 (33) vs XG and
-  2.36 (39) -> 1.89 (34) vs the Neongammon reference. Full money benchmark: total
+  2.36 (39) -> 1.89 (34) vs the NeonGammon reference. Full money benchmark: total
   PR 2.43 -> 2.35, cube 2.36 -> 1.89, checker 2.441 -> 2.435 (paired
   -0.006 +- 0.010; 30 of 14,693 picks change).
 - 2-ply, flat 0.80: full money benchmark total PR 1.383 -> 1.338, cube
@@ -3013,7 +3031,7 @@ the round-2 `sl_snake2_warm` net, below). Snake folder, every pick
 rollout-graded, PR at 1P / 2P / 3P: Stage 9 63.56 / 48.06 / 32.18 (364 /
 286 / 205 blunders); trio 52.45 / 34.72 / 28.49; `stage11s` **15.71 / 35.65 /
 24.35** (141 / 251 / 165). The 1-ply figure is the first real competence any
-Neongammon net has shown in the region. **Why 2-ply scores worse than 1-ply
+NeonGammon net has shown in the region. **Why 2-ply scores worse than 1-ply
 — measured 2026-09-04** on the 795 checker decisions (cubeless 1-ply PR
 16.0): two separate effects, one a bug and one not.
 
@@ -3175,7 +3193,7 @@ How the run worked:
   graded against them, XG's own #1 cost PR 61 against XG.
 - XG always analyses the played move at full depth. So
   `score_folder_vs_xg.py complete` writes a second set of games that play
-  each of Neongammon's picks XG had left shallower (1,244 games). With that pass,
+  each of NeonGammon's picks XG had left shallower (1,244 games). With that pass,
   every decision is graded.
 
 Results, PR (paired differences +- 1 SE). The twin row covers 959 decisions,
@@ -3213,37 +3231,49 @@ Not the cause: the cube life (0.68 to 1.0 changes ~25 picks, the gap
 stays), the Jacoby rule, and cubeful versus cubeless conversion at 1-ply
 (the two pick alike).
 
-Root routing is not the cause either, and switching it off makes 2-ply
-worse under XG too. At first XG seemed to disagree with the rollouts here
-(XG -5.6, both rollouts +10), but that was a selection effect, measured
-2026-11-19 with the filtered 2-ply:
-- Switching root routing off changes 384 of the 795 snake checker picks.
-- XG takes only its leading moves to full depth. In 166 of the 384, it
-  never took the no-pin pick there. In most of those the pick is not in
-  XG's move list at all; where it is, it ranks third or lower, 0.22 behind
-  the pinned pick.
-- An XG grading that needs a full-depth value for both picks drops those
-  decisions, so only the rollouts saw them.
+Root routing is not the cause either. Whether switching it off is worse
+depends on the reference: the rollouts say clearly yes at 2-ply, XG says
+no. Measured 2026-11-20 with the filtered 2-ply, every pick of both
+configurations graded by XG (`score_folder_vs_xg.py complete` for both
+sets of picks, `data/snake_xg_completion_rr`):
+- Switching root routing off changes 384 of the 795 snake checker picks at
+  2-ply and 330 at 3-ply.
+- XG takes only its leading moves to full depth. In 179 / 176 of the 384
+  at 2-ply (S9-play / twin) and 110 / 111 of the 330 at 3-ply, it had left
+  one of the two picks shallower, almost always the no-pin one.
 
-No-pin minus pin, contribution to snake checker PR over all 795
-decisions (S9-play / S11-play twin; XG has no value for the second row):
+No-pin minus pin, contribution to snake checker PR over all 795 decisions
+(S9-play / S11-play twin):
 
 | Decisions | ply | n | vs XG | vs rollout |
 |---|---|---|---|---|
-| graded by all four references | 2 | 192 | -4.8 / -5.4 (+- 1.6) | -0.3 / +0.5 (+- 1.2 / 0.9) |
-| no-pin pick not at XG's full depth | 2 | 166 | — | +8.8 / +7.6 (+- 1.2 / 0.9) |
-| graded by all four references | 3 | 196 | -2.3 / -2.1 (+- 1.6) | -5.2 / -1.6 (+- 1.4 / 0.6) |
-| no-pin pick not at XG's full depth | 3 | 92 | — | +4.0 / +3.1 (+- 1.2 / 0.8) |
+| graded by XG's first pass | 2 | 205 / 208 | -5.5 / -5.6 (+- 1.7) | -0.3 / +0.7 (+- 1.3 / 0.9) |
+| graded only by the completion pass | 2 | 179 / 176 | +1.0 / +1.9 (+- 1.7) | +15.5 / +13.0 (+- 1.9 / 1.8) |
+| all changed picks | 2 | 384 | **-4.5 / -3.7 (+- 2.4)** | **+15.1 / +13.7 (+- 2.4 / 2.1)** |
+| graded by XG's first pass | 3 | 220 / 219 | -2.3 / -1.7 (+- 1.7) | -6.1 / -1.5 (+- 1.5 / 0.7) |
+| graded only by the completion pass | 3 | 110 / 111 | +3.0 / +3.3 (+- 1.3) | +5.5 / +4.3 (+- 1.4 / 1.0) |
+| all changed picks | 3 | 330 | +0.7 / +1.6 (+- 2.1) | -0.6 / +2.8 (+- 2.2 / 1.3) |
 
-So at 2-ply root routing is worth ~8 PR in snakes. At 3-ply it is about
-neutral. The XG-only edge for no-pin on the shared decisions comes mostly
-from a handful of 0.5-1.1 swings that the rollouts don't see: trimming the
-ten largest on each side takes it from -4.8 to -2.7. That is within the usual spread
-between XG and the rollouts in snakes. To compare two configurations
-against XG, run a completion pass for both sets of picks
-(`score_folder_vs_xg.py complete`). Grading only where XG has both values
-is biased towards the configuration whose picks XG considers too poor to
-search.
+What it shows:
+- At 3-ply root routing is neutral under both references.
+- At 2-ply the references disagree by ~19 PR, on the decisions XG had
+  first left shallow. There the rollouts charge the no-pin pick 0.14
+  equity per decision on average; XG, once it searches the move, rates it
+  level with the pinned one. An earlier reading (2026-11-19) took the gap
+  for a selection effect of XG grading only where it had both values. The
+  completion pass refutes that: it is a real disagreement about these
+  positions.
+- XG's edge for no-pin on its first-pass decisions comes mostly from a
+  handful of 0.5-1.1 swings: trimming the ten largest on each side takes
+  the all-changed figure from -4.5 to -3.8 and -3.7 to -3.1.
+
+Root routing stays on: it rests on the rollouts, which are the better
+reference in snakes (see "Why XG and the rollouts disagree in snakes"
+below), and XG's case against it is under two standard errors. It is not
+independently confirmed. To compare two configurations against XG, run a
+completion pass for both sets of picks first. Grading only where XG has
+both values leaves out exactly the decisions where the two configurations
+differ most.
 
 At 2-ply, cubeful checker play now searches only the filter's survivors.
 The pruned moves keep 1-ply Janowski values and enter the search only
@@ -3267,6 +3297,26 @@ That brings 2-ply level with 1-ply in snakes, not ahead of it. Elsewhere at
 - ten backgame folders pooled: -0.04 +- 0.02;
 - containment, massive and `Positions XG gets wrong`: within noise.
 
+**What is left of the snake 2-ply gap (2026-11-20).** With every pick graded,
+2-ply minus 1-ply over all 795 snake checker decisions is +1.1 +- 1.9 /
++1.5 +- 1.8 against XG and -1.6 +- 1.2 / +1.7 +- 1.3 against the rollouts
+(S9-play / twin): level. Split by what the two picks do to the snake, one
+part loses under all four references, the other gains back:
+
+| 2-ply pick vs 1-ply pick | n | vs XG | vs rollout |
+|---|---|---|---|
+| 2-ply releases, 1-ply keeps the snake | 64 | +2.4 / +1.8 (+- 1.2 / 1.1) | +1.3 / +2.6 (+- 0.6 / 0.8) |
+| 2-ply keeps, 1-ply releases | 38 | -0.8 / -0.7 (+- 0.3) | -1.5 / -0.4 (+- 0.6 / 0.5) |
+
+(Contributions to checker PR over the 795 decisions. "Releases" = the
+post-move board is no longer a snake, `scripts/snake_rule.py`.) The
+release over-valuation described under Round 2 is still there, smaller,
+and offset by the opposite case. Its cause under root routing (where the
+pinned snake net values the exit replies it was trained on) is not
+measured. 3-ply minus 2-ply
+is -4.2 +- 1.7 / -4.0 +- 1.8 against XG and +4.1 +- 2.0 / -1.6 +- 1.3
+against the rollouts.
+
 3-ply keeps the full search. With the filter, the money benchmark's 3-ply
 checker PR rose 0.59 -> 0.64 (paired +0.044 +- 0.011; 124 decisions worse,
 62 better), although it helped the snake folder against the rollouts
@@ -3276,16 +3326,16 @@ Read only the ranking of the levels. In absolute terms XG and the rollouts
 disagree widely here:
 - XG's #1 costs 25.9 / 38.8 against the two rollouts (checker play 26.9 /
   46.3).
-- Neongammon costs 31-39 against XG.
+- NeonGammon costs 31-39 against XG.
 - XG's own figures are a mix of 4-ply and Roller+.
 
 *Why XG and the rollouts disagree in snakes (2026-11-19).* XG misjudges
 the positions themselves. The cube and the move ranking are not the cause:
-- **Values, same move, cubeless.** XG's offset from either Neongammon rollout
-  has sd 0.39 equity per decision (P(win) sd 0.12). The two Neongammon rollouts
+- **Values, same move, cubeless.** XG's offset from either NeonGammon rollout
+  has sd 0.39 equity per decision (P(win) sd 0.12). The two NeonGammon rollouts
   (S9 play, S11 play) agree to 0.07 (P(win) 0.022). In ordinary contact
-  positions XG and Neongammon agree to 0.009 in P(win) (Benchmark PR sample, XG
-  4-ply #1 against Neongammon 2-ply).
+  positions XG and NeonGammon agree to 0.009 in P(win) (Benchmark PR sample, XG
+  4-ply #1 against NeonGammon 2-ply).
 - **Not the cube.** Graded on shared moves, XG's #1 costs PR 24.2 against
   the rollout cubeful, and its cubeless pick costs 17.7 graded cubeless.
   Within each engine, switching between cubeful and cubeless ranking

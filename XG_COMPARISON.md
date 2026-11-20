@@ -1,12 +1,12 @@
-# Comparing the Neongammon Bot Engine to XG's Bot Engine
+# Comparing the NeonGammon Bot Engine to XG's Bot Engine
 
 XG (eXtreme Gammon) is a standard reference for backgammon analysis, and its bot engine is considered a very strong one.
 
-XG does not include an API to run its bot engine programmatically, so we could not run head-to-head games between Neongammon and XG at the scale required to identify small differences between them.
+XG does not include an API to run its bot engine programmatically, so we could not run head-to-head games between NeonGammon and XG at the scale required to identify small differences between them.
 
-However, we did settle on an approach to test Neongammon against XG at scale using XG's Batch Analysis function.
+However, we did settle on an approach to test NeonGammon against XG at scale using XG's Batch Analysis function.
 
-Our goal was to compare Neongammon evaluations against XG evaluations at a comparable level. We compared:
+Our goal was to compare NeonGammon evaluations against XG evaluations at a comparable level. We compared:
 * Sage 3T vs XG Roller ++. Both are truncated rollouts that incorporate variance reduction, truncate after 7 turns, and use 3-ply (or better) for decisions along each simulation path.
 * Sage 2T vs XG Roller +. Like 3T/++ except that they make 2-ply decisions internally.
 * Sage 1T vs XG Roller. Truncated rollouts with 72 (Sage 1T)/42 (XG Roller) paths, use variance reduction, truncate after 5 turns, and use 1-ply evaluations internally.
@@ -30,7 +30,7 @@ This is similar in approach to the analysis done on XG (and a number of other bo
 
 We simulated 500 money games of Sage 3P vs Sage 3P. We ran through all the decisions, and did a second pass, re-evaluating any decisions at Sage 3T where the best decision was within 0.05 equity of the next best decision. We then did a third pass, rolling out any decisions which Sage 3T evaluated as within 0.02 equity of the next best decision. We saved out all those results and counted them as the "true" decision results, against which we can benchmark any bot's decisions.
 
-For rollouts we used Neongammon rollouts with 3P decisions for checker play and cube actions. We ran batches of 1,296 paths until the 95% accuracy range on the equity was less than 0.005, or it did 20,736 (=16 times 1,296) paths.
+For rollouts we used NeonGammon rollouts with 3P decisions for checker play and cube actions. We ran batches of 1,296 paths until the 95% accuracy range on the equity was less than 0.005, or it did 20,736 (=16 times 1,296) paths.
 
 For a given bot (and evaluation level), we had the bot evaluate its decision for each one of those benchmark decisions, and scored it against the benchmark truth. We calculated a Performance Rating (PR) as the average error (as measured against the benchmark equities) multiplied by 500. We also broke out the results into checker play and cube action PRs.
 
@@ -410,8 +410,8 @@ In practical terms: a player who analyzes a match in Sage will, in the large maj
 
 ## Conclusion
 
-Neongammon and XG are close at every matched evaluation level. In the Rollout PR study — money play and 5-point match play alike — Sage's evaluations score better than the equivalent XG evaluation at every level except 3-ply, where the two are within noise, and the edge is clearest at the truncated-rollout levels most users rely on: 3T scores 0.23 against Roller ++'s 0.34 in money play and 0.23 against 0.36 in match play. Rebuilt for the money games with XG's own analysis as the reference, that ranking turns around — XG is ahead at every matched level except 2T, where the two are level — with most of the margin coming from the decisions XG's own 3-ply and Roller ++ settle: each engine scores best against its own analysis. The Disputed Positions study — which rolls out only the money positions where the two engines actually disagree and scores them against both engines' rollouts — is level on checker play, each rollout favouring the engine that ran it, with cube disagreements too rare and too split to call. The differences are small.
+NeonGammon and XG are close at every matched evaluation level. In the Rollout PR study — money play and 5-point match play alike — Sage's evaluations score better than the equivalent XG evaluation at every level except 3-ply, where the two are within noise, and the edge is clearest at the truncated-rollout levels most users rely on: 3T scores 0.23 against Roller ++'s 0.34 in money play and 0.23 against 0.36 in match play. Rebuilt for the money games with XG's own analysis as the reference, that ranking turns around — XG is ahead at every matched level except 2T, where the two are level — with most of the margin coming from the decisions XG's own 3-ply and Roller ++ settle: each engine scores best against its own analysis. The Disputed Positions study — which rolls out only the money positions where the two engines actually disagree and scores them against both engines' rollouts — is level on checker play, each rollout favouring the engine that ran it, with cube disagreements too rare and too split to call. The differences are small.
 
 On the position families where engines have historically been weakest, Sage's play is measured to the same standard: pooled over the ten classic backgames its 3T PR is under 0.7 and its 3-ply PR under 1.0, containment games and massive backgames score between 2 and 3 at the truncated-rollout levels, and the snake remains the hardest family by a wide margin. In Paskogammon, the whole-game variant that produces these positions constantly, Sage is ahead of XG at every matched level from 3-ply up — 3T 0.88 against Roller ++'s 1.92 — and the margin is widest at 3-ply, where XG's cube PR is 3.04 against Sage's 1.78.
 
-And on real matches, the two engines assign nearly identical Performance Ratings: across 290 tournament matches, the average difference between a player's Sage PR and XG PR is statistically indistinguishable from zero. Whether the test is strength against a rolled-out truth or simple agreement on how a real game was played, Neongammon and XG land in the same place.
+And on real matches, the two engines assign nearly identical Performance Ratings: across 290 tournament matches, the average difference between a player's Sage PR and XG PR is statistically indistinguishable from zero. Whether the test is strength against a rolled-out truth or simple agreement on how a real game was played, NeonGammon and XG land in the same place.
