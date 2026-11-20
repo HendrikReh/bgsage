@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 // Copyright (C) 2026 Mark Higgins
 #include "bgbot/bearoff.h"
+#include <atomic>
 #include "bgbot/board.h"
 #include "bgbot/cube.h"        // for cl2cf (cube-aware BearoffStrategy)
 #include "bgbot/moves.h"
@@ -556,6 +557,7 @@ void BearoffDB::generate() {
     generate_gammon_distributions();
 
     loaded_ = true;
+    identity_ = next_identity();
 }
 
 void BearoffDB::generate_gammon_distributions() {
@@ -752,13 +754,37 @@ bool BearoffDB::load(const std::string& path) {
 
     if (!binom_initialized_) init_binom();
     loaded_ = in.good();
+    identity_ = loaded_ ? next_identity() : 0;
     return loaded_;
+}
+
+uint64_t BearoffDB::next_identity() {
+    static std::atomic<uint64_t> counter{1};
+    return counter.fetch_add(1, std::memory_order_relaxed);
 }
 
 // --- BearoffStrategy ---
 
 BearoffStrategy::BearoffStrategy(std::shared_ptr<Strategy> base, const BearoffDB* db)
-    : base_(std::move(base)), db_(db) {}
+    : base_(std::move(base)), db_(db)
+{
+    const auto* inner = dynamic_cast<const BearoffStrategy*>(base_.get());
+    wraps_same_db_ = inner && inner->db_ == db_;
+}
+
+uint64_t BearoffStrategy::eval_identity() const {
+    if (wraps_same_db_) return base_->eval_identity();
+    const uint64_t base_id = base_->eval_identity();
+    const uint64_t db_id = db_ ? db_->identity() : 0;
+    if (db_id == 0) return base_id;   // no data: the wrapper changes nothing
+    // Base identities are small counters; mixing in a well-spread function of
+    // the database identity keeps (base, database) pairs apart.
+    uint64_t h = db_id * 0x9E3779B97F4A7C15ULL;
+    h ^= h >> 31;
+    h *= 0xBF58476D1CE4E5B9ULL;
+    h ^= h >> 29;
+    return base_id ^ (h | 1ULL << 63);
+}
 
 double BearoffStrategy::evaluate(const Board& board, bool pre_move_is_race) const {
     if (db_->is_bearoff(board)) {
