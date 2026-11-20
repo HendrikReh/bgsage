@@ -3,9 +3,9 @@
 """XG as an independent referee for the money benchmark's cube decisions.
 
 The money benchmark's cube references (``data/money_benchmark/benchmark.json``)
-are Sage's own analyses: 3-ply, 3T or full rollouts in which Sage makes the
+are Neongammon's own analyses: 3-ply, 3T or full rollouts in which Neongammon makes the
 in-trial cube decisions itself. A cube-life change tuned against them could
-partly be learning to agree with Sage. This script lets eXtreme Gammon grade
+partly be learning to agree with Neongammon. This script lets eXtreme Gammon grade
 the same decisions instead.
 
 1. ``generate`` writes every scoreable cube position as a one-decision game in
@@ -19,10 +19,10 @@ the same decisions instead.
    folder, level "World Class", "Save games after analyze" ON. XG writes its
    analysis into each file in place.
 3. ``score --xg-dir DIR`` reads XG's equities back into ``DIR/xg_reference.jsonl``
-   and prints XG's own cube PR against the Sage reference, as a sanity check.
-4. ``sage --xg-dir DIR`` plays every decision with Sage at 1-, 2- and 3-ply,
+   and prints XG's own cube PR against the Neongammon reference, as a sanity check.
+4. ``sage --xg-dir DIR`` plays every decision with Neongammon at 1-, 2- and 3-ply,
    with the engine-default cube life ("old", ``MONEY_CONTACT_CUBE_LIFE``
-   emptied) and the current one ("new"), and scores both against the Sage
+   emptied) and the current one ("new"), and scores both against the Neongammon
    reference and against XG, with paired new-minus-old differences.
 
 Scoring is ``benchmark_money._score_cube``'s: the doubler's error
@@ -57,7 +57,7 @@ for _p in (_SCRIPT_DIR, _PROJECT_ROOT / "build", _PROJECT_ROOT / "python"):
 
 import benchmark_money as bm  # noqa: E402
 import export_folder_benchmark_xg as fx  # noqa: E402
-from bgsage import xg_file as xf  # noqa: E402
+from neongammon import xg_file as xf  # noqa: E402
 from export_pasko_benchmark_xg import _templates, write_xg  # noqa: E402
 
 DEFAULT_OUT_DIR = _PROJECT_ROOT / "data" / "money_cube_xg"
@@ -106,7 +106,7 @@ def plan_games(entries: list[dict]) -> tuple[list[dict], Counter]:
 def cmd_generate(args) -> None:
     if not args.template.exists():
         raise SystemExit(f"template .xg not found: {args.template} (copy any XG-analysed "
-                         f"Sage-vs-Sage seed_N.xg there -- its header must carry Jacoby "
+                         f"Neongammon-vs-Neongammon seed_N.xg there -- its header must carry Jacoby "
                          f"and Beaver -- or pass --template)")
     tpl = _templates(args.template)
     entries = load_cube_entries()
@@ -206,18 +206,18 @@ def cmd_score(args) -> None:
     for r in rows:
         errs += errors(sage_ref(by_key[r["key"]]), r["has_double"], r["has_take"],
                        r["xg"]["should_double"], r["xg"]["should_take"])
-    print(f"XG's own cube PR against the Sage reference: {pr(errs):.2f} over {len(errs)} "
+    print(f"XG's own cube PR against the Neongammon reference: {pr(errs):.2f} over {len(errs)} "
           f"decisions -> {_rel(out)}")
 
 
 # ---------------------------------------------------------------------------
-# sage: score Sage old/new against both references
+# sage: score Neongammon old/new against both references
 # ---------------------------------------------------------------------------
 
 
 def sage_picks(rows: list[dict], level: str, policy: str, threads: int) -> list[tuple[bool, bool]]:
-    import bgsage.analyzer as A
-    from bgsage import BgBotAnalyzer
+    import neongammon.analyzer as A
+    from neongammon import BgBotAnalyzer
     saved = dict(A.MONEY_CONTACT_CUBE_LIFE)
     if policy == "old":
         A.MONEY_CONTACT_CUBE_LIFE.clear()
@@ -261,7 +261,7 @@ def cmd_sage(args) -> None:
     n_dec = sum(r["has_double"] + r["has_take"] for r in rows)
     print(f"{len(rows)} positions, {n_dec} cube decisions; cube PR (blunders > "
           f"{bm.BLUNDER_THRESHOLD}) against each reference\n")
-    print(f"{'player':22s} {'vs Sage reference':>22s} {'vs XG':>22s}")
+    print(f"{'player':22s} {'vs Neongammon reference':>22s} {'vs XG':>22s}")
     report = {"n_positions": len(rows), "n_decisions": n_dec, "rows": []}
     xg_picks = [(r["xg"]["should_double"], r["xg"]["should_take"]) for r in rows]
     for name, picks in [("XG World Class", xg_picks)]:
@@ -283,7 +283,7 @@ def cmd_sage(args) -> None:
                 cells.append(f"{pr(flat):6.2f} ({blunders:3d})")
                 row[ref] = {"pr": pr(flat), "blunders": blunders}
             report["rows"].append(row)
-            print(f"{'Sage ' + level + ' ' + policy:22s} {cells[0]:>22s} {cells[1]:>22s}"
+            print(f"{'Neongammon ' + level + ' ' + policy:22s} {cells[0]:>22s} {cells[1]:>22s}"
                   f"   [{time.perf_counter() - t0:.0f}s]", flush=True)
         diffs = []
         for ref in ("sage", "xg"):

@@ -54,8 +54,8 @@ for _p in (_PROJECT_ROOT / "python", _PROJECT_ROOT / "build"):
         sys.path.insert(0, str(_p))
 
 import bgbot_cpp  # noqa: E402
-from bgsage import STARTING_BOARD, batch_checker_play, check_game_over, flip_board, is_race  # noqa: E402
-from bgsage.weights import bearoff_db_path  # noqa: E402
+from neongammon import STARTING_BOARD, batch_checker_play, check_game_over, flip_board, is_race  # noqa: E402
+from neongammon.weights import bearoff_db_path  # noqa: E402
 
 _DATA = _PROJECT_ROOT / "data"
 

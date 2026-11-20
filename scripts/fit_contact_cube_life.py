@@ -14,7 +14,7 @@ XG Batch-Analyzes.
 2. Fit (contact_x, slope) by grid search, minimising the cube error against
    XG on half the seeds and scoring the other half, both ways round, plus the
    flat model (slope 0) with the same procedure. Reported against XG and
-   against the Sage reference, with the paired out-of-fold difference.
+   against the Neongammon reference, with the paired out-of-fold difference.
 
 Usage::
 
@@ -39,8 +39,8 @@ for _p in (_SCRIPT_DIR, _PROJECT_ROOT / "build", _PROJECT_ROOT / "python"):
         sys.path.insert(0, str(_p))
 
 import bgbot_cpp  # noqa: E402
-import bgsage.analyzer as A  # noqa: E402
-from bgsage import BgBotAnalyzer  # noqa: E402
+import neongammon.analyzer as A  # noqa: E402
+from neongammon import BgBotAnalyzer  # noqa: E402
 
 import benchmark_money as bm  # noqa: E402
 import export_money_cube_xg as X  # noqa: E402

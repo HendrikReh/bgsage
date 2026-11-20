@@ -35,7 +35,7 @@ project_dir = os.path.dirname(os.path.dirname(script_dir))
 build_dir = os.path.join(project_dir, 'build')
 
 sys.path.insert(0, build_dir)
-sys.path.insert(0, os.path.join(project_dir, 'bgsage', 'python'))
+sys.path.insert(0, os.path.join(project_dir, 'neongammon', 'python'))
 
 import bgbot_cpp
 

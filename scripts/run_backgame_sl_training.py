@@ -3,13 +3,13 @@
 """SL training for backgame NNs (Stage 9).
 
 Usage:
-    python bgsage/scripts/run_backgame_sl_training.py --side player
-    python bgsage/scripts/run_backgame_sl_training.py --side opponent
+    python neongammon/scripts/run_backgame_sl_training.py --side player
+    python neongammon/scripts/run_backgame_sl_training.py --side opponent
 """
 import argparse, gc, os, shutil, sys, time
 sys.path.insert(0, 'build')
 import bgbot_cpp
-from bgsage import sl_train
+from neongammon import sl_train
 import numpy as np
 
 N_HIDDEN = 400
@@ -44,7 +44,7 @@ def run():
 
     # Load training data
     boards_list, probs_list = [], []
-    with open(f'bgsage/data/{train_file}') as f:
+    with open(f'neongammon/data/{train_file}') as f:
         for line in f:
             parts = line.split()
             if len(parts) < 31: continue
@@ -56,7 +56,7 @@ def run():
 
     # Load benchmark data (keep raw boards for NNStrategy.evaluate_board)
     bench_boards_list, bench_probs_list = [], []
-    with open(f'bgsage/data/{bench_file}') as f:
+    with open(f'neongammon/data/{bench_file}') as f:
         for line in f:
             parts = line.split()
             if len(parts) < 31: continue
@@ -74,10 +74,10 @@ def run():
     print(f'Pre-encoded {len(train_boards)} positions ({N_INPUTS} features) in {time.time()-t_enc:.1f}s', flush=True)
 
     # Weights
-    wpath = f'bgsage/models/{wname}.weights'
-    best_path = f'bgsage/models/{wname}.weights.best'
+    wpath = f'neongammon/models/{wname}.weights'
+    best_path = f'neongammon/models/{wname}.weights.best'
     if not os.path.exists(wpath):
-        s8_src = f'bgsage/models/sl_s8_{s8_nn}.weights.best'
+        s8_src = f'neongammon/models/sl_s8_{s8_nn}.weights.best'
         print(f'Init from S8 {s8_nn}', flush=True)
         shutil.copy2(s8_src, wpath)
         shutil.copy2(s8_src, best_path)

@@ -70,8 +70,8 @@ def play_worker(args):
     """Play games [start, start+count) and return containment positions."""
     start, count = args
     from backgame_benchmark import _play_game, _start_for_game, read_start_positions
-    from bgsage import BgBotAnalyzer
-    from bgsage.weights import WeightConfig
+    from neongammon import BgBotAnalyzer
+    from neongammon.weights import WeightConfig
     import containment_rule as cr
 
     starts = read_start_positions("containment")

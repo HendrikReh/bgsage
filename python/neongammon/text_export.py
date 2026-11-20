@@ -507,7 +507,7 @@ def export_history_to_txt(record_dict: dict[str, Any]) -> bytes:
       ``"no double"`` / ``"resign"`` / ``None``
     """
     p1 = (record_dict.get("player1_name") or "").strip() or "You"
-    p2 = (record_dict.get("player2_name") or "").strip() or "Sage Bot"
+    p2 = (record_dict.get("player2_name") or "").strip() or "Neongammon"
     mode = (record_dict.get("mode") or "unlimited").strip().lower()
     started = _parse_iso(record_dict.get("started_at"))
     history_id = (record_dict.get("history_id") or "").strip()

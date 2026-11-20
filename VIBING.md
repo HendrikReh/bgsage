@@ -22,7 +22,7 @@ First, download the Claude desktop application to your computer. This applicatio
 
 Next, download git to your computer, if you have not already. Ask an AI how to do it if you're not sure. git is a tool to manage different versions of code, so you can always walk back and attribute changes. We'll use it to download the code.
 
-Next, check out the markbgsage/bgsage git repository from github.com. If you do not know how to do this (like I do not), create a new folder (called bgsage) wherever you like on your computer, then run Claude Code and connect to that folder. Choose the Code tab at the top, then ask Claude Code to check out that repository, just like "check out the repository markbgsage/bgsage from github.com". It'll walk you through how to do it.
+Next, check out the markbgsage/bgsage git repository from github.com. If you do not know how to do this (like I do not), create a new folder (called neongammon) wherever you like on your computer, then run Claude Code and connect to that folder. Choose the Code tab at the top, then ask Claude Code to check out that repository, just like "check out the repository markbgsage/bgsage from github.com". It'll walk you through how to do it.
 
 Now you've got all the files you need on your computer. There's a file called CLAUDE.md that has the context that Claude Code uses each time it starts a session - that acts like a memory for the project. It also has all the source code in various subdirectories.
 

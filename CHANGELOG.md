@@ -1,16 +1,15 @@
 # Changelog
 
-Changes in this fork ([HendrikReh/bgsage](https://github.com/HendrikReh/bgsage))
-on top of upstream [markbgsage/bgsage](https://github.com/markbgsage/bgsage).
+Changes in Neongammon ([HendrikReh/neongammon](https://github.com/HendrikReh/neongammon),
+called `bgsage` until 2026-11-20) on top of upstream [markbgsage/bgsage](https://github.com/markbgsage/bgsage).
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 The fork branched from upstream at `139427d` (2026-10-17, "Add compact
 all-roll legal move arrays for video reconstruction"). Everything before that
 commit is upstream's history; see `git log 139427d`. The fork targets macOS
-on Apple Silicon only (see "Platform Scope" in `CLAUDE.md`). It has no
-Releases keep upstream's `2.0.YYYYMMDD` version scheme, dated by the fork's
+on Apple Silicon only (see "Platform Scope" in `CLAUDE.md`). Releases keep upstream's `2.0.YYYYMMDD` version scheme, dated by the fork's
 release. They are published as GitHub releases with Apple Silicon wheels,
-not on PyPI, where the `bgsage` name is upstream's.
+not on PyPI.
 
 Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
@@ -45,6 +44,33 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
     simulation records.
 
 ### Changed
+
+- **The project is now Neongammon** (it was `bgsage`). Breaking for imports.
+  - Repository: `HendrikReh/bgsage` -> `HendrikReh/neongammon`. GitHub
+    redirects the old URLs, clones and remotes; `git remote set-url origin
+    https://github.com/HendrikReh/neongammon.git` updates a checkout.
+  - Python package and wheel: `bgsage` -> `neongammon`
+    (`python/neongammon/`, `from neongammon import BgBotAnalyzer`). There is
+    no `bgsage` alias: `import bgsage` fails.
+  - Environment variables: `NEONGAMMON_GNUBG`, `NEONGAMMON_SETTINGS` and
+    `NEONGAMMON_NO_ROOT_ROUTING`. The `BGSAGE_*` names are still read when
+    the new one is unset.
+  - Settings file: `~/.config/neongammon/settings.json`. While it does not
+    exist, a saved `~/.config/bgsage/settings.json` is read; the next save
+    writes the new file (`tests/test_settings.py`).
+  - Mobile C API: `bgsage_mobile_*` -> `neongammon_mobile_*`,
+    `BgsageMobileEngine` -> `NeongammonMobileEngine`, library
+    `libneongammon_mobile.dylib`, CMake option
+    `NEONGAMMON_MOBILE_REFERENCE_PYTHON`. The top-level CMake variables are
+    `NEONGAMMON_*`.
+  - The bot's name in transcripts and reports: player labels "Sage" and
+    "Sage Bot" are now "Neongammon"; the benchmark scripts' `SageBot` class
+    is `NeongammonBot`.
+  - Unchanged: the C++ engine (`bgbot` namespace and headers, the
+    `bgbot_cpp` extension, `BgBotAnalyzer`), weights and data, script file
+    names such as `run_sage_vs_sage_games.py`, and the measured results
+    quoted in the docs. The license stays MPL-2.0, and files from upstream
+    keep their copyright notices.
 
 - **Single and batch N-ply checker play run one native routine.**
   - `BgBotAnalyzer.checker_play` (cube-aware N-ply) and `batch_checker_play`
@@ -137,7 +163,7 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
     `cpp/CMakeLists_cpu.txt` is now `cpp/CMakeLists.txt`.
   - Packaging: the Linux and Windows cibuildwheel targets and classifiers,
     and the upstream-only PyPI job in `wheels.yml`.
-  - Python: `bgsage.sl_train` is MLX-only. GNUbg auto-detection looks for
+  - Python: `neongammon.sl_train` is MLX-only. GNUbg auto-detection looks for
     `gnubg` on PATH and in Homebrew's locations, not the Windows install path.
   - Scripts: the PowerShell scripts, the pywinauto XG driver
     (`xg_batch_win.py`, `xg_folder_chain.py`, `xg_folder_batch.py analyze`),
@@ -483,7 +509,7 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
   - Both N-ply overloads ran the cube-aware tree for every legal move. At
     2-ply the pick could then land on a move the analyzer's 1-ply filter
     rejects: the filter that
-    [#26](https://github.com/HendrikReh/bgsage/pull/26) added for the
+    [#26](https://github.com/HendrikReh/neongammon/pull/26) added for the
     analyzer never reached the batch.
     Three more differences, at every depth:
     - the probs came from the cubeless tree;
@@ -541,7 +567,7 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
     no benchmark files.
 
 - **The test suite runs clean on macOS**
-  ([#16](https://github.com/HendrikReh/bgsage/pull/16)): 318 passed,
+  ([#16](https://github.com/HendrikReh/neongammon/pull/16)): 318 passed,
   21 skipped, none failing. Three test files had upstream's Windows
   heritage, and none of the fixes touch engine code:
   - `test_bearoff.py` called the Windows-only `os.add_dll_directory` at
@@ -567,14 +593,14 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
     noise (−0.015 ± 0.007).
 - `CLAUDE.md` records that re-rolling the containment net's general rows
   under Stage 9 did not help
-  ([#17](https://github.com/HendrikReh/bgsage/pull/17)). All 291,242 rows
+  ([#17](https://github.com/HendrikReh/neongammon/pull/17)). All 291,242 rows
   were rolled out on Modal (~$223), and the retrained net's holdout ER fell
   (general rows 36.8 → 24.4), but its decisions did not improve. On the money
   benchmark's 237 containment-routed decisions it scores 3.50 / 2.05 / 1.28
   at 1P / 2P / 3P against 3.06 / 1.94 / 1.18 for the installed net, and the
   containment folder is a tie. The installed net stays.
 - The `scripts/accuracy_vs_time.py` results were re-measured after the
-  race-net swap ([#8](https://github.com/HendrikReh/bgsage/pull/8)).
+  race-net swap ([#8](https://github.com/HendrikReh/neongammon/pull/8)).
   `stage11`'s Benchmark PR at 1 / 2 / 3 / 4-ply is now
   4.10 / 3.15 / 2.54 / 2.54, against 4.11 / 3.18 / 2.53 / 2.55 before.
   - Between 89 and 143 of the 5,140 picks changed per level. GNUbg's PR is
@@ -591,7 +617,7 @@ The fork's first release.
 ### Added
 
 - **Apple MLX trainer for supervised learning** (`bgsage.sl_train`,
-  [#2](https://github.com/HendrikReh/bgsage/pull/2)). `supervised_train` and
+  [#2](https://github.com/HendrikReh/neongammon/pull/2)). `supervised_train` and
   `supervised_train_preencoded` take the same arguments and return the same
   dict as the CUDA bindings. They use CUDA when available and otherwise Apple
   MLX on the Mac GPU (`pip install mlx`). All 20 training scripts now call
@@ -600,33 +626,33 @@ The fork's first release.
   transcription within 2e-5. On the snake-net recipe it reaches holdout ER
   53.96, against 53.95 for CUDA on an RTX 4070S.
 - **Configurable GNUbg binary** (`bgsage.settings`,
-  [#1](https://github.com/HendrikReh/bgsage/pull/1)). The path is resolved
+  [#1](https://github.com/HendrikReh/neongammon/pull/1)). The path is resolved
   from, in order: `set_gnubg_path()` or a per-instance `gnubg_path=`, the
   `BGSAGE_GNUBG` environment variable, `~/.config/bgsage/settings.json`, and
   auto-detection on `PATH`. `GnuBgAnalyzer` and `post_move_analytics` now run
   on macOS.
 - **Cloud rollouts on Modal** (`scripts/modal_rollout.py`,
-  [#7](https://github.com/HendrikReh/bgsage/pull/7)). The script rolls out
+  [#7](https://github.com/HendrikReh/neongammon/pull/7)). The script rolls out
   position files on Modal CPU containers in the SL trainers' format, with a
   `.meta.jsonl` sidecar. Runs are resumable, and `--max-usd`, `--chunk` and
   `--local` are available. Measured cost is about $0.002 per containment
   board and $0.0001 per pure-race board.
 - **Pure-race position harvest** (`scripts/harvest_race_positions.py`,
-  [#7](https://github.com/HendrikReh/bgsage/pull/7)). 30,000 self-play games
+  [#7](https://github.com/HendrikReh/neongammon/pull/7)). 30,000 self-play games
   yield 329,753 train and 36,478 holdout race boards, as the basis for
   retraining the PureRace net on rollout targets.
 - **Benchmark PR sampling** (`generate_benchmark_pr.py --resume
-  --decision-step N`, [#1](https://github.com/HendrikReh/bgsage/pull/1)).
+  --decision-step N`, [#1](https://github.com/HendrikReh/neongammon/pull/1)).
   This rolls out every Nth saved decision. The fork's reference is the
   1-in-20 sample: 6,944 decisions and 20,302 positions, about 4.5 hours.
   Both PR scorers accept `--decision-step N` and score exactly that sample.
-- **CHANGELOG** for the fork ([#10](https://github.com/HendrikReh/bgsage/pull/10)).
+- **CHANGELOG** for the fork ([#10](https://github.com/HendrikReh/neongammon/pull/10)).
 - **`score_benchmark_pr_strategy` binding**
-  ([#2](https://github.com/HendrikReh/bgsage/pull/2)).
+  ([#2](https://github.com/HendrikReh/neongammon/pull/2)).
   `score_benchmark_pr.py` now scores every registered model type: 5-NN,
   pair, and backgame-aware models including `stage11`.
 - **Accuracy against thinking time** (`scripts/accuracy_vs_time.py`,
-  [#10](https://github.com/HendrikReh/bgsage/pull/10)). The
+  [#10](https://github.com/HendrikReh/neongammon/pull/10)). The
   script measures Benchmark PR and single-thread CPU time per decision for
   Open Sage and GNUbg at 1–4 ply, with both engines picking moves as in
   normal use and depths in the XG convention. First results (`stage11`,
@@ -635,7 +661,7 @@ The fork's first release.
   4-ply (~145 ms). The reference is Stage 5's rollout, which leans towards
   Open Sage.
 - **XG as a Benchmark PR referee** (`scripts/export_benchmark_pr_xg.py`,
-  [#8](https://github.com/HendrikReh/bgsage/pull/8)). The script exports the
+  [#8](https://github.com/HendrikReh/neongammon/pull/8)). The script exports the
   sample as one-decision `.xg` games for XG's Batch Analyze, reads XG's
   ranked moves back, and scores Sage and GNUbg against both the Stage 5
   rollout and XG. Against XG 4-ply, `stage11` 2-ply (before the race-net
@@ -643,7 +669,7 @@ The fork's first release.
   2-ply 1.40 (paired difference −0.17 ± 0.07). The PR also adds
   `scripts/run_purerace_sl.py`, the pure-race fine-tuning experiment, which
   did not beat Stage 5's net.
-- **Analysis tools** ([#6](https://github.com/HendrikReh/bgsage/pull/6)):
+- **Analysis tools** ([#6](https://github.com/HendrikReh/neongammon/pull/6)):
   - `scripts/race_gap_analysis.py` breaks down pure-race PR into bearoff
     positions and races outside the database.
   - `scripts/race_net_swap.py` scores the same races with other race nets
@@ -652,19 +678,19 @@ The fork's first release.
     `cube_action` and `checker_play`.
 - **Tests:**
   - `tests/test_encoding_golden.py` pins the encoder features on 1,000
-    positions ([#1](https://github.com/HendrikReh/bgsage/pull/1)).
+    positions ([#1](https://github.com/HendrikReh/neongammon/pull/1)).
   - `tests/test_settings.py` covers the GNUbg path precedence
-    ([#1](https://github.com/HendrikReh/bgsage/pull/1)).
+    ([#1](https://github.com/HendrikReh/neongammon/pull/1)).
   - `tests/test_analyzer_thread_limits.py` pins thread limits per level
-    ([#3](https://github.com/HendrikReh/bgsage/pull/3)).
+    ([#3](https://github.com/HendrikReh/neongammon/pull/3)).
   - `tests/test_cube_strategy_threads.py` calls one analyzer from 8 threads
     and requires results bit-identical to a fresh analyzer per call
-    ([#6](https://github.com/HendrikReh/bgsage/pull/6)).
+    ([#6](https://github.com/HendrikReh/neongammon/pull/6)).
 
 ### Changed
 
 - **`stage11` uses Stage 5's 200h pure-race net**
-  ([#8](https://github.com/HendrikReh/bgsage/pull/8)) instead of the 100h net
+  ([#8](https://github.com/HendrikReh/neongammon/pull/8)) instead of the 100h net
   every model since Stage 6 shared. XG as referee agrees with the swap in
   direction, though not significantly (see the paired comparison under
   [Unreleased]). Sample
@@ -675,20 +701,20 @@ The fork's first release.
   wheels and attaches them, with the sdist, to the GitHub release of a `v*`
   tag. The PyPI job runs only in upstream's repository.
 - **Apple Accelerate path for batched NN evaluation**
-  ([#1](https://github.com/HendrikReh/bgsage/pull/1)). All batched candidate
+  ([#1](https://github.com/HendrikReh/neongammon/pull/1)). All batched candidate
   kernels go through `NeuralNetwork::forward_group`. On Apple arm64 it runs
   one `cblas_sgemm` per layer on the CPU's matrix unit (SME/AMX). It uses the
   exact Cephes sigmoid instead of the clamped NEON lookup table, so equities
   move by up to about 0.004. The path is on by default;
   `-DBGBOT_USE_ACCELERATE=OFF` restores the portable kernels, which are
   bit-identical to the previous engine.
-- **Faster contact encoder** ([#1](https://github.com/HendrikReh/bgsage/pull/1)).
+- **Faster contact encoder** ([#1](https://github.com/HendrikReh/neongammon/pull/1)).
   `hitting_shots`, `double_hitting_shots`, `compute_piploss`, `moment2` and
   `backbone` use bitmask formulations. That takes 1.80 → 1.17 µs per board,
   bit-identical on 655k boards. Together with Accelerate, `checker_play` is
   1.37–1.41x faster at 2- and 3-ply. Money benchmark PR is unchanged (2-ply
   1.67 → 1.68, 3-ply 0.60).
-- **Analyzer call overhead** ([#3](https://github.com/HendrikReh/bgsage/pull/3)).
+- **Analyzer call overhead** ([#3](https://github.com/HendrikReh/neongammon/pull/3)).
   `cube_action` loads its base strategy once per analyzer instead of
   reloading all weight files (24 for `stage11`) on every call. The 1-ply
   cubeful `checker_play` conversion runs serially instead of in a thread pool
@@ -697,24 +723,24 @@ The fork's first release.
   about 8x. Code that builds a new analyzer per call still pays the weight
   load.
 - **`score_benchmark_pr.py` uses the bearoff database**, as the engine and
-  GNUbg do ([#5](https://github.com/HendrikReh/bgsage/pull/5)). Only the
+  GNUbg do ([#5](https://github.com/HendrikReh/neongammon/pull/5)). Only the
   pure-race column moves: `stage11` 1-ply 4.15 → 4.11, 2-ply 3.22 → 3.17.
   `--no-bearoff` scores the raw networks.
 - **N-ply PR scoring adds the PubEval opponent prefilter** that
-  `BgBotAnalyzer` uses ([#2](https://github.com/HendrikReh/bgsage/pull/2)).
+  `BgBotAnalyzer` uses ([#2](https://github.com/HendrikReh/neongammon/pull/2)).
   Stage 5 2-ply goes from 4.104 to 4.097.
-- **Repo-root paths** ([#1](https://github.com/HendrikReh/bgsage/pull/1)).
+- **Repo-root paths** ([#1](https://github.com/HendrikReh/neongammon/pull/1)).
   `generate_benchmark_pr.py`, `score_benchmark_pr_gnubg.py` and
   `test_match_gnubg_comparison.py` resolve `python/`, `build/`, `data/` and
   `logs/` inside this repo instead of the host project above it.
 - **`test_match_gnubg_comparison.py` evaluates through `BgBotAnalyzer`**
-  ([#1](https://github.com/HendrikReh/bgsage/pull/1)), so it runs with any
+  ([#1](https://github.com/HendrikReh/neongammon/pull/1)), so it runs with any
   model, not only 5-NN ones.
 
 ### Fixed
 
 - **Post-Crawford cube for the trailer**
-  ([#9](https://github.com/HendrikReh/bgsage/pull/9)). After the Crawford
+  ([#9](https://github.com/HendrikReh/neongammon/pull/9)). After the Crawford
   game the trailer doubles at the first opportunity, but `cl2cf_match`
   still interpolated towards a dead cube at the current value. On 15 BG
   Tutor duel positions (3- or 4-away vs 1-away, cube centered) this put
@@ -728,16 +754,16 @@ The fork's first release.
   unchanged. `tests/test_post_crawford_cube.py` adds 24 cases; 16 of them
   fail on the code before the fix.
 - **Thread limits for 1-ply cubeful checker play**
-  ([#3](https://github.com/HendrikReh/bgsage/pull/3)). `parallel_threads=1`
+  ([#3](https://github.com/HendrikReh/neongammon/pull/3)). `parallel_threads=1`
   was replaced by the CPU count (`workers <= 1` instead of `workers <= 0`),
   and `_OnePlyAnalyzer` never received the limit.
 - **GNUbg comparison without a cube decision**
-  ([#1](https://github.com/HendrikReh/bgsage/pull/1)). At double match point,
+  ([#1](https://github.com/HendrikReh/neongammon/pull/1)). At double match point,
   in the Crawford game and for the post-Crawford leader, GNUbg prints no cube
   analysis. These cases now count as agreement when bgsage also has no cube
   action, which takes the tally from 13 / 0 / 5 skipped to 18 agree.
 - **Benchmark PR scoring counts only the rolled-out sample**
-  ([#2](https://github.com/HendrikReh/bgsage/pull/2)). The scorers used to
+  ([#2](https://github.com/HendrikReh/neongammon/pull/2)). The scorers used to
   include decisions whose candidates happened to be covered, a skewed set
   (Stage 5 2-ply 3.37 on the sample against 5.27 on those extras).
 
@@ -746,26 +772,26 @@ The fork's first release.
 - The fork is declared Apple Silicon only in `README.md` and `CLAUDE.md`,
   with a tested Apple Silicon build section. Windows, Linux and CUDA builds
   are kept but not supported
-  ([#1](https://github.com/HendrikReh/bgsage/pull/1)).
+  ([#1](https://github.com/HendrikReh/neongammon/pull/1)).
 - `CLAUDE.md` records:
   - the Accelerate and encoder measurements
-    ([#1](https://github.com/HendrikReh/bgsage/pull/1));
-  - the MLX trainer ([#2](https://github.com/HendrikReh/bgsage/pull/2));
+    ([#1](https://github.com/HendrikReh/neongammon/pull/1));
+  - the MLX trainer ([#2](https://github.com/HendrikReh/neongammon/pull/2));
   - the analyzer overhead timings
-    ([#4](https://github.com/HendrikReh/bgsage/pull/4));
+    ([#4](https://github.com/HendrikReh/neongammon/pull/4));
   - the Benchmark PR sample table and the pure-race gap analysis
-    ([#2](https://github.com/HendrikReh/bgsage/pull/2),
-    [#5](https://github.com/HendrikReh/bgsage/pull/5));
+    ([#2](https://github.com/HendrikReh/neongammon/pull/2),
+    [#5](https://github.com/HendrikReh/neongammon/pull/5));
   - the Modal operating notes
-    ([#7](https://github.com/HendrikReh/bgsage/pull/7));
+    ([#7](https://github.com/HendrikReh/neongammon/pull/7));
   - the post-Crawford auto-double rule, also in `MULTI-PLY.md`
-    ([#9](https://github.com/HendrikReh/bgsage/pull/9));
+    ([#9](https://github.com/HendrikReh/neongammon/pull/9));
   - the XG referee results and the failed pure-race retraining
-    ([#8](https://github.com/HendrikReh/bgsage/pull/8)).
+    ([#8](https://github.com/HendrikReh/neongammon/pull/8)).
 - The build section installs from `build/cmake_accel` and removes the old
   module before copying it, because `cp` over a loaded `.so` makes macOS kill
-  the next import ([#12](https://github.com/HendrikReh/bgsage/pull/12)).
+  the next import ([#12](https://github.com/HendrikReh/neongammon/pull/12)).
 
-[Unreleased]: https://github.com/HendrikReh/bgsage/compare/v2.0.20261119...HEAD
-[2.0.20261119]: https://github.com/HendrikReh/bgsage/compare/v2.0.20261118...v2.0.20261119
-[2.0.20261118]: https://github.com/HendrikReh/bgsage/releases/tag/v2.0.20261118
+[Unreleased]: https://github.com/HendrikReh/neongammon/compare/v2.0.20261119...HEAD
+[2.0.20261119]: https://github.com/HendrikReh/neongammon/compare/v2.0.20261118...v2.0.20261119
+[2.0.20261118]: https://github.com/HendrikReh/neongammon/releases/tag/v2.0.20261118

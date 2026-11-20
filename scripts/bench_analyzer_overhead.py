@@ -35,7 +35,7 @@ args = ap.parse_args()
 root = args.root.resolve()
 sys.path[:0] = [str(root / "build"), str(root / "python")]
 
-from bgsage import (BgBotAnalyzer, STARTING_BOARD, check_game_over,  # noqa: E402
+from neongammon import (BgBotAnalyzer, STARTING_BOARD, check_game_over,  # noqa: E402
                     flip_board, possible_moves)
 
 rng = random.Random(11)

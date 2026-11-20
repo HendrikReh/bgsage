@@ -32,7 +32,7 @@ sys.path.insert(0, str(_BUILD_DIR))
 sys.path.insert(0, str(_PY_PKG))
 
 import bgbot_cpp                                              # noqa: E402
-from bgsage.weights import (WeightConfig, PRODUCTION_MODEL,   # noqa: E402
+from neongammon.weights import (WeightConfig, PRODUCTION_MODEL,   # noqa: E402
                             bearoff_db_path)
 
 N_THREADS = 16

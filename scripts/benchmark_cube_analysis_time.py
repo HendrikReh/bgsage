@@ -27,7 +27,7 @@ def main():
 
 
     import bgbot_cpp
-    from bgsage.gnubg import _build_cube_analytics_command, _run_gnubg, _parse_cube_analytics
+    from neongammon.gnubg import _build_cube_analytics_command, _run_gnubg, _parse_cube_analytics
 
     # Starting position (pre-roll, symmetric)
     starting_pos = [0, -2, 0, 0, 0, 0, 5, 0, 3, 0, 0, 0,

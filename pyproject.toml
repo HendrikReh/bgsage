@@ -3,15 +3,18 @@ requires = ["scikit-build-core>=0.10", "pybind11>=2.12"]
 build-backend = "scikit_build_core.build"
 
 [project]
-name = "bgsage"
+name = "neongammon"
 version = "2.0.20261119"
-description = "Open Sage bot engine — a neural-network backgammon engine"
+description = "Neongammon — a neural-network backgammon engine for Apple Silicon (fork of Open Sage / markbgsage/bgsage)"
 readme = "README.md"
 license = "MPL-2.0"
 license-files = ["LICENSE"]
 requires-python = ">=3.10"
 authors = [
     { name = "Mark Higgins" },
+]
+maintainers = [
+    { name = "Hendrik Reh" },
 ]
 keywords = ["backgammon", "neural-network", "game-ai"]
 dependencies = [
@@ -33,9 +36,10 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/markbgsage/bgsage"
-Repository = "https://github.com/markbgsage/bgsage"
-Issues = "https://github.com/markbgsage/bgsage/issues"
+Homepage = "https://github.com/HendrikReh/neongammon"
+Repository = "https://github.com/HendrikReh/neongammon"
+Issues = "https://github.com/HendrikReh/neongammon/issues"
+Upstream = "https://github.com/markbgsage/bgsage"
 
 # ---------------------------------------------------------------------------
 # scikit-build-core: CMake-driven build of the pybind11 extension (bgbot_cpp)
@@ -44,7 +48,7 @@ Issues = "https://github.com/markbgsage/bgsage/issues"
 minimum-version = "0.10"
 cmake.build-type = "Release"
 # The Python package tree lives under python/, not at the repo root.
-wheel.packages = ["python/bgsage"]
+wheel.packages = ["python/neongammon"]
 
 # sdist contents: by default scikit-build-core ships every git-tracked file.
 #
@@ -82,7 +86,7 @@ skip = [
 ]
 build-verbosity = 1
 # Smoke-test the built wheel: import the package, run a trivial analysis.
-test-command = "python -c \"from bgsage import BgBotAnalyzer, STARTING_BOARD, GameConfig, simulate_game; a = BgBotAnalyzer(); r = a.checker_play(STARTING_BOARD, 3, 1); b = [0]*26; b[1]=1; b[24]=-1; g = simulate_game(players=(a,a), config=GameConfig(start_board=tuple(b))); assert g['winner'] == 1; print('ok', r.moves[0].equity)\""
+test-command = "python -c \"from neongammon import BgBotAnalyzer, STARTING_BOARD, GameConfig, simulate_game; a = BgBotAnalyzer(); r = a.checker_play(STARTING_BOARD, 3, 1); b = [0]*26; b[1]=1; b[24]=-1; g = simulate_game(players=(a,a), config=GameConfig(start_board=tuple(b))); assert g['winner'] == 1; print('ok', r.moves[0].equity)\""
 
 [tool.cibuildwheel.macos]
 # Apple Silicon only (NEON + Accelerate).

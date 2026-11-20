@@ -3,7 +3,7 @@
 import sys, shutil, gc
 sys.path.insert(0, 'build')
 import bgbot_cpp
-from bgsage import sl_train
+from neongammon import sl_train
 import numpy as np
 
 def benchmark_er(bench_boards, bench_eq, weights_path):
@@ -16,7 +16,7 @@ def benchmark_er(bench_boards, bench_eq, weights_path):
 
 def run():
     boards_list, probs_list = [], []
-    with open('bgsage/data/player-backgame-train-rollout') as f:
+    with open('neongammon/data/player-backgame-train-rollout') as f:
         for line in f:
             parts = line.split()
             if len(parts) < 31: continue
@@ -26,7 +26,7 @@ def run():
     probs = np.array(probs_list, dtype=np.float32)
 
     bench_boards_list, bench_probs_list = [], []
-    with open('bgsage/data/player-backgame-benchmark-rollout') as f:
+    with open('neongammon/data/player-backgame-benchmark-rollout') as f:
         for line in f:
             parts = line.split()
             if len(parts) < 31: continue
@@ -36,8 +36,8 @@ def run():
     bench_probs = np.array(bench_probs_list, dtype=np.float32)
     bench_eq = 2*bench_probs[:,0] - 1 + bench_probs[:,1] - bench_probs[:,3] + bench_probs[:,2] - bench_probs[:,4]
 
-    wpath = 'bgsage/models/sl_s9_player_bg.weights'
-    shutil.copy2('bgsage/models/sl_s8_anch_race.weights.best', wpath)
+    wpath = 'neongammon/models/sl_s9_player_bg.weights'
+    shutil.copy2('neongammon/models/sl_s8_anch_race.weights.best', wpath)
 
     er = benchmark_er(bench_boards, bench_eq, wpath)
     gc.collect()

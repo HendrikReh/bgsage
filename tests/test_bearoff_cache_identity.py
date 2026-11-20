@@ -27,7 +27,7 @@ for _p in (os.path.join(_ROOT, "build"), os.path.join(_ROOT, "python")):
 
 import bgbot_cpp  # noqa: E402
 
-from bgsage.weights import bearoff_db_path, default_weights  # noqa: E402
+from neongammon.weights import bearoff_db_path, default_weights  # noqa: E402
 
 pytestmark = pytest.mark.skipif(bearoff_db_path() is None, reason="no bearoff database")
 

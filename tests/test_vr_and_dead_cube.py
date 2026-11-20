@@ -54,8 +54,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'python'))
 import pytest
 
 import bgbot_cpp
-from bgsage import BgBotAnalyzer
-from bgsage.weights import WeightConfig
+from neongammon import BgBotAnalyzer
+from neongammon.weights import WeightConfig
 
 
 # A decided race, mover on roll: 15 checkers on board (nothing borne off), 193

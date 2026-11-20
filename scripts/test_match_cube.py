@@ -12,7 +12,7 @@ Tests cube decisions at various match scores to verify correct behavior:
   7. N-ply match cube decisions (2-ply)
 
 Usage:
-    python bgsage/scripts/test_match_cube.py [--build-dir build] [--model stage5]
+    python neongammon/scripts/test_match_cube.py [--build-dir build] [--model stage5]
 """
 
 import sys
@@ -25,12 +25,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--build-dir', type=str, default='build')
 
-    # Setup paths — must set DLL dirs before any bgsage imports
+    # Setup paths — must set DLL dirs before any neongammon imports
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    bgsage_dir = os.path.dirname(script_dir)
-    project_dir = os.path.dirname(bgsage_dir)
+    neongammon_dir = os.path.dirname(script_dir)
+    project_dir = os.path.dirname(neongammon_dir)
 
-    # Pre-parse build-dir to set paths before importing bgsage
+    # Pre-parse build-dir to set paths before importing neongammon
     build_dir_arg = 'build'
     for i, arg in enumerate(sys.argv):
         if arg == '--build-dir' and i + 1 < len(sys.argv):
@@ -38,17 +38,17 @@ def main():
 
     build_dir = os.path.join(project_dir, build_dir_arg)
     build_dir_std = os.path.join(project_dir, 'build')
-    sys.path.insert(0, os.path.join(bgsage_dir, 'python'))
+    sys.path.insert(0, os.path.join(neongammon_dir, 'python'))
     sys.path.insert(0, build_dir)
     sys.path.insert(0, build_dir_std)
 
 
-    from bgsage.weights import WeightConfig
+    from neongammon.weights import WeightConfig
     WeightConfig.add_model_arg(parser)
     args = parser.parse_args()
 
     import bgbot_cpp
-    from bgsage import BgBotAnalyzer, STARTING_BOARD, batch_evaluate, batch_cube_action
+    from neongammon import BgBotAnalyzer, STARTING_BOARD, batch_evaluate, batch_cube_action
 
     w = WeightConfig.from_args(args)
     w.validate()

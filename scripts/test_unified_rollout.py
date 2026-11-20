@@ -17,7 +17,7 @@ nodes (different game plan classification, pre-filtering). At 1-ply both use dir
 NN evaluation, so tolerance is tight (1e-6).
 
 Usage:
-    python bgsage/scripts/test_unified_rollout.py [--build-dir build] [--model stage5]
+    python neongammon/scripts/test_unified_rollout.py [--build-dir build] [--model stage5]
 """
 
 import sys
@@ -34,19 +34,19 @@ def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_dir = os.path.dirname(os.path.dirname(script_dir))
 
-    # Pre-parse to get build_dir before importing bgsage (which needs bgbot_cpp)
+    # Pre-parse to get build_dir before importing neongammon (which needs bgbot_cpp)
     args_pre, _ = parser.parse_known_args()
     build_dir = os.path.join(project_dir, args_pre.build_dir)
     build_dir_std = os.path.join(project_dir, 'build')
 
     sys.path.insert(0, build_dir)
     sys.path.insert(0, build_dir_std)
-    sys.path.insert(0, os.path.join(project_dir, 'bgsage', 'python'))
+    sys.path.insert(0, os.path.join(project_dir, 'neongammon', 'python'))
 
     import bgbot_cpp
     bgbot_cpp.init_escape_tables()
 
-    from bgsage.weights import WeightConfig
+    from neongammon.weights import WeightConfig
     WeightConfig.add_model_arg(parser)
     args = parser.parse_args()
 

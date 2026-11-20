@@ -336,7 +336,7 @@ Benchmark run: 2026-03-23, RTX 4070S / Windows, Stage 5 production model.
 **Reproducing:**
 
 ```bash
-python bgsage/scripts/rollout_cube_bench.py
+python neongammon/scripts/rollout_cube_bench.py
 ```
 
 Edit the `configs` list in the script to select which configurations to run. Each

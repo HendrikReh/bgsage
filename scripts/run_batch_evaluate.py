@@ -4,7 +4,7 @@
 """Demo script for batch position evaluation.
 
 Usage:
-    python bgsage/scripts/run_batch_evaluate.py [--model stage5] [--level 1ply]
+    python neongammon/scripts/run_batch_evaluate.py [--model stage5] [--level 1ply]
 """
 
 import argparse
@@ -17,10 +17,10 @@ project_dir = os.path.dirname(os.path.dirname(script_dir))
 build_dir = os.path.join(project_dir, 'build')
 
 sys.path.insert(0, build_dir)
-sys.path.insert(0, os.path.join(project_dir, 'bgsage', 'python'))
+sys.path.insert(0, os.path.join(project_dir, 'neongammon', 'python'))
 
-from bgsage.batch import batch_evaluate
-from bgsage.weights import WeightConfig
+from neongammon.batch import batch_evaluate
+from neongammon.weights import WeightConfig
 
 
 STARTING_BOARD = [0, -2, 0, 0, 0, 0, 5, 0, 3, 0, 0, 0, -5, 5, 0, 0, 0, -3, 0, -5, 0, 0, 0, 0, 2, 0]

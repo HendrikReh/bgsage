@@ -1,8 +1,8 @@
 """Rules tests plus real native-engine seeded transcript replay."""
 from types import SimpleNamespace as NS
 import pytest
-from bgsage import BgBotAnalyzer, GameConfig, STARTING_BOARD, simulate_game, simulate_match
-from bgsage import simulation as sim
+from neongammon import BgBotAnalyzer, GameConfig, STARTING_BOARD, simulate_game, simulate_match
+from neongammon import simulation as sim
 
 
 class Policy:

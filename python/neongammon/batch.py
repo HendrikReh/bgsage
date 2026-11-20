@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MPL-2.0
 # Copyright (C) 2026 Mark Higgins
-"""Batch position evaluation for the Open Sage bot engine.
+"""Batch position evaluation for the Neongammon bot engine.
 
 Evaluates lists of positions in parallel, returning cubeless probabilities,
 cubeless equity, cubeful equity, and (for pre-roll) cube decisions.
@@ -10,7 +10,7 @@ evaluations run serially so there is no double-parallelization.
 
 Typical usage::
 
-    from bgsage.batch import batch_evaluate, batch_post_move_evaluate
+    from neongammon.batch import batch_evaluate, batch_post_move_evaluate
 
     # Pre-roll positions (with cube decisions)
     positions = [
@@ -114,7 +114,7 @@ class BatchModels:
     once, on first use, and every N-ply strategy is built around it, so no
     weights are loaded twice. Results are the same either way.
 
-    ``bearoff_db`` works as in :class:`~bgsage.BgBotAnalyzer`: True (the
+    ``bearoff_db`` works as in :class:`~neongammon.BgBotAnalyzer`: True (the
     default) loads the one-sided bearoff database from ``data/``, a string
     loads it from that path, False leaves it out. With it, the 1-ply strategy
     returns the database's exact probs at bearoff positions and the N-ply
@@ -342,7 +342,7 @@ def batch_post_move_evaluate(
             on, like the analyzer); give it with ``weights``, not ``models``.
 
     Returns:
-        List of :class:`~bgsage.types.PostMoveAnalysis`, one per input position.
+        List of :class:`~neongammon.types.PostMoveAnalysis`, one per input position.
     """
     n_plies = _check_level(eval_level)
     models = _resolve_models(weights, models, bearoff_db)
@@ -403,7 +403,7 @@ def batch_cube_action(
     """Evaluate cube decisions for a batch of pre-roll positions in parallel.
 
     This is a convenience wrapper around :func:`batch_evaluate` that returns
-    :class:`~bgsage.types.CubeActionResult` objects (the same type returned by
+    :class:`~neongammon.types.CubeActionResult` objects (the same type returned by
     ``BgBotAnalyzer.cube_action()``).
 
     Cube decisions use Janowski interpolation on the N-ply cubeless probs
@@ -438,7 +438,7 @@ def batch_cube_action(
             on, like the analyzer); give it with ``weights``, not ``models``.
 
     Returns:
-        List of :class:`~bgsage.types.CubeActionResult`, one per input position.
+        List of :class:`~neongammon.types.CubeActionResult`, one per input position.
     """
     evals = batch_evaluate(
         positions,
@@ -524,7 +524,7 @@ def batch_checker_play(
             on, like the analyzer); give it with ``weights``, not ``models``.
 
     Returns:
-        List of :class:`~bgsage.types.CheckerPlayResult`, one per input
+        List of :class:`~neongammon.types.CheckerPlayResult`, one per input
         position.  Each contains a ``moves`` list sorted best-first by
         cubeful equity: the list ``BgBotAnalyzer.checker_play`` gives at the
         same level and bearoff database setting.  At the depths in

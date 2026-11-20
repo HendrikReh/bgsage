@@ -23,12 +23,12 @@ for _p in (os.path.join(_ROOT, "build"), os.path.join(_ROOT, "python")):
 
 import bgbot_cpp  # noqa: E402
 
-from bgsage import (  # noqa: E402
+from neongammon import (  # noqa: E402
     BatchModels, STARTING_BOARD, batch_evaluate, batch_post_move_evaluate, flip_board,
     possible_moves,
 )
-from bgsage.batch import CHEAP_POSITIONS_PER_WORKER, _auto_threads  # noqa: E402
-from bgsage.board import check_game_over  # noqa: E402
+from neongammon.batch import CHEAP_POSITIONS_PER_WORKER, _auto_threads  # noqa: E402
+from neongammon.board import check_game_over  # noqa: E402
 
 
 def _rows(n, seed=1429):
@@ -50,7 +50,7 @@ def _rows(n, seed=1429):
 
 def test_auto_thread_rule():
     m = CHEAP_POSITIONS_PER_WORKER
-    with patch("bgsage.batch.os.cpu_count", lambda: 14):
+    with patch("neongammon.batch.os.cpu_count", lambda: 14):
         assert [_auto_threads(0, n, 1) for n in (0, 1, m - 1, m, 2 * m, 5 * m, 1000)] == \
             [1, 1, 1, 1, 2, 5, 14]
         assert _auto_threads(3, 1000, 1) == 3          # explicit counts as given

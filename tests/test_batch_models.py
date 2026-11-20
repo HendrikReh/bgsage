@@ -29,13 +29,13 @@ for _p in (os.path.join(_ROOT, "build"), os.path.join(_ROOT, "python")):
 
 import bgbot_cpp  # noqa: E402
 
-from bgsage import (  # noqa: E402
+from neongammon import (  # noqa: E402
     BatchModels, STARTING_BOARD, batch_checker_play, batch_cube_action,
     batch_evaluate, batch_post_move_evaluate, flip_board, possible_moves,
 )
-from bgsage.analyzer import CUBEFUL_FILTERED_PLIES, _contact_cube_life, _contact_cube_slope  # noqa: E402
-from bgsage.board import check_game_over  # noqa: E402
-from bgsage.weights import WeightConfig, default_weights  # noqa: E402
+from neongammon.analyzer import CUBEFUL_FILTERED_PLIES, _contact_cube_life, _contact_cube_slope  # noqa: E402
+from neongammon.board import check_game_over  # noqa: E402
+from neongammon.weights import WeightConfig, default_weights  # noqa: E402
 
 CUBES = [
     dict(cube_value=1, cube_owner="centered"),
@@ -251,7 +251,7 @@ BEAROFF = [0, 3, 3, 2, 3, 2, 2] + [0] * 12 + [-2, -3, -2, -3, -2, -2] + [0]
 
 
 def test_the_bearoff_database_is_loaded_once_and_matches_the_analyzer():
-    from bgsage import BgBotAnalyzer
+    from neongammon import BgBotAnalyzer
     a, b = BatchModels(), BatchModels()
     assert a.bearoff_db is not None and a.bearoff_db is b.bearoff_db
     assert BatchModels(bearoff_db=False).bearoff_db is None

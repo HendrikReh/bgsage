@@ -22,7 +22,7 @@ Two modes:
                     ply level XG's move filter used).
 
 The cache is keyed by the benchmark decision ``key`` and lives entirely under
-``xg_results/`` — separate from the Sage reference data and Sage score caches.
+``xg_results/`` — separate from the Neongammon reference data and Neongammon score caches.
 
 Usage:
   python scripts/xg_harvest_results.py --benchmark money --set rollerpp
@@ -36,7 +36,7 @@ from collections import Counter
 from pathlib import Path
 
 import xg_batch_common as xbc
-from bgsage import xg_file
+from neongammon import xg_file
 
 
 def _ctx_ok(ctx) -> bool:

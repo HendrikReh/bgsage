@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MPL-2.0
-"""Head-to-head money games, Sage against eXtreme Gammon, without an XG API.
+"""Head-to-head money games, Neongammon against eXtreme Gammon, without an XG API.
 
 XG cannot be driven programmatically on the Mac (it runs under CrossOver), but
 its Batch Analyze can grade any position we write as a one-decision ``.xg``
 game. This script turns that into real games by replaying to a fixed point:
 
-1. Sage plays its own seat. For XG's seat it uses XG's recorded answer when it
-   has one, and otherwise PREDICTS XG's decision with Sage and keeps playing.
+1. Neongammon plays its own seat. For XG's seat it uses XG's recorded answer when it
+   has one, and otherwise PREDICTS XG's decision with Neongammon and keeps playing.
 2. Every predicted XG decision is written as a one-decision game; you run XG's
    Batch Analyze on the round's folder once.
 3. The next ``round`` reads XG's answers back and replays every game from the
@@ -26,17 +26,17 @@ Design rules (the ones upstream's retired replay runner broke):
   higher die moves first with both dice; no cube decision before it.
 * Every XG decision is certified: XG's #1 checker play (validated against the
   legal moves) and XG's cube recommendation (double iff FlagDouble > 0, take
-  iff DT <= DP), never a fallback to Sage. Forced moves and dances need no
+  iff DT <= DP), never a fallback to Neongammon. Forced moves and dances need no
   decision. Records XG leaves unanalysed stay pending.
 * No game is ever skipped or dropped; ``report`` refuses to score an
   incomplete set unless asked to, and then says so.
 * Duplicate dice: game pair ``p`` is played twice on the same dice with the
-  seats swapped (``p####a``: Sage in seat 0, ``p####b``: Sage in seat 1).
+  seats swapped (``p####a``: Neongammon in seat 0, ``p####b``: Neongammon in seat 1).
 
 Rules: money game, Jacoby ON, Beaver OFF (no beavers by either side; the XG
 files' header says so too), unlimited cube.
 
-Variance reduction (``report --luck``): each roll's luck, from Sage's own
+Variance reduction (``report --luck``): each roll's luck, from Neongammon's own
 2-ply analytics (``BgBotAnalyzer.roll_luck``), times the cube value is
 subtracted from the result. Every roll's luck has expectation zero whatever
 evaluator computes it, so the adjusted mean is unbiased; it only lowers the
@@ -51,7 +51,7 @@ Workflow::
     python scripts/xg_h2h.py round --dir data/xg_h2h/pilot      # repeat until done
     python scripts/xg_h2h.py report --dir data/xg_h2h/pilot --luck
 
-``round --simulate-xg 2ply`` lets a Sage level stand in for XG (no files, all
+``round --simulate-xg 2ply`` lets a Neongammon level stand in for XG (no files, all
 rounds at once) to test the machinery and measure rounds; use a separate
 ``--dir`` for that, ``init`` records which kind of run a directory is.
 """
@@ -74,7 +74,7 @@ for _p in (_SCRIPT_DIR, _PROJECT_ROOT / "build", _PROJECT_ROOT / "python"):
         sys.path.insert(0, str(_p))
 
 import export_folder_benchmark_xg as fx  # noqa: E402
-from bgsage import (STARTING_BOARD, BgBotAnalyzer, check_game_over, flip_board,  # noqa: E402
+from neongammon import (STARTING_BOARD, BgBotAnalyzer, check_game_over, flip_board,  # noqa: E402
                     possible_moves, xg_file as xf)
 from export_pasko_benchmark_xg import _templates, derive_half_moves, write_xg  # noqa: E402
 
@@ -125,7 +125,7 @@ def swap_owner(owner: str) -> str:
 
 
 def game_ids(n_pairs: int) -> list[tuple[str, int, int]]:
-    """``(game id, pair, Sage's seat)`` for every game of the run."""
+    """``(game id, pair, Neongammon's seat)`` for every game of the run."""
     return [(f"p{p:04d}{'ab'[s]}", p, s) for p in range(n_pairs) for s in (0, 1)]
 
 
@@ -141,12 +141,12 @@ def _read_jsonl(path: Path) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Sage as a decision oracle (own seat, predictions, stand-in XG), cached
+# Neongammon as a decision oracle (own seat, predictions, stand-in XG), cached
 # ---------------------------------------------------------------------------
 
 
 class SageOracle:
-    """Sage's decisions at one level, memoised on disk by decision key."""
+    """Neongammon's decisions at one level, memoised on disk by decision key."""
 
     def __init__(self, level: str, cache_path: Path):
         self.level = level
@@ -228,7 +228,7 @@ def play_game(seed: int, pair: int, sage_seat: int, sage: SageOracle, xg: XgAnsw
     Returns ``status`` ("done" when every XG decision was XG's own answer,
     else "pending"), the ``events``, the XG ``queries`` still unanswered (in
     play order) and, when the game reached its end, ``winner_seat``, ``points``
-    and ``result`` (points from Sage's side). With ``lookahead`` > 0 the game
+    and ``result`` (points from Neongammon's side). With ``lookahead`` > 0 the game
     stops after that many unanswered XG decisions.
     """
     events: list[dict] = []
@@ -342,7 +342,7 @@ def cmd_init(args) -> None:
            "opponent": f"standin:{args.standin}" if args.standin else "xg",
            "jacoby": JACOBY, "beaver": BEAVER, "created": time.strftime("%Y-%m-%d %H:%M:%S")}
     (d / "config.json").write_text(json.dumps(cfg, indent=2) + "\n")
-    print(f"{d}: {args.pairs} pairs = {2 * args.pairs} games, Sage {args.sage_level} against "
+    print(f"{d}: {args.pairs} pairs = {2 * args.pairs} games, Neongammon {args.sage_level} against "
           f"{cfg['opponent']}, seed {args.seed}")
 
 
@@ -526,7 +526,7 @@ def cmd_round(args) -> None:
             print(f"round {rounds + 1}: {s['done']}/{s['games']} games done, "
                   f"{s['unique_queries']} unanswered stand-in decisions "
                   f"({s['checker_queries']} checker / {s['cube_queries']} cube) "
-                  f"[{time.perf_counter() - started:.0f}s, Sage computed {run.sage.computed}]",
+                  f"[{time.perf_counter() - started:.0f}s, Neongammon computed {run.sage.computed}]",
                   flush=True)
             if not s["pending"]:
                 break
@@ -558,7 +558,7 @@ def cmd_round(args) -> None:
     s = summarise(results)
     print(f"{s['done']}/{s['games']} games finished; {s['pending']} wait on "
           f"{s['unique_queries']} XG decisions [{time.perf_counter() - started:.0f}s, "
-          f"Sage computed {run.sage.computed} decisions]")
+          f"Neongammon computed {run.sage.computed} decisions]")
     if not s["pending"]:
         print("All games finished. Next: python scripts/xg_h2h.py report --dir", run.dir)
         return
@@ -589,7 +589,7 @@ def _mean_se(xs: list[float]) -> tuple[float, float]:
 
 
 def game_luck(run: Run, res: dict, sage_seat: int, analyzer, cache: dict, cache_path: Path) -> float:
-    """Sage's net luck in points: its rolls' luck minus XG's, each times the
+    """Neongammon's net luck in points: its rolls' luck minus XG's, each times the
     cube value it was rolled at."""
     net = 0.0
     for e in res["events"]:
@@ -628,7 +628,7 @@ def cmd_report(args) -> None:
         for gid, r in done.items():
             luck[gid] = game_luck(run, r, seat[gid], an, lcache, lpath)
 
-    # agreement of Sage's prediction with XG, per decision type
+    # agreement of Neongammon's prediction with XG, per decision type
     agree = Counter()
     for gid, r in done.items():
         for e in r["events"]:
@@ -651,13 +651,13 @@ def cmd_report(args) -> None:
         a, b = done.get(f"p{p:04d}a"), done.get(f"p{p:04d}b")
         if a and b:
             pairs.append((a["result"] + b["result"]) / 2)
-    print(f"Sage {run.cfg['sage_level']} vs {run.cfg['opponent']}: {len(done)}/{s['games']} games "
+    print(f"Neongammon {run.cfg['sage_level']} vs {run.cfg['opponent']}: {len(done)}/{s['games']} games "
           f"finished, {len(run.round_dirs()) or len(_read_jsonl(run.dir / 'rounds.jsonl'))} "
           f"round(s); Jacoby {'on' if JACOBY else 'off'}, beaver {'on' if BEAVER else 'off'}")
     m, se = _mean_se(per_game)
-    print(f"  points per game for Sage, per game:      {m:+.3f} +- {se:.3f}  (n={len(per_game)})")
+    print(f"  points per game for Neongammon, per game:      {m:+.3f} +- {se:.3f}  (n={len(per_game)})")
     m, se = _mean_se(pairs)
-    print(f"  points per game for Sage, duplicate pairs: {m:+.3f} +- {se:.3f}  (n={len(pairs)})")
+    print(f"  points per game for Neongammon, duplicate pairs: {m:+.3f} +- {se:.3f}  (n={len(pairs)})")
     if luck:
         adj = [done[g]["result"] - luck[g] for g in done]
         m, se = _mean_se(adj)
@@ -675,7 +675,7 @@ def cmd_report(args) -> None:
     print(f"  turns per game: mean {sum(turns) / max(1, len(turns)):.1f}, max {max(turns, default=0)}")
     for k in ("checker", "offer", "take"):
         if agree[k]:
-            print(f"  Sage predicted XG's {k:7s}: {agree[k + '_same']}/{agree[k]} "
+            print(f"  Neongammon predicted XG's {k:7s}: {agree[k + '_same']}/{agree[k]} "
                   f"({agree[k + '_same'] / agree[k]:.1%})")
     rows = [{"game": gid, "result": r["result"], "how": r["how"], "points": r["points"],
              "turns": r["turns"], "luck": luck.get(gid), "events": r["events"]}
@@ -695,7 +695,7 @@ def main(argv=None) -> None:
     p.add_argument("--pairs", type=int, required=True, help="duplicate game pairs (2 games each)")
     p.add_argument("--seed", type=int, default=1)
     p.add_argument("--sage-level", default="3ply")
-    p.add_argument("--standin", default=None, help="a Sage level standing in for XG (testing)")
+    p.add_argument("--standin", default=None, help="a Neongammon level standing in for XG (testing)")
     p.set_defaults(func=cmd_init)
     p = sub.add_parser("round", help="read XG's answers, replay, write the next round")
     p.add_argument("--dir", type=Path, required=True)

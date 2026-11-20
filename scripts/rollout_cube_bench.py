@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'python'))
 
 
 import bgbot_cpp
-from bgsage.weights import WeightConfig
+from neongammon.weights import WeightConfig
 
 w = WeightConfig.default()
 

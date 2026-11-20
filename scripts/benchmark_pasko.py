@@ -36,7 +36,7 @@ start (e.g. XG's text import) will not reconstruct these games as-is.
 
 Two public entry points (same shapes as :mod:`benchmark_money`):
 
-  * :func:`build_benchmark_data` - simulate Sage-3P vs Sage-3P Paskogammon games
+  * :func:`build_benchmark_data` - simulate Neongammon-3P vs Neongammon-3P Paskogammon games
     and emit the reference data set (three adaptive-precision passes). Crash-safe
     and resumable.
 
@@ -47,14 +47,14 @@ Two public entry points (same shapes as :mod:`benchmark_money`):
 Distributed passes (from the PARENT repo, via Parallelizor):
 
     # Pass 1 locally, then export the 3T jobs:
-    python bgsage/scripts/benchmark_pasko.py build --n-games 10 --stages pass1
-    python bgsage/scripts/benchmark_pasko.py build --n-games 10 --stages pass2 --threet-mode export
+    python neongammon/scripts/benchmark_pasko.py build --n-games 10 --stages pass1
+    python neongammon/scripts/benchmark_pasko.py build --n-games 10 --stages pass2 --threet-mode export
     python scripts/threet_pasko_benchmark.py --vms 20            # distributed 3T
     # Ingest 3T results, then export the rollout jobs:
-    python bgsage/scripts/benchmark_pasko.py build --n-games 10 --stages pass2,pass3 --rollout-mode export
+    python neongammon/scripts/benchmark_pasko.py build --n-games 10 --stages pass2,pass3 --rollout-mode export
     python scripts/rollout_pasko_benchmark.py --workers 100      # distributed rollouts
     # Final ingest + assembly:
-    python bgsage/scripts/benchmark_pasko.py build --n-games 10 --stages pass2,pass3
+    python neongammon/scripts/benchmark_pasko.py build --n-games 10 --stages pass2,pass3
 
 Usage::
 
@@ -78,24 +78,24 @@ from pathlib import Path
 from typing import Optional
 
 # ---------------------------------------------------------------------------
-# bgsage path setup - self-contained within the bgsage repo (mirrors
+# neongammon path setup - self-contained within the neongammon repo (mirrors
 # benchmark_money.py). Importing benchmark_money also runs its identical path
 # setup; doing it here too keeps this module importable on its own (e.g. when
-# the parent-repo Parallelizor scripts add bgsage/scripts to sys.path).
+# the parent-repo Parallelizor scripts add neongammon/scripts to sys.path).
 # ---------------------------------------------------------------------------
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = _SCRIPT_DIR.parent          # = bgsage repo root
-_BGSAGE_PYTHON = _PROJECT_ROOT / "python"   # = bgsage/python
-_BUILD_DIR = _PROJECT_ROOT / "build"        # = bgsage/build
+_PROJECT_ROOT = _SCRIPT_DIR.parent          # = neongammon repo root
+_NEONGAMMON_PYTHON = _PROJECT_ROOT / "python"   # = neongammon/python
+_BUILD_DIR = _PROJECT_ROOT / "build"        # = neongammon/build
 
-for _p in (_SCRIPT_DIR, _BGSAGE_PYTHON, _BUILD_DIR):
+for _p in (_SCRIPT_DIR, _NEONGAMMON_PYTHON, _BUILD_DIR):
     _sp = str(_p)
     if _sp not in sys.path:
         sys.path.insert(0, _sp)
 
 
-# benchmark_money supplies all the variant-agnostic machinery. Its bgsage imports
+# benchmark_money supplies all the variant-agnostic machinery. Its neongammon imports
 # are deferred, so importing it here does NOT load the engine.
 import benchmark_money as bm  # noqa: E402
 
@@ -116,7 +116,7 @@ TIER_ROLLOUT = bm.TIER_ROLLOUT
 #: The bot interface is exactly the money one -- Paskogammon decisions carry the
 #: same (board, dice, cube) context, so any money BenchmarkBot scores unchanged.
 BenchmarkBot = bm.BenchmarkBot
-SageBot = bm.SageBot
+NeongammonBot = bm.NeongammonBot
 CheckerCandidate = bm.CheckerCandidate
 CubeAssessment = bm.CubeAssessment
 make_decision_key = bm.make_decision_key
@@ -141,7 +141,7 @@ PASKO_STARTING_BOARD: list[int] = [
 
 
 # ---------------------------------------------------------------------------
-# Output locations (all under bgsage/data/pasko_money_benchmark/)
+# Output locations (all under neongammon/data/pasko_money_benchmark/)
 # ---------------------------------------------------------------------------
 
 _DATA_DIR = _PROJECT_ROOT / "data" / "pasko_money_benchmark"
@@ -164,7 +164,7 @@ _ROLLOUT_JOBS_FILE = _DATA_DIR / "rollout_jobs.jsonl"
 
 
 def _simulate_and_capture(seed: int, parallel_threads: int) -> tuple[list[dict], dict]:
-    """Play one Sage-3P vs Sage-3P Paskogammon game; capture every decision's 3P analytics.
+    """Play one Neongammon-3P vs Neongammon-3P Paskogammon game; capture every decision's 3P analytics.
 
     Identical to ``benchmark_money._simulate_and_capture`` except the game starts
     from ``PASKO_STARTING_BOARD``. Player 1 (the standard-layout side) is on roll
@@ -173,10 +173,10 @@ def _simulate_and_capture(seed: int, parallel_threads: int) -> tuple[list[dict],
 
     Returns ``(decisions, xg_record)`` where ``decisions`` is the list of benchmark
     decision dicts (with 3P analytics) and ``xg_record`` is the match-history dict
-    ``bgsage.text_export.export_history_to_txt`` consumes.
+    ``neongammon.text_export.export_history_to_txt`` consumes.
     """
-    from bgsage import check_game_over, classify_game_plan, possible_moves
-    from bgsage.text_export import compute_move_notation
+    from neongammon import check_game_over, classify_game_plan, possible_moves
+    from neongammon.text_export import compute_move_notation
 
     analyzer = bm._get_analyzer("3ply", parallel_threads)
     rng = random.Random(seed)
@@ -301,8 +301,8 @@ def _simulate_and_capture(seed: int, parallel_threads: int) -> tuple[list[dict],
         mult = {"single": 1, "gammon": 2, "backgammon": 3}[win_type]
         result_str, points = f"{side}-win-{win_type}", cube_at_end * mult
     xg_record = {
-        "player1_name": "Sage",
-        "player2_name": "Sage",
+        "player1_name": "Neongammon",
+        "player2_name": "Neongammon",
         "mode": "unlimited",
         "result": result_str,
         "result_points": points,
@@ -325,7 +325,7 @@ def _build_stage1_game(seed: int, write_txt: bool, parallel_threads: int) -> dic
     tmp_path.replace(out_path)
 
     if write_txt:
-        from bgsage.text_export import export_history_to_txt
+        from neongammon.text_export import export_history_to_txt
 
         (_XG_DIR / f"seed_{seed}.txt").write_bytes(export_history_to_txt(xg_record))
 
@@ -536,7 +536,7 @@ def build_benchmark_data(
 ) -> dict:
     """Build the Paskogammon benchmark data set (three adaptive-precision passes).
 
-    Pass 1: simulate ``n_games`` Sage-3P vs Sage-3P Paskogammon games, capturing
+    Pass 1: simulate ``n_games`` Neongammon-3P vs Neongammon-3P Paskogammon games, capturing
     3-ply analytics for every real decision (optionally writing an XG-import
     ``.txt`` per game). Pass 2: re-evaluate decisions whose 3-ply best-vs-2nd-best
     gap < 0.05 at 3T. Pass 3: roll out (1,296 paths, VR, 3-ply checker + cube)
@@ -678,9 +678,9 @@ def _main(argv: Optional[list[str]] = None) -> None:
     p_build.add_argument("--dataset", type=Path, default=DEFAULT_DATASET,
                          help="Output dataset path")
 
-    p_score = sub.add_parser("score", help="Score the Sage engine against the data set")
+    p_score = sub.add_parser("score", help="Score the Neongammon engine against the data set")
     p_score.add_argument("--level", default="3ply",
-                         help="SageBot eval level (1ply..4ply, truncated1/2/3, rollout)")
+                         help="NeongammonBot eval level (1ply..4ply, truncated1/2/3, rollout)")
     p_score.add_argument("--model", default=None, help="Model name (default: production)")
     p_score.add_argument("--n-threads", type=int, default=1,
                          help="Threads scoring decisions concurrently")
@@ -701,7 +701,7 @@ def _main(argv: Optional[list[str]] = None) -> None:
         )
     elif args.command == "score":
         # Internal threads = 1 so benchmark_pr's n_threads parallelizes across positions.
-        bot = SageBot(eval_level=args.level, model=args.model, parallel_threads=1)
+        bot = NeongammonBot(eval_level=args.level, model=args.model, parallel_threads=1)
         label = args.label or f"sage_{args.level}" + (f"_{args.model}" if args.model else "")
         result = benchmark_pr(bot, dataset_path=args.dataset, n_threads=args.n_threads,
                               label=label, max_seed=args.max_seed)

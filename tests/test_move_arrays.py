@@ -14,8 +14,8 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "build/video_move_batch"))
 sys.path.append(str(ROOT / "build"))
-if os.environ.get("BGSAGE_MOVE_ARRAY_EXTENSION"):
-    extension_path = Path(os.environ["BGSAGE_MOVE_ARRAY_EXTENSION"]).resolve()
+if os.environ.get("NEONGAMMON_MOVE_ARRAY_EXTENSION"):
+    extension_path = Path(os.environ["NEONGAMMON_MOVE_ARRAY_EXTENSION"]).resolve()
     if not extension_path.is_relative_to(ROOT):
         raise ValueError("The test extension must stay inside the engine repository")
     extension_spec = importlib.util.spec_from_file_location("bgbot_cpp", extension_path)
@@ -23,10 +23,10 @@ if os.environ.get("BGSAGE_MOVE_ARRAY_EXTENSION"):
     extension_spec.loader.exec_module(probe)
 else:
     try:
-        import _bgsage_move_array_probe as probe
+        import _neongammon_move_array_probe as probe
     except ImportError:
         probe = pytest.importorskip("bgbot_cpp")
-spec = importlib.util.spec_from_file_location("move_arrays_under_test", ROOT / "python/bgsage/move_arrays.py")
+spec = importlib.util.spec_from_file_location("move_arrays_under_test", ROOT / "python/neongammon/move_arrays.py")
 arrays = importlib.util.module_from_spec(spec)
 previous_cpp = sys.modules.get("bgbot_cpp")
 try:

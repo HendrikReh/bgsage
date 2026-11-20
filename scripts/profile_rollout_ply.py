@@ -10,7 +10,7 @@ sys.path.insert(0, build_dir)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'python'))
 
 import bgbot_cpp
-from bgsage.weights import WeightConfig, PRODUCTION_MODEL
+from neongammon.weights import WeightConfig, PRODUCTION_MODEL
 
 checkers = [0, -2, 2, 2, 2, 2, 2, 0, 0, 0, 0, 2, 0, 2, 0, 0, 0, 0, -2, -3, -3, -3, -2, 1, 0, 0]
 

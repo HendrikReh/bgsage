@@ -9,7 +9,7 @@ self-contained and does not import a parent application's harness.
 """
 
 RETIRED = (
-    "The replay-based Sage/XG benchmark is retired: it allowed nonstandard "
+    "The replay-based Neongammon/XG benchmark is retired: it allowed nonstandard "
     "openings, incomplete XG decisions, and skipped failed games. Use the "
     "checkpointed xg_h2h/lockstep_mp.py controller with explicit XG profile "
     "and a fresh output. Historical results cannot be resumed or pooled as validated data."

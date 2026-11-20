@@ -18,15 +18,15 @@ Workflow per level:
 The analyzed folder is the durable cache -- re-harvesting is free; never analyze the
 master, and never analyze one folder at two levels.
 
-Level tags (tag -> XG Batch-Analyze menu selection -> Sage equivalent):
+Level tags (tag -> XG Batch-Analyze menu selection -> Neongammon equivalent):
 
-    xg1ply        1-ply                 Sage 1P
-    xg2ply        2-ply                 Sage 2P
-    xg3ply        3-ply                 Sage 3P
-    xg4ply        4-ply                 Sage 4P
-    xgroller      XG Roller             Sage 1T
-    xgrollerplus  XG Roller+            Sage 2T
-    xgrollerpp    XG Roller++           Sage 3T
+    xg1ply        1-ply                 Neongammon 1P
+    xg2ply        2-ply                 Neongammon 2P
+    xg3ply        3-ply                 Neongammon 3P
+    xg4ply        4-ply                 Neongammon 4P
+    xgroller      XG Roller             Neongammon 1T
+    xgrollerplus  XG Roller+            Neongammon 2T
+    xgrollerpp    XG Roller++           Neongammon 3T
 
 Usage::
 
@@ -46,19 +46,19 @@ sys.path.insert(0, _SCRIPT_DIR)
 
 import benchmark_pasko as bp  # noqa: E402  (pasko data dir; no engine load)
 
-#: tag -> (XG Batch-Analyze menu label, Sage equivalent) -- also the documented mapping.
+#: tag -> (XG Batch-Analyze menu label, Neongammon equivalent) -- also the documented mapping.
 LEVELS: dict[str, tuple[str, str]] = {
-    "xg1ply":       ("1-ply",      "Sage 1P"),
-    "xg2ply":       ("2-ply",      "Sage 2P"),
-    "xg3ply":       ("3-ply",      "Sage 3P"),
-    "xg4ply":       ("4-ply",      "Sage 4P"),
-    "xgroller":     ("XG Roller",  "Sage 1T"),
-    "xgrollerplus": ("XG Roller+", "Sage 2T"),
-    "xgrollerpp":   ("XG Roller++", "Sage 3T"),
+    "xg1ply":       ("1-ply",      "Neongammon 1P"),
+    "xg2ply":       ("2-ply",      "Neongammon 2P"),
+    "xg3ply":       ("3-ply",      "Neongammon 3P"),
+    "xg4ply":       ("4-ply",      "Neongammon 4P"),
+    "xgroller":     ("XG Roller",  "Neongammon 1T"),
+    "xgrollerplus": ("XG Roller+", "Neongammon 2T"),
+    "xgrollerpp":   ("XG Roller++", "Neongammon 3T"),
 }
 
-#: Stamped by default: the three plies that mirror the Sage 1P/2P/3P table, plus the
-#: three XG Roller truncated-rollout levels (Roller / Roller+ / Roller++ = Sage 1T/2T/3T).
+#: Stamped by default: the three plies that mirror the Neongammon 1P/2P/3P table, plus the
+#: three XG Roller truncated-rollout levels (Roller / Roller+ / Roller++ = Neongammon 1T/2T/3T).
 DEFAULT_LEVELS = ["xg1ply", "xg2ply", "xg3ply", "xgroller", "xgrollerplus", "xgrollerpp"]
 
 #: The pristine native-.xg master that every per-level copy is stamped from.
@@ -67,7 +67,7 @@ MASTER = bp._DATA_DIR / "xg_native"
 
 def _print_table(tags):
     w = max(len(t) for t in LEVELS)
-    print(f"{'folder tag':<{w}}  {'XG Batch-Analyze level':<22}  Sage equiv")
+    print(f"{'folder tag':<{w}}  {'XG Batch-Analyze level':<22}  Neongammon equiv")
     print(f"{'-'*w}  {'-'*22}  {'-'*10}")
     for t in tags:
         xg, sage = LEVELS[t]
@@ -130,7 +130,7 @@ def main(argv=None):
         return
 
     print(f"Master: {args.master}  ({n_master} games)\n")
-    print(f"{'folder':<34}  {'XG level to pick':<22}  {'Sage equiv':<10}  status")
+    print(f"{'folder':<34}  {'XG level to pick':<22}  {'Neongammon equiv':<10}  status")
     print(f"{'-'*34}  {'-'*22}  {'-'*10}  ------")
     for tag in tags:
         dest = args.master.parent / f"{args.master.name}_{tag}"

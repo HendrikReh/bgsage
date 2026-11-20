@@ -39,11 +39,11 @@ isolated_build_dir = os.path.join(project_dir, 'experiments', 'gpw_sensitivity',
 build_dir = isolated_build_dir if os.path.isdir(isolated_build_dir) else os.path.join(project_dir, 'build')
 
 sys.path.insert(0, build_dir)
-sys.path.insert(0, os.path.join(project_dir, 'bgsage', 'python'))
+sys.path.insert(0, os.path.join(project_dir, 'neongammon', 'python'))
 
 import bgbot_cpp
-from bgsage import sl_train
-from bgsage.data import load_benchmark_file, load_gnubg_training_data
+from neongammon import sl_train
+from neongammon.data import load_benchmark_file, load_gnubg_training_data
 
 DATA_DIR = os.path.join(project_dir, 'data')
 MODELS_DIR = os.path.join(project_dir, 'models')

@@ -7,25 +7,25 @@ Evaluates at 1-ply through 4-ply plus rollout (Stage 5 only), and prints a compa
 
 Usage:
     # Cube action (money game, centered cube)
-    python bgsage/scripts/eval_position.py cube \
+    python neongammon/scripts/eval_position.py cube \
         --checkers "0,2,3,2,2,1,3,1,0,0,0,0,1,0,-1,-1,0,0,0,-3,-2,-3,-2,-2,-1,0"
 
     # Cube action (match play: 5-point match, player 3 pts, opp 0 pts)
-    python bgsage/scripts/eval_position.py cube \
+    python neongammon/scripts/eval_position.py cube \
         --checkers "0,2,3,2,2,1,3,1,0,0,0,0,1,0,-1,-1,0,0,0,-3,-2,-3,-2,-2,-1,0" \
         --match 5 --score 3 0
 
     # Cube action with player owning cube=2
-    python bgsage/scripts/eval_position.py cube \
+    python neongammon/scripts/eval_position.py cube \
         --checkers "..." --cube-value 2 --cube-owner player
 
     # Checker play
-    python bgsage/scripts/eval_position.py checker \
+    python neongammon/scripts/eval_position.py checker \
         --checkers "0,-2,0,0,0,0,5,0,3,0,0,0,-5,5,0,0,0,-3,0,-5,0,0,0,0,2,0" \
         --dice 3 1
 
     # Checker play (match play)
-    python bgsage/scripts/eval_position.py checker \
+    python neongammon/scripts/eval_position.py checker \
         --checkers "..." --dice 3 1 --match 5 --score 3 0
 """
 
@@ -51,7 +51,7 @@ sys.path.insert(0, os.path.join(root_dir, 'build'))
 def run_cube_analysis(checkers, cube_value, cube_owner_str, match_length,
                       player_score, opp_score, is_crawford):
     import bgbot_cpp
-    from bgsage.weights import WeightConfig
+    from neongammon.weights import WeightConfig
 
     w = WeightConfig.default()
     w.validate()
@@ -128,7 +128,7 @@ def run_cube_analysis(checkers, cube_value, cube_owner_str, match_length,
     sage['rollout'] = {'result': r, 'time': time.time() - t0}
 
     # --- GNUbg ---
-    from bgsage.gnubg import GnuBgAnalyzer
+    from neongammon.gnubg import GnuBgAnalyzer
 
     gnubg = {}
     for n_ply in [1, 2, 3, 4]:
@@ -175,7 +175,7 @@ def _print_cube_tables(sage, gnubg):
         if level in sage:
             p = sage[level]['result']['probs']
             eq = sage[level]['result']['cubeless_equity']
-            print(f"{label:<10} {'Sage':<8} {p[0]:8.4f} {p[1]:8.4f} {p[2]:8.4f} {p[3]:8.4f} {p[4]:8.4f} {eq:+9.4f}")
+            print(f"{label:<10} {'Neongammon':<8} {p[0]:8.4f} {p[1]:8.4f} {p[2]:8.4f} {p[3]:8.4f} {p[4]:8.4f} {eq:+9.4f}")
         if level in gnubg:
             r = gnubg[level]['result']
             eq = r['equity_cubeless']
@@ -193,7 +193,7 @@ def _print_cube_tables(sage, gnubg):
             r = sage[level]['result']
             t = sage[level]['time']
             action = _action_str(r['should_double'], r['should_take'])
-            print(f"{label:<10} {'Sage':<8} {r['equity_nd']:+9.4f} {r['equity_dt']:+9.4f} {r['equity_dp']:+9.4f} {action:<16} {t:6.2f}s")
+            print(f"{label:<10} {'Neongammon':<8} {r['equity_nd']:+9.4f} {r['equity_dt']:+9.4f} {r['equity_dp']:+9.4f} {action:<16} {t:6.2f}s")
         if level in gnubg:
             r = gnubg[level]['result']
             t = gnubg[level]['time']
@@ -214,9 +214,9 @@ def _print_cube_tables(sage, gnubg):
 def run_checker_analysis(checkers, die1, die2, cube_value, cube_owner_str,
                          match_length, player_score, opp_score, is_crawford):
     import bgbot_cpp
-    from bgsage import BgBotAnalyzer
-    from bgsage.gnubg import GnuBgAnalyzer
-    from bgsage.weights import WeightConfig
+    from neongammon import BgBotAnalyzer
+    from neongammon.gnubg import GnuBgAnalyzer
+    from neongammon.weights import WeightConfig
 
     w = WeightConfig.default()
 
@@ -283,7 +283,7 @@ def _print_checker_tables(sage, gnubg):
             moves = r['result'].moves[:5]
             for i, m in enumerate(moves):
                 t_str = f"{r['time']:6.2f}s" if i == 0 else ""
-                print(f"  {i+1:<5} {'Sage':<8} {m.equity:+9.4f} {m.equity_diff:+9.4f} "
+                print(f"  {i+1:<5} {'Neongammon':<8} {m.equity:+9.4f} {m.equity_diff:+9.4f} "
                       f"{m.probs.win:8.4f} {m.probs.gammon_win:8.4f} {m.probs.gammon_loss:8.4f} {t_str}")
 
         if level in gnubg:
@@ -303,7 +303,7 @@ def _print_checker_tables(sage, gnubg):
         label = lvl.replace('ply', '-ply')
         if lvl in sage and sage[lvl]['result'].moves:
             m = sage[lvl]['result'].moves[0]
-            print(f"{label:<10} {'Sage':<8} {m.equity:+9.4f} {m.probs.win:8.4f}")
+            print(f"{label:<10} {'Neongammon':<8} {m.equity:+9.4f} {m.probs.win:8.4f}")
         if lvl in gnubg and gnubg[lvl]['result'].moves:
             m = gnubg[lvl]['result'].moves[0]
             print(f"{label:<10} {'GNUbg':<8} {m.equity:+9.4f} {m.probs.win:8.4f}")

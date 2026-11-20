@@ -9,7 +9,7 @@ Validates the hardcoded Kazaross-XG2 MET data and utility functions:
   - can_double_match: Crawford/post-Crawford/dead cube rules
 
 Usage:
-    python bgsage/scripts/test_match_equity.py [--build-dir build]
+    python neongammon/scripts/test_match_equity.py [--build-dir build]
 """
 
 import sys
@@ -22,13 +22,13 @@ def main():
     parser.add_argument('--build-dir', type=str, default='build')
     args = parser.parse_args()
 
-    # Setup paths — find project root (parent of bgsage/)
+    # Setup paths — find project root (parent of neongammon/)
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    bgsage_dir = os.path.dirname(script_dir)
-    project_dir = os.path.dirname(bgsage_dir)
+    neongammon_dir = os.path.dirname(script_dir)
+    project_dir = os.path.dirname(neongammon_dir)
 
     build_dir = os.path.join(project_dir, args.build_dir)
-    sys.path.insert(0, os.path.join(bgsage_dir, 'python'))
+    sys.path.insert(0, os.path.join(neongammon_dir, 'python'))
     sys.path.insert(0, build_dir)
 
 

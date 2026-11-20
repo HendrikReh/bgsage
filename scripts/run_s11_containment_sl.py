@@ -41,7 +41,7 @@ for _p in (_PROJECT_ROOT / "python", _PROJECT_ROOT / "build"):
         sys.path.insert(0, str(_p))
 
 import bgbot_cpp  # noqa: E402
-from bgsage import sl_train
+from neongammon import sl_train
 import numpy as np  # noqa: E402
 
 N_HIDDEN, N_INPUTS = 400, 244

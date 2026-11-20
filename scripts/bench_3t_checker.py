@@ -38,8 +38,8 @@ sys.path.insert(0, str(_BUILD_DIR))
 sys.path.insert(0, str(_PY_PKG))
 
 import bgbot_cpp                              # noqa: E402
-from bgsage import BgBotAnalyzer              # noqa: E402
-from bgsage.weights import PRODUCTION_MODEL   # noqa: E402
+from neongammon import BgBotAnalyzer              # noqa: E402
+from neongammon.weights import PRODUCTION_MODEL   # noqa: E402
 
 N_THREADS = 16
 EQUITY_BAND_FLOOR = 0.01

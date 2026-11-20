@@ -3,7 +3,7 @@
 # Copyright (C) 2026 Mark Higgins
 """Stage .xg files with batch-rollout marks for XG's Batch Rollout feature.
 
-For every benchmark decision whose Sage reference is a full rollout
+For every benchmark decision whose Neongammon reference is a full rollout
 (``tier == "rollout"``), this script locates the decision inside the
 Roller++-batch-analyzed ``.xg`` game file it came from, sets XG's
 "marked for later rollout" fields on it, and writes the marked copy to
@@ -13,7 +13,7 @@ rollout preset > Start) and let it run; XG writes results back into the staged
 files, which ``xg_harvest_results.py`` then parses into the XG results cache.
 
 Which moves get rolled (checker decisions): the best ``--max-sage-moves`` of
-Sage's own rollout candidates that XG stored, plus XG's top ``--xg-top`` moves.
+Neongammon's own rollout candidates that XG stored, plus XG's top ``--xg-top`` moves.
 Cube decisions are marked whole (XG rolls ND and D/T lines together when the
 preset has "Roll for both Double and NoDouble" on).
 
@@ -33,7 +33,7 @@ import sys
 from datetime import datetime, timezone
 
 import xg_batch_common as xbc
-from bgsage import xg_file
+from neongammon import xg_file
 
 BATCH_SET = "rollout"
 
@@ -44,9 +44,9 @@ Next steps in XG (one time for this folder):
        {folder}
      and multi-select all the staged .xg files.
   3. Pick / configure the rollout preset (Options > Rollouts, or "change
-     setting" in the dialog). Recommended, to mirror the Sage reference:
+     setting" in the dialog). Recommended, to mirror the Neongammon reference:
        - Minimum games: 1296, Maximum games: 20736
-       - "Roll until error is less than": 0.005  (95% CI ~ 2 x Sage's 0.0025 SE gate)
+       - "Roll until error is less than": 0.005  (95% CI ~ 2 x Neongammon's 0.0025 SE gate)
        - No truncation ("Truncate after N moves" OFF)
        - Variance reduction: ON
        - Checker play: 3-ply for first moves AND next moves
@@ -60,17 +60,17 @@ Next steps in XG (one time for this folder):
 --benchmark {benchmark} --set rollout
 """
 
-# Sage evaluation-level choice caches (per-decision equity error vs the Sage
+# Neongammon evaluation-level choice caches (per-decision equity error vs the Neongammon
 # reference; the chosen move is recovered from the error). Money benchmark names.
-SAGE_SCORE_CACHES = {"Sage 1T": "sage_1t_clean72", "Sage 2T": "sage_2t_clean"}
+SAGE_SCORE_CACHES = {"Neongammon 1T": "sage_1t_clean72", "Neongammon 2T": "sage_2t_clean"}
 XG_PICK_LEVELS = ("roller", "rollerplus", "rollerpp")
 
 
 def _extra_level_boards(d, xg_maps, stage2, sage_caches):
     """The 6 evaluation levels' own chosen moves for checker decision ``d``.
 
-    XG Roller/Roller+/Roller++ from their batch-analyze files; Sage 3T from
-    stage2_3t (argmax); Sage 1T/2T recovered from their score-cache errors.
+    XG Roller/Roller+/Roller++ from their batch-analyze files; Neongammon 3T from
+    stage2_3t (argmax); Neongammon 1T/2T recovered from their score-cache errors.
     Returned as a set of board tuples so plan_checker_flags can flag them.
     """
     key = d["key"]
@@ -103,7 +103,7 @@ def main(argv=None):
     ap.add_argument("--limit", type=int, default=None,
                     help="Stage at most N files (first N seeds with targets)")
     ap.add_argument("--threshold", type=float, default=0.02,
-                    help="Flag moves within this Sage-equity gap of the best move")
+                    help="Flag moves within this Neongammon-equity gap of the best move")
     ap.add_argument("--min-moves", type=int, default=2,
                     help="Always flag at least this many moves per checker decision")
     ap.add_argument("--max-moves", type=int, default=4,
@@ -140,7 +140,7 @@ def main(argv=None):
     missing_sage = [lbl for lbl, name in SAGE_SCORE_CACHES.items()
                     if not (scores_dir / f"{name}.jsonl").exists()]
     if not stage2:
-        print("  WARNING: stage2_3t.jsonl not found -- Sage 3T picks won't be flagged")
+        print("  WARNING: stage2_3t.jsonl not found -- Neongammon 3T picks won't be flagged")
     if missing_sage:
         print(f"  WARNING: score caches missing for {missing_sage} -- those picks "
               f"won't be flagged")
@@ -263,7 +263,7 @@ def main(argv=None):
     print(f"\n{verb} {totals['files']} files in {out_dir}")
     print(f"  decisions marked: {totals['checker_marked']} checker "
           f"({totals['flagged_moves']} move rollout lines), {totals['cube_marked']} cube")
-    print(f"  level-pick moves flagged (Sage 1T/2T/3T + XG Roller/+/++): "
+    print(f"  level-pick moves flagged (Neongammon 1T/2T/3T + XG Roller/+/++): "
           f"{totals['level_pick_lines']} added, {totals['level_pick_missing']} not in "
           f"XG's stored moves (can't be rolled)")
     if totals["skipped_existing"]:
@@ -273,7 +273,7 @@ def main(argv=None):
     if totals["not_found"]:
         print(f"  {totals['not_found']} decisions could not be located/flagged in their game file")
     if totals["sage_best_missing"]:
-        print(f"  WARNING: {totals['sage_best_missing']} decisions where Sage's #1 rollout "
+        print(f"  WARNING: {totals['sage_best_missing']} decisions where Neongammon's #1 rollout "
               f"move is not among XG's stored moves (XG cannot roll it; tracked in manifest)")
     if totals["files"] and not args.dry_run:
         print("\n" + XG_INSTRUCTIONS.format(folder=out_dir, benchmark=args.benchmark))

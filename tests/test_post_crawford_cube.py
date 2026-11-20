@@ -11,7 +11,7 @@ The Janowski conversion (cl2cf_match) used to interpolate between a live cube
 and a DEAD cube at the current value, where a trailer's gammon at 3-away/1-away
 scores 2 points (to 1-away/1-away) instead of the match. With x ~ 0.68 that put
 No Double 0.06-0.18 equity below Double/Take at 2-ply in 15 positions from
-engine duels -- while both GNUbg (hint and 1296-trial rollout) and Open Sage's
+engine duels -- while both GNUbg (hint and 1296-trial rollout) and Neongammon's
 own rollout give No Double == Double/Take there. The cube decision still said
 "double" (the auto_double rule), but the No Double equity it reported was
 wrong, so every analysis built on it charged the trailer an error for not
@@ -32,7 +32,7 @@ sys.path.insert(0, os.path.join(project_dir, "python"))
 import pytest  # noqa: E402
 
 import bgbot_cpp as B  # noqa: E402
-from bgsage import BgBotAnalyzer  # noqa: E402
+from neongammon import BgBotAnalyzer  # noqa: E402
 
 C, P, O = B.CubeOwner.CENTERED, B.CubeOwner.PLAYER, B.CubeOwner.OPPONENT
 
@@ -43,7 +43,7 @@ CONTACT = [0.574, 0.136, 0.004, 0.101, 0.002]
 # beats the cash the leader would take on a double.
 GAMMONISH = [0.95, 0.85, 0.10, 0.01, 0.0]
 
-# A 5-point engine duel (Open Sage vs GNUbg), score 2-4, post-Crawford; the
+# A 5-point engine duel (Neongammon vs GNUbg), score 2-4, post-Crawford; the
 # trailer (3-away) is on roll with the cube centered on 1.
 DUEL_3A_1A = [0, 0, 2, -1, -2, 2, 2, 2, 3, 0, 0, 0, 0, 2, -1, 0, -3, -2, 0,
               -2, -2, 2, 0, -2, 0, 0]

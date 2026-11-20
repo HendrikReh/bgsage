@@ -1,11 +1,11 @@
-# bgsage — top-level CMakeLists.txt for the pip (scikit-build-core) build.
+# neongammon — top-level CMakeLists.txt for the pip (scikit-build-core) build.
 #
 # This file delegates the compiled-extension build to cpp/CMakeLists.txt (the
 # engine build) and then adds the install steps that place the pybind11
 # module, model weights, and bearoff database into the wheel.
 
 cmake_minimum_required(VERSION 3.18)
-project(bgsage LANGUAGES CXX)
+project(neongammon LANGUAGES CXX)
 
 # Don't build the benchmark / profiler executables in the wheel — just the
 # pybind11 module. Dev builds leave this ON (the default in cpp/CMakeLists.txt).
@@ -22,10 +22,10 @@ if(TARGET bgbot_cpp)
 endif()
 
 # Bundle the production model's weights and the bearoff database into the
-# wheel, inside the `bgsage` package under `_assets/`.  `weights.py` discovers
+# wheel, inside the `neongammon` package under `_assets/`.  `weights.py` discovers
 # them there when running from an installed wheel.
 #
-# The production model is `stage11` (PRODUCTION_MODEL in python/bgsage/weights.py),
+# The production model is `stage11` (PRODUCTION_MODEL in python/neongammon/weights.py),
 # a 24-NN layout: Stage 9's 17 standard pair NNs (sl_s9_*), with Stage 5's
 # 200h pure-race net (sl_s5_purerace) in place of sl_s9_purerace, plus 7
 # backgame/containment specialists (sl_s11_bg_*).  All three are
@@ -33,8 +33,8 @@ endif()
 # at runtime, which the build itself would not catch.
 #
 # WHEN PROMOTING A NEW PRODUCTION MODEL: add its weight-file pattern here, and
-# keep the BGSAGE_MIN_WEIGHTS floor below in step with the new file count.
-file(GLOB BGSAGE_MODEL_WEIGHTS
+# keep the NEONGAMMON_MIN_WEIGHTS floor below in step with the new file count.
+file(GLOB NEONGAMMON_MODEL_WEIGHTS
     "${CMAKE_CURRENT_SOURCE_DIR}/models/sl_s9_*.weights.best"
     "${CMAKE_CURRENT_SOURCE_DIR}/models/sl_s11_*.weights.best"
     "${CMAKE_CURRENT_SOURCE_DIR}/models/sl_s5_purerace.weights.best")
@@ -48,28 +48,28 @@ endif()
 
 # Drop training artifacts the registry never loads (e.g. the TD-init variant
 # sl_s11_bg_deep_tdinit) — they'd be dead weight in every wheel.
-list(FILTER BGSAGE_MODEL_WEIGHTS EXCLUDE REGEX "_tdinit\\.weights\\.best$")
+list(FILTER NEONGAMMON_MODEL_WEIGHTS EXCLUDE REGEX "_tdinit\\.weights\\.best$")
 
 # stage11 resolves to 21 distinct files (13 sl_s9_* after NN sharing, 1
 # sl_s5_purerace, 7 sl_s11_bg_*).  The glob picks up all 19 sl_s9_* files, so
 # 27 is the expected
 # count; require at least 21 so a partial checkout fails the build loudly
 # rather than shipping a wheel that cannot construct an analyzer.
-set(BGSAGE_MIN_WEIGHTS 21)
-list(LENGTH BGSAGE_MODEL_WEIGHTS BGSAGE_N_WEIGHTS)
+set(NEONGAMMON_MIN_WEIGHTS 21)
+list(LENGTH NEONGAMMON_MODEL_WEIGHTS NEONGAMMON_N_WEIGHTS)
 
-if(BGSAGE_N_WEIGHTS LESS BGSAGE_MIN_WEIGHTS)
+if(NEONGAMMON_N_WEIGHTS LESS NEONGAMMON_MIN_WEIGHTS)
     message(FATAL_ERROR
-        "Only ${BGSAGE_N_WEIGHTS} model weight files found under "
-        "${CMAKE_CURRENT_SOURCE_DIR}/models/ (need at least ${BGSAGE_MIN_WEIGHTS}). "
+        "Only ${NEONGAMMON_N_WEIGHTS} model weight files found under "
+        "${CMAKE_CURRENT_SOURCE_DIR}/models/ (need at least ${NEONGAMMON_MIN_WEIGHTS}). "
         "The production model needs both sl_s9_*.weights.best and "
         "sl_s11_*.weights.best to be present for the wheel build.")
 endif()
 
-message(STATUS "bgsage: bundling ${BGSAGE_N_WEIGHTS} model weight files")
+message(STATUS "neongammon: bundling ${NEONGAMMON_N_WEIGHTS} model weight files")
 
-install(FILES ${BGSAGE_MODEL_WEIGHTS}
-    DESTINATION bgsage/_assets/models)
+install(FILES ${NEONGAMMON_MODEL_WEIGHTS}
+    DESTINATION neongammon/_assets/models)
 
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/data/bearoff_1sided.db"
-    DESTINATION bgsage/_assets/data)
+    DESTINATION neongammon/_assets/data)

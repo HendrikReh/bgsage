@@ -21,18 +21,18 @@ import unittest
 
 # Setup paths
 script_dir = os.path.dirname(os.path.abspath(__file__))
-project_dir = os.path.dirname(script_dir)  # the bgsage repo root
+project_dir = os.path.dirname(script_dir)  # the neongammon repo root
 build_dir = os.path.join(project_dir, 'build')
 
 sys.path.insert(0, build_dir)
 sys.path.insert(0, os.path.join(project_dir, 'python'))
 
-from bgsage.gnubg import post_move_analytics, post_move_analytics_many
-from bgsage.settings import gnubg_path
+from neongammon.gnubg import post_move_analytics, post_move_analytics_many
+from neongammon.settings import gnubg_path
 
 _GNUBG = gnubg_path()
 _GNUBG_FOUND = bool(shutil.which(_GNUBG)) or os.path.isfile(_GNUBG)
-_NO_GNUBG = f"GNUbg binary not found ({_GNUBG}); see bgsage.settings"
+_NO_GNUBG = f"GNUbg binary not found ({_GNUBG}); see neongammon.settings"
 
 
 def flip_board(checkers):
@@ -153,7 +153,7 @@ class TestGnubgVsStage4(unittest.TestCase):
     def setUpClass(cls):
         """Load models and find top-100 positions."""
         import bgbot_cpp
-        from bgsage.data import load_benchmark_file
+        from neongammon.data import load_benchmark_file
 
         cls.bgbot_cpp = bgbot_cpp
 
@@ -218,7 +218,7 @@ class TestGnubgVsStage4(unittest.TestCase):
         contact_indices = {e[2] for e in top_100 if e[1] == 'contact'}
         crashed_indices = {e[2] for e in top_100 if e[1] == 'crashed'}
 
-        from bgsage.data import board_from_gnubg_position_string
+        from neongammon.data import board_from_gnubg_position_string
 
         def read_bm_positions(filepath, indices):
             """Read specific positions from a .bm file."""

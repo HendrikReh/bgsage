@@ -22,13 +22,13 @@ build_dirs = [
 for d in reversed(build_dirs):
     if os.path.isdir(d):
         sys.path.insert(0, d)
-sys.path.insert(0, os.path.join(project_dir, 'bgsage', 'python'))
+sys.path.insert(0, os.path.join(project_dir, 'neongammon', 'python'))
 
 import bgbot_cpp
-from bgsage.data import load_benchmark_file, load_benchmark_scenarios_by_indices
-from bgsage.weights import WeightConfig
+from neongammon.data import load_benchmark_file, load_benchmark_scenarios_by_indices
+from neongammon.weights import WeightConfig
 
-DATA_DIR = os.path.join(project_dir, 'bgsage', 'data')
+DATA_DIR = os.path.join(project_dir, 'neongammon', 'data')
 THREADS = 16
 
 bgbot_cpp.init_escape_tables()
@@ -82,7 +82,7 @@ def run_rollout_subprocess(label, model_name, kwargs, ci, ki,
                            hybrid_filter_model=None):
     """Run rollout in subprocess to avoid OOM from cache accumulation."""
     abs_build_dirs = [os.path.abspath(d) for d in build_dirs if os.path.isdir(d)]
-    abs_python_path = os.path.join(os.path.abspath(project_dir), 'bgsage', 'python')
+    abs_python_path = os.path.join(os.path.abspath(project_dir), 'neongammon', 'python')
     abs_contact = os.path.join(os.path.abspath(DATA_DIR), 'contact.bm')
     abs_crashed = os.path.join(os.path.abspath(DATA_DIR), 'crashed.bm')
 
@@ -92,8 +92,8 @@ def run_rollout_subprocess(label, model_name, kwargs, ci, ki,
         '    sys.path.insert(0, d)',
         f'sys.path.insert(0, {repr(abs_python_path)})',
         'import bgbot_cpp',
-        'from bgsage.data import load_benchmark_scenarios_by_indices',
-        'from bgsage.weights import WeightConfig',
+        'from neongammon.data import load_benchmark_scenarios_by_indices',
+        'from neongammon.weights import WeightConfig',
         'bgbot_cpp.init_escape_tables()',
         f'tc = load_benchmark_scenarios_by_indices({repr(abs_contact)}, {repr(ci)}) if {repr(ci)} else bgbot_cpp.ScenarioSet()',
         f'tk = load_benchmark_scenarios_by_indices({repr(abs_crashed)}, {repr(ki)}) if {repr(ki)} else bgbot_cpp.ScenarioSet()',

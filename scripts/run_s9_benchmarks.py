@@ -11,7 +11,7 @@ Self-play (S8 reports S/G/B%) is unavailable for S9 — no 19-NN
 play_games_*_vs_self binding exists. It is omitted from the S9 report.
 
 Run from anywhere:
-    python bgsage/scripts/run_s9_benchmarks.py
+    python neongammon/scripts/run_s9_benchmarks.py
 """
 import os
 import sys
@@ -24,27 +24,27 @@ from datetime import datetime
 
 # Path setup — handles both normal repo and worktree layout (matches run_s8_training.py)
 script_dir = os.path.dirname(os.path.abspath(__file__))
-bgsage_dir = os.path.dirname(script_dir)
+neongammon_dir = os.path.dirname(script_dir)
 
-_parts = os.path.normpath(bgsage_dir).replace('\\', '/').split('/')
+_parts = os.path.normpath(neongammon_dir).replace('\\', '/').split('/')
 if '.claude' in _parts:
     _idx = _parts.index('.claude')
-    bgsage_dir = '/'.join(_parts[:_idx])
-project_dir = os.path.dirname(bgsage_dir)
+    neongammon_dir = '/'.join(_parts[:_idx])
+project_dir = os.path.dirname(neongammon_dir)
 build_dirs = [os.path.join(project_dir, 'build')]
 
 for d in reversed(build_dirs):
     if os.path.isdir(d):
         sys.path.insert(0, d)
-sys.path.insert(0, os.path.join(bgsage_dir, 'python'))
+sys.path.insert(0, os.path.join(neongammon_dir, 'python'))
 
 import bgbot_cpp
-from bgsage.data import (load_benchmark_file, load_benchmark_scenarios_by_indices,
+from neongammon.data import (load_benchmark_file, load_benchmark_scenarios_by_indices,
                           board_from_gnubg_position_string)
-from bgsage.weights import WeightConfig, WeightConfigPair
+from neongammon.weights import WeightConfig, WeightConfigPair
 
-DATA_DIR = os.path.join(bgsage_dir, 'data')
-MODELS_DIR = os.path.join(bgsage_dir, 'models')
+DATA_DIR = os.path.join(neongammon_dir, 'data')
+MODELS_DIR = os.path.join(neongammon_dir, 'models')
 N_THREADS = 32                # User has 32-core desktop
 N_THREADS_MULTIPY = 32        # Multi-ply N-ply on full contact.bm
 N_THREADS_PAIR_HIGH_PLY = 4   # Pair strategy segfaults at 8+ threads, 3-ply decision (top-100 + rollouts)
@@ -350,7 +350,7 @@ def main():
     # Per-scenario 1-ply scoring: no native _stage9 per-scenario binding, so we
     # replicate the C++ score_slice_per_scenario logic in Python using a 1-ply
     # MultiPlyStrategy wrapper. ~30s for 207k scenarios in benchmarking.
-    from bgsage.board import flip_board
+    from neongammon.board import flip_board
 
     strat_1ply = bgbot_cpp.create_multipy_stage9(
         w9.paths, w9.hiddens, n_plies=1, parallel_evaluate=False)
@@ -478,7 +478,7 @@ def main():
     for name, kwargs in rollout_configs:
         er, t = _run_rollout_subprocess(name, kwargs, w9.paths, w9.hiddens,
                                          contact_indices, crashed_indices,
-                                         build_dirs, project_dir, bgsage_dir)
+                                         build_dirs, project_dir, neongammon_dir)
         if er is not None:
             print(f"  {name:<50} {er:>8.2f}  {t:>9.1f}s", flush=True)
             top100_results.append((name, er, t))
@@ -502,22 +502,22 @@ def main():
 
 def _run_rollout_subprocess(level_name, create_kwargs, weight_paths, hidden_sizes,
                               contact_indices, crashed_indices, build_dirs,
-                              project_dir, bgsage_dir):
+                              project_dir, neongammon_dir):
     """Run a single rollout level in a subprocess (stage9 strategy)."""
     code = f'''
 import os, sys, json, time
 for d in {repr([os.path.abspath(d) for d in reversed(build_dirs) if os.path.isdir(d)])}:
     sys.path.insert(0, d)
-sys.path.insert(0, {repr(os.path.join(bgsage_dir, 'python'))})
+sys.path.insert(0, {repr(os.path.join(neongammon_dir, 'python'))})
 
 import bgbot_cpp
-from bgsage.data import load_benchmark_scenarios_by_indices
+from neongammon.data import load_benchmark_scenarios_by_indices
 bgbot_cpp.init_escape_tables()
 
 weight_paths = {repr(weight_paths)}
 hidden_sizes = {repr(hidden_sizes)}
 
-DATA_DIR = {repr(os.path.join(bgsage_dir, 'data'))}
+DATA_DIR = {repr(os.path.join(neongammon_dir, 'data'))}
 contact_file = os.path.join(DATA_DIR, 'contact.bm')
 crashed_file = os.path.join(DATA_DIR, 'crashed.bm')
 ci = {repr(contact_indices)}

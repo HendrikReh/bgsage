@@ -33,7 +33,7 @@ import concurrent.futures
 
 # Setup import paths
 script_dir = os.path.dirname(os.path.abspath(__file__))
-project_dir = os.path.dirname(script_dir)  # the bgsage repo root
+project_dir = os.path.dirname(script_dir)  # the neongammon repo root
 build_dir = os.path.join(project_dir, 'build')
 
 sys.path.insert(0, build_dir)

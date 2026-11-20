@@ -94,7 +94,7 @@ the truncation evaluation introduces NN bias.
 | XG Roller++ (3T)  | 360 | 7 | 3 | 2  | 2  |
 | Full Rollout (R)  | 1,296 | 0 | 1 | -1 | 20 |
 
-These are the params to **replicate XG** exactly. Sage's own app levels diverge from
+These are the params to **replicate XG** exactly. Neongammon's own app levels diverge from
 these — see Standard Configurations (App Levels) below. `truncated1` (1T) uses **72**
 trials (2×36), not 42 (42 isn't a multiple of 36 and mis-weights the first roll).
 `truncated2` (2T) uses `late_threshold=1`, `ultra_late_threshold=9999`, 2-ply cube
@@ -1500,7 +1500,7 @@ into it.
 (`truncation_ply=2`) — neither is shown as a column above.)
 
 These per-level defaults are defined in one place — the `BgBotAnalyzer.__init__`
-dispatch in [python/bgsage/analyzer.py](python/bgsage/analyzer.py), in the
+dispatch in [python/neongammon/analyzer.py](python/neongammon/analyzer.py), in the
 `elif eval_level == "truncated1"/"truncated2"/"truncated3"/"rollout":` blocks.
 Change them there and all callers (including the host app) pick up the new
 defaults.

@@ -16,7 +16,7 @@ opponent holds >= 2 anchors in player's home board (points 1-6).
 Every detected position is also flipped and recorded from the other
 perspective, so player_bg and opponent_bg counts are always equal.
 
-Output: Four files in bgsage/data/:
+Output: Four files in neongammon/data/:
   player-backgame-train-data       (~90% of player BG positions)
   player-backgame-benchmark-data   (~10% of player BG positions)
   opponent-backgame-train-data     (~90% of opponent BG positions)
@@ -25,7 +25,7 @@ Output: Four files in bgsage/data/:
 Each file: one position per line, 26 space-separated integers.
 
 Usage:
-  python bgsage/scripts/generate_backgame_data.py
+  python neongammon/scripts/generate_backgame_data.py
 """
 
 import os
@@ -40,7 +40,7 @@ project_dir = os.path.dirname(os.path.dirname(script_dir))
 build_dir = os.path.join(project_dir, 'build')
 
 sys.path.insert(0, build_dir)
-sys.path.insert(0, os.path.join(project_dir, 'bgsage', 'python'))
+sys.path.insert(0, os.path.join(project_dir, 'neongammon', 'python'))
 
 # --- Constants ------------------------------------------------------------
 TARGET_POSITIONS = 100_000
@@ -52,7 +52,7 @@ STARTING_BOARD = [
     5, 0, 0, 0, -3, 0, -5, 0, 0, 0, 0, 2, 0,
 ]
 
-DATA_DIR = os.path.join(project_dir, 'bgsage', 'data')
+DATA_DIR = os.path.join(project_dir, 'neongammon', 'data')
 
 # --- Worker-local state (set by pool initializer) -------------------------
 _strategy = None
@@ -141,7 +141,7 @@ def write_positions(filepath, positions):
 
 
 def main():
-    from bgsage.weights import WeightConfigPair
+    from neongammon.weights import WeightConfigPair
 
     w = WeightConfigPair.from_model('stage8')
     w.validate()

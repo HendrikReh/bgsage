@@ -7,8 +7,8 @@ with timing.  Use for regression testing: values should not change materially
 across code changes, while wall-clock time should decrease with optimisations.
 
 Usage:
-    python bgsage/scripts/profile_cube_benchmark.py 3ply
-    python bgsage/scripts/profile_cube_benchmark.py 2T
+    python neongammon/scripts/profile_cube_benchmark.py 3ply
+    python neongammon/scripts/profile_cube_benchmark.py 2T
 
 Supported levels: 1ply, 2ply, 3ply, 4ply, 1T, 2T, 3T
 """
@@ -20,10 +20,10 @@ import sys
 import time
 
 sys.path.insert(0, "build")
-sys.path.insert(0, "bgsage/python")
+sys.path.insert(0, "neongammon/python")
 
-from bgsage import BgBotAnalyzer
-from bgsage.weights import PRODUCTION_MODEL
+from neongammon import BgBotAnalyzer
+from neongammon.weights import PRODUCTION_MODEL
 
 # ── Positions ──────────────────────────────────────────────────────────────
 

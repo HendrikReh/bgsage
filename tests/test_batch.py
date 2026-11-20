@@ -7,8 +7,8 @@ Verifies that batch_evaluate results match serial (single-position) evaluation
 for both 0-ply and 1-ply, using 100 random positions from contact.bm.
 
 Run with:
-    python -m pytest bgsage/tests/test_batch.py -v
-    python -m unittest bgsage.tests.test_batch -v
+    python -m pytest neongammon/tests/test_batch.py -v
+    python -m unittest neongammon.tests.test_batch -v
 """
 
 import os
@@ -19,7 +19,7 @@ import unittest
 # Setup paths
 script_dir = os.path.dirname(os.path.abspath(__file__))
 # Resolve INSIDE this repo. dirname(dirname(tests/)) is the HOST project when
-# bgsage is vendored as a submodule, so this used to load the host's stale
+# neongammon is vendored as a submodule, so this used to load the host's stale
 # bgbot_cpp instead of the one built here -- tests then silently exercised a
 # different binary than the developer just compiled.
 project_dir = os.path.dirname(script_dir)
@@ -29,9 +29,9 @@ sys.path.insert(0, build_dir)
 sys.path.insert(0, os.path.join(project_dir, "python"))
 
 import bgbot_cpp
-from bgsage.batch import batch_evaluate
-from bgsage.data import board_from_gnubg_position_string
-from bgsage.weights import default_weights
+from neongammon.batch import batch_evaluate
+from neongammon.data import board_from_gnubg_position_string
+from neongammon.weights import default_weights
 
 DATA_DIR = os.path.join(project_dir, "data")
 CONTACT_BM = os.path.join(DATA_DIR, "contact.bm")
@@ -129,7 +129,7 @@ class TestBatchEvaluate(unittest.TestCase):
     def test_1ply_batch_matches_direct_cpp(self):
         """batch_evaluate matches one-at-a-time C++ evaluation.
 
-        Was "0ply": bgsage uses the XG convention where 1-ply IS the raw
+        Was "0ply": neongammon uses the XG convention where 1-ply IS the raw
         NN, so that level string was never accepted and this test could
         not have passed.
         """

@@ -276,7 +276,7 @@ def read_position(data: bytes | bytearray, offset: int) -> list[int]:
 
 
 def norm_bars(board) -> list[int]:
-    """XG signs the bar cells by owner; bgsage stores both bars as counts."""
+    """XG signs the bar cells by owner; neongammon stores both bars as counts."""
     b = list(board)
     b[0] = abs(b[0])
     b[25] = abs(b[25])
@@ -284,14 +284,14 @@ def norm_bars(board) -> list[int]:
 
 
 def to_mover_board(raw_board: list[int], actif: int) -> tuple[int, ...]:
-    """Raw record board (player-1 frame) -> mover's perspective, bgsage bars."""
+    """Raw record board (player-1 frame) -> mover's perspective, neongammon bars."""
     b = raw_board if actif == 1 else flip_board(raw_board)
     return tuple(norm_bars(b))
 
 
 def xg_eval_to_probs(ev) -> list[float]:
     """XG 7-float eval [bg_loss, g_loss, loss, win, g_win, bg_win, equity]
-    -> bgsage probs [win, g_win, bg_win, g_loss, bg_loss]."""
+    -> neongammon probs [win, g_win, bg_win, g_loss, bg_loss]."""
     return [float(ev[3]), float(ev[4]), float(ev[5]), float(ev[1]), float(ev[0])]
 
 
@@ -412,14 +412,14 @@ def set_cube_timedelay(data: bytearray, off: int, marked: bool = True,
 # Record construction (writing synthetic games for XG to Batch-Analyze)
 # ---------------------------------------------------------------------------
 # XG stores boards signed by owner (P2 bar cell <= 0, P1/own bar cell >= 0) and
-# numbers points 0..23 with bar=24 / off=-1. bgsage stores both bars as counts
+# numbers points 0..23 with bar=24 / off=-1. neongammon stores both bars as counts
 # and points 1..24 with bar=25 / off=0. The helpers below convert. A record is
 # built by cloning a real one of the same type (`template`, a 2560-byte slice)
 # and overwriting the fields; all analysis fields are cleared so XG re-analyzes.
 
 
 def sign_bars(board) -> list[int]:
-    """bgsage board (bars as +counts) -> XG signed frame (idx0 <= 0, idx25 >= 0)."""
+    """neongammon board (bars as +counts) -> XG signed frame (idx0 <= 0, idx25 >= 0)."""
     b = list(board)
     b[0] = -abs(b[0])
     b[25] = abs(b[25])
@@ -427,12 +427,12 @@ def sign_bars(board) -> list[int]:
 
 
 def bg_point_to_xg(p: int) -> int:
-    """bgsage point -> XG move code: point-1; bar(25) -> 24; off(0) -> -1."""
+    """neongammon point -> XG move code: point-1; bar(25) -> 24; off(0) -> -1."""
     return -1 if p == 0 else 24 if p == 25 else p - 1
 
 
 def encode_played_move(half_moves) -> list[int]:
-    """``half_moves`` = up to 4 (from, to) pairs in bgsage points (mover frame) ->
+    """``half_moves`` = up to 4 (from, to) pairs in neongammon points (mover frame) ->
     8 ints for the _MOVE_PLAYED field (XG codes; unused slots are (-1, -1))."""
     out: list[int] = []
     for i in range(4):
@@ -448,7 +448,7 @@ def build_move_record(template: bytes, board_mover, post_mover, die1: int, die2:
                       half_moves, actif: int = 1) -> bytes:
     """A tsMove record playing ``board_mover --(die1,die2)--> post_mover`` (both in
     the mover's frame), unanalyzed. ``half_moves`` are the per-die (from,to) steps
-    (bgsage points) that reproduce it. ``actif`` = 1 (player-1 on roll) or -1."""
+    (neongammon points) that reproduce it. ``actif`` = 1 (player-1 on roll) or -1."""
     raw = board_mover if actif == 1 else flip_board(list(board_mover))
     rec = bytearray(template)
     struct.pack_into('<26b', rec, _MOVE_POSITION_I, *sign_bars(raw))          # pre, P1 frame
@@ -503,7 +503,7 @@ def build_cube_record(template: bytes, board_mover, actif: int = 1,
 def build_game_header(template: bytes, posinit_p1frame, game_number: int,
                       score1: int = 0, score2: int = 0) -> bytes:
     """A tsHeaderGame with the game's initial position + scores. ``posinit_p1frame``
-    is the start board in P1 frame (bgsage bars-as-counts)."""
+    is the start board in P1 frame (neongammon bars-as-counts)."""
     rec = bytearray(template)
     struct.pack_into('<i', rec, _GAME_SCORE1, score1)
     struct.pack_into('<i', rec, _GAME_SCORE2, score2)

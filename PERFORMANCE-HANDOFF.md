@@ -1,4 +1,4 @@
-# bgsage performance review handoff
+# neongammon performance review handoff
 
 Start with the **mixed-batch rule fix** (section 3): it is a few lines of Python and fixes wrong results. Then **skip the discarded cubeless search in cubeful checker play at 3-ply and deeper** (section 1), then make **batch 2-ply checker play follow the analyzer's filter** (section 4). Fix repeated model construction next for workloads that submit small batches. Keep changes to search policy separate from performance work so result differences are easy to attribute.
 
@@ -6,13 +6,13 @@ Start with the **mixed-batch rule fix** (section 3): it is a few lines of Python
 
 | Section | State |
 | --- | --- |
-| 1. Cubeless pre-pass at 3-ply+ | done in [#28](https://github.com/HendrikReh/bgsage/pull/28) |
-| 2. Batch model construction | done in [#33](https://github.com/HendrikReh/bgsage/pull/33) (`BatchModels`) |
-| 3. Mixed-batch rules | done in [#27](https://github.com/HendrikReh/bgsage/pull/27) |
-| 4. Batch 2-ply filter parity | done in [#30](https://github.com/HendrikReh/bgsage/pull/30); see the notes below |
-| 5. Details path | done in [#36](https://github.com/HendrikReh/bgsage/pull/36): the details run on the engine, so the headline equals the plain call exactly; results change (see the PR) |
-| 6. Cache clearing | done in [#34](https://github.com/HendrikReh/bgsage/pull/34): the legacy table is allocated on first insert |
-| 7. Move generator | done in [#35](https://github.com/HendrikReh/bgsage/pull/35) |
+| 1. Cubeless pre-pass at 3-ply+ | done in [#28](https://github.com/HendrikReh/neongammon/pull/28) |
+| 2. Batch model construction | done in [#33](https://github.com/HendrikReh/neongammon/pull/33) (`BatchModels`) |
+| 3. Mixed-batch rules | done in [#27](https://github.com/HendrikReh/neongammon/pull/27) |
+| 4. Batch 2-ply filter parity | done in [#30](https://github.com/HendrikReh/neongammon/pull/30); see the notes below |
+| 5. Details path | done in [#36](https://github.com/HendrikReh/neongammon/pull/36): the details run on the engine, so the headline equals the plain call exactly; results change (see the PR) |
+| 6. Cache clearing | done in [#34](https://github.com/HendrikReh/neongammon/pull/34): the legacy table is allocated on first insert |
+| 7. Move generator | done in [#35](https://github.com/HendrikReh/neongammon/pull/35) |
 
 Notes on #30:
 - It found three more differences between batch and analyzer, besides the filter:
@@ -41,7 +41,7 @@ The original review and local spot checks used `6a3a269`, Stage 11, and the Appl
 
 ## 1. Skip the discarded cubeless search in cubeful checker play
 
-**Finding.** The cubeful wrapper calls the cubeless analyzer before deciding how to evaluate candidates. At full-width depths (3-ply and deeper, everything not in `CUBEFUL_FILTERED_PLIES`) it replaces every candidate's probabilities, equities, and depth label, then sorts the results again; nothing of the first pass survives except the candidate boards. The first pass generates and scores moves, searches survivors, promotes candidates, and clears caches. `_move_order_key` is a total order (cubeful equity, cubeless equity, board), so the input order cannot leak into the result either. [Cubeful wrapper](python/bgsage/analyzer.py#L942) · [Cubeless checker pass](python/bgsage/analyzer.py#L433) · [Cube-aware evaluation](python/bgsage/analyzer.py#L1056)
+**Finding.** The cubeful wrapper calls the cubeless analyzer before deciding how to evaluate candidates. At full-width depths (3-ply and deeper, everything not in `CUBEFUL_FILTERED_PLIES`) it replaces every candidate's probabilities, equities, and depth label, then sorts the results again; nothing of the first pass survives except the candidate boards. The first pass generates and scores moves, searches survivors, promotes candidates, and clears caches. `_move_order_key` is a total order (cubeful equity, cubeless equity, board), so the input order cannot leak into the result either. [Cubeful wrapper](python/neongammon/analyzer.py#L942) · [Cubeless checker pass](python/neongammon/analyzer.py#L433) · [Cube-aware evaluation](python/neongammon/analyzer.py#L1056)
 
 | Historical depth (`6a3a269`) | Existing call | Enumeration-only pre-pass | Median reduction |
 | --- | ---: | ---: | ---: |
@@ -60,7 +60,7 @@ The historical experiment reused one analyzer per depth with two threads. It alt
 
 So the bypass is safe and worth doing, but plan with 12–24%, not 34%. The pre-pass's share grows with the thread count because the cube-aware pass parallelises across candidates and the pre-pass mostly does not.
 
-**Implementation.** At 3-ply and deeper, generate the legal boards directly and send them through the existing cube-aware evaluator. At 2-ply, the preliminary pass determines which moves receive deeper evaluation. It currently includes candidates promoted by the cubeless search, and an existing test requires that superset (`test_best_move_comes_from_the_search`: every cubeless survivor is searched in the cubeful path too). Treat any change to which candidates enter the 2-ply search as a separate decision backed by paired accuracy measurements. [Filtered candidates and 1-ply fallback](python/bgsage/analyzer.py#L1100) · [Cubeful promotion](python/bgsage/analyzer.py#L1174) · [Survivor coverage test](tests/test_cubeful_nply_filter.py#L81)
+**Implementation.** At 3-ply and deeper, generate the legal boards directly and send them through the existing cube-aware evaluator. At 2-ply, the preliminary pass determines which moves receive deeper evaluation. It currently includes candidates promoted by the cubeless search, and an existing test requires that superset (`test_best_move_comes_from_the_search`: every cubeless survivor is searched in the cubeful path too). Treat any change to which candidates enter the 2-ply search as a separate decision backed by paired accuracy measurements. [Filtered candidates and 1-ply fallback](python/neongammon/analyzer.py#L1100) · [Cubeful promotion](python/neongammon/analyzer.py#L1174) · [Survivor coverage test](tests/test_cubeful_nply_filter.py#L81)
 
 The bypass also drops the pre-pass's `self._strategy_nply.clear_cache()` call. The cube-aware pass runs in a fresh `ThreadPoolExecutor` per call and the engine's cache keys carry a process-unique evaluator id, so this should not change results; the parity check above agrees, but keep it in the regression test.
 
@@ -68,7 +68,7 @@ The bypass also drops the pre-pass's `self._strategy_nply.clear_cache()` call. T
 
 ## 2. Reuse loaded models across batch calls
 
-**Finding.** Batch entry points construct strategies on each call. N-ply checker batches build both a 1-ply scorer and an N-ply strategy, whose factory (`create_multipy`) loads a second base model. Empty batches still pay setup costs. The C++ `MultiPlyStrategy` constructor already takes a base strategy, but the Python class exposes no constructor, so sharing the base needs a new binding or factory argument. [Pre-roll batch setup](python/bgsage/batch.py#L101) · [Post-move batch setup](python/bgsage/batch.py#L232) · [Checker batch setup](python/bgsage/batch.py#L453) · [N-ply factory](cpp/pybind/bindings.cpp#L5590)
+**Finding.** Batch entry points construct strategies on each call. N-ply checker batches build both a 1-ply scorer and an N-ply strategy, whose factory (`create_multipy`) loads a second base model. Empty batches still pay setup costs. The C++ `MultiPlyStrategy` constructor already takes a base strategy, but the Python class exposes no constructor, so sharing the base needs a new binding or factory argument. [Pre-roll batch setup](python/neongammon/batch.py#L101) · [Post-move batch setup](python/neongammon/batch.py#L232) · [Checker batch setup](python/neongammon/batch.py#L453) · [N-ply factory](cpp/pybind/bindings.cpp#L5590)
 
 | Stage 11 operation | Historical median (`6a3a269`) | Re-measured (`f164c92`) |
 | --- | ---: | ---: |
@@ -80,13 +80,13 @@ The bypass also drops the pre-pass's `self._strategy_nply.clear_cache()` call. T
 
 Historical medians used 25 timed calls after warm-up, the re-measured ones 15 (200 for the native call). The one-position probe used the starting board and one worker. The native call isolates evaluation and binding overhead. It uses native defaults and excludes construction and high-level Python result conversion. The absolute times differ with machine load; the conclusion does not: a small batch costs one or two weight loads.
 
-**Implementation.** Validate the level before returning an empty result. Give repeated callers an explicit way to own and reuse loaded strategies. Construct the N-ply checker strategy from the base already loaded for the batch, using the existing constructor. Centralize model-family dispatch where possible. [Base-strategy constructor](cpp/src/multipy.cpp#L276) · [Existing analyzer strategy reuse](python/bgsage/analyzer.py#L195)
+**Implementation.** Validate the level before returning an empty result. Give repeated callers an explicit way to own and reuse loaded strategies. Construct the N-ply checker strategy from the base already loaded for the batch, using the existing constructor. Centralize model-family dispatch where possible. [Base-strategy constructor](cpp/src/multipy.cpp#L276) · [Existing analyzer strategy reuse](python/neongammon/analyzer.py#L195)
 
 **Verification.** Count factory calls to show that empty batches load zero models, an N-ply checker batch loads one base, and repeated calls can reuse it. Compare 5-NN and Stage 11 results at 1-ply and N-ply, including threaded batches and custom weights. Time cold creation, warm calls, and batches of 0, 1, 32, and 256 positions separately. An invalid level on empty input already raises today (checked on `f164c92`); keep that.
 
 ## 3. Apply cube rules per position in batches
 
-**Finding.** The Python wrappers turn Jacoby (and, in `batch_evaluate`, beavers) off for the whole batch if any row is a match. The C++ side does not need this: `CubeInfo::jacoby_active()` already requires `is_money()`, and the beaver is only applied on the money paths of `cube.cpp`. So the native batch functions already handle a mixed batch correctly row by row, and the Python fix is to pass `jacoby` / `beaver` through unchanged. The behaviour is known: `test_batch_one_ply_matches_the_analyzer` evaluates one position per call to avoid it. [Pre-roll rule selection](python/bgsage/batch.py#L120) · [Post-move rule selection](python/bgsage/batch.py#L250) · [Checker rule selection](python/bgsage/batch.py#L464) · [Workaround in the test](tests/test_contact_cube_life.py#L84)
+**Finding.** The Python wrappers turn Jacoby (and, in `batch_evaluate`, beavers) off for the whole batch if any row is a match. The C++ side does not need this: `CubeInfo::jacoby_active()` already requires `is_money()`, and the beaver is only applied on the money paths of `cube.cpp`. So the native batch functions already handle a mixed batch correctly row by row, and the Python fix is to pass `jacoby` / `beaver` through unchanged. The behaviour is known: `test_batch_one_ply_matches_the_analyzer` evaluates one position per call to avoid it. [Pre-roll rule selection](python/neongammon/batch.py#L120) · [Post-move rule selection](python/neongammon/batch.py#L250) · [Checker rule selection](python/neongammon/batch.py#L464) · [Workaround in the test](tests/test_contact_cube_life.py#L84)
 
 **Reproduction.** With Stage 11, run each 1-ply batch API with a centered money position from `STARTING_BOARD` (roll 3–1 for checker play). Then append the same board at 5-away/3-away. With default Jacoby and one worker, all three APIs change the money row (reproduced exactly on `f164c92`):
 
@@ -102,7 +102,7 @@ Historical medians used 25 timed calls after warm-up, the re-measured ones 15 (2
 
 ## 4. Make batch 2-ply checker play follow the analyzer's filter (new)
 
-**Finding (not in the original review).** Both N-ply `batch_checker_play` overloads compute `compute_cubeful` — the full N-ply cube tree — for **every** legal candidate, survivors and pruned moves alike, and additionally run the cubeless N-ply `evaluate_probs` on the survivors. So batch checker play still has the pre-`bef8bcd` behaviour at 2-ply: pruned moves carry 2-ply cubeful equities, and the pick can land on a move the filter rejected. The analyzer comment, the `bef8bcd` commit message and the docstring of `tests/test_cubeful_nply_filter.py` all say pruned moves keep 1-ply values "as in batch_checker_play"; that is not what the code does. At 3-ply and deeper both paths score every move through the cube tree, so they agree there. [Pruned candidates in the cube tree](cpp/pybind/bindings.cpp#L4726) · [Same in the second overload](cpp/pybind/bindings.cpp#L4990) · [Analyzer comment](python/bgsage/analyzer.py#L1100)
+**Finding (not in the original review).** Both N-ply `batch_checker_play` overloads compute `compute_cubeful` — the full N-ply cube tree — for **every** legal candidate, survivors and pruned moves alike, and additionally run the cubeless N-ply `evaluate_probs` on the survivors. So batch checker play still has the pre-`bef8bcd` behaviour at 2-ply: pruned moves carry 2-ply cubeful equities, and the pick can land on a move the filter rejected. The analyzer comment, the `bef8bcd` commit message and the docstring of `tests/test_cubeful_nply_filter.py` all say pruned moves keep 1-ply values "as in batch_checker_play"; that is not what the code does. At 3-ply and deeper both paths score every move through the cube tree, so they agree there. [Pruned candidates in the cube tree](cpp/pybind/bindings.cpp#L4726) · [Same in the second overload](cpp/pybind/bindings.cpp#L4990) · [Analyzer comment](python/neongammon/analyzer.py#L1100)
 
 **Measured on `f164c92`.** 40 positions (seed 7), centered money cube, `batch_checker_play(..., eval_level="2ply", n_threads=4)` against `BgBotAnalyzer(eval_level="2ply", parallel_threads=2).checker_play`: the best move differs on **2 of 40**, and on moves the analyzer prunes the two equities differ by up to **0.43** (1-ply Janowski against the 2-ply cube tree). `test_batch_checker_play_matches_the_analyzer[2ply]` passes only because its single position (`CONTACT`, 6-2) happens to agree.
 

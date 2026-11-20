@@ -24,14 +24,14 @@ import argparse
 
 # Setup import paths
 script_dir = os.path.dirname(os.path.abspath(__file__))
-project_dir = os.path.dirname(script_dir)  # bgsage repo root
+project_dir = os.path.dirname(script_dir)  # neongammon repo root
 build_dir = os.path.join(project_dir, 'build')
 
 sys.path.insert(0, build_dir)
 sys.path.insert(0, os.path.join(project_dir, 'python'))
 
 import bgbot_cpp
-from bgsage.weights import MODELS, WeightConfig, bearoff_db_path
+from neongammon.weights import MODELS, WeightConfig, bearoff_db_path
 
 DATA_DIR = os.path.join(project_dir, 'data')
 BENCHMARK_DIR = os.path.join(DATA_DIR, 'benchmark_pr')

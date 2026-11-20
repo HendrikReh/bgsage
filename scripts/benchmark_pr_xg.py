@@ -5,7 +5,7 @@
 
 Companion to ``benchmark_money.benchmark_pr``, but the engine being scored is XG.
 Rather than call XG position-by-position (it has no API), we read the ``.xg`` files
-XG's *Batch Analyze* produced for the Sage-vs-Sage transcripts in
+XG's *Batch Analyze* produced for the Neongammon-vs-Neongammon transcripts in
 ``data/money_benchmark/xg/``, pick out XG's **best** decision for each position --
 its #1 ranked move, or its recommended cube action -- and score *that* decision
 against the benchmark's SAVED reference analytics, exactly as ``benchmark_pr`` scores
@@ -38,13 +38,13 @@ from pathlib import Path
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _SCRIPT_DIR)
 
-# benchmark_money sets up the bgsage import path (and DLL dirs) at import time and
-# supplies the scoring/aggregate/report helpers we reuse. Its bgsage imports are
+# benchmark_money sets up the neongammon import path (and DLL dirs) at import time and
+# supplies the scoring/aggregate/report helpers we reuse. Its neongammon imports are
 # deferred, so importing it here does NOT load the engine -- and this script never
 # needs it (pure parse + match + score).
 import benchmark_money as bm
-from bgsage.board import flip_board
-from bgsage.xg_compare import parse_xg_game
+from neongammon.board import flip_board
+from neongammon.xg_compare import parse_xg_game
 
 log = logging.getLogger("benchmark_pr_xg")
 
@@ -79,9 +79,9 @@ def _seed_lookup(seed: int) -> dict:
 
 
 def _norm_bars(board) -> tuple:
-    """Normalise XG's signed-bar convention to bgsage's (bars are non-negative counts).
+    """Normalise XG's signed-bar convention to neongammon's (bars are non-negative counts).
 
-    XG signs the bars by owner, so the opponent's bar comes out negative; bgsage stores
+    XG signs the bars by owner, so the opponent's bar comes out negative; neongammon stores
     both bars (index 0 = opponent, index 25 = mover) as positive counts. Points (1-24)
     already share the signed-by-owner convention, so only the two bar cells need fixing.
     Without this, any board with a checker on the (opponent's) bar -- i.e. just been hit
@@ -94,9 +94,9 @@ def _norm_bars(board) -> tuple:
 
 
 def _to_mover(board_before, player) -> tuple:
-    """XG ``board_before`` (player-1 perspective) -> mover's perspective, bgsage bars.
+    """XG ``board_before`` (player-1 perspective) -> mover's perspective, neongammon bars.
 
-    Flip on bot turns (bgsage ``flip_board``), then normalise the bars. Flipping first
+    Flip on bot turns (neongammon ``flip_board``), then normalise the bars. Flipping first
     moves a wrong-signed bar to the other index, which the bar-normalisation then fixes.
     """
     b = list(board_before) if player == "user" else list(flip_board(board_before))

@@ -5,8 +5,8 @@
 Displays a table of the 5 probabilities, equity, and computation time for each.
 
 Usage:
-    python bgsage/scripts/test_evaluate_probs.py [--checkers 0,0,0,...] [--build-dir build]
-    python bgsage/scripts/test_evaluate_probs.py --ply 4 --model stage3
+    python neongammon/scripts/test_evaluate_probs.py [--checkers 0,0,0,...] [--build-dir build]
+    python neongammon/scripts/test_evaluate_probs.py --ply 4 --model stage3
 """
 
 import sys
@@ -28,11 +28,11 @@ def main():
     parser.add_argument('--skip-gnubg', action='store_true',
                         help='Skip GNUbg evaluations')
 
-    # Add the build dir and python dir to sys.path (before importing bgsage)
+    # Add the build dir and python dir to sys.path (before importing neongammon)
     project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    sys.path.insert(0, os.path.join(project_dir, 'bgsage', 'python'))
+    sys.path.insert(0, os.path.join(project_dir, 'neongammon', 'python'))
 
-    from bgsage.weights import WeightConfig
+    from neongammon.weights import WeightConfig
     WeightConfig.add_model_arg(parser)
     args = parser.parse_args()
 
@@ -98,7 +98,7 @@ def main():
 
     # ---- gnubg evaluations ----
     if not args.skip_gnubg:
-        from bgsage.gnubg import post_move_analytics
+        from neongammon.gnubg import post_move_analytics
         gnubg_plies = ply_depths if args.ply is not None else list(range(1, 5))
         for n_plies in gnubg_plies:
             label = f'gnubg {n_plies}-ply'

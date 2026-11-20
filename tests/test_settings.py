@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MPL-2.0
 # Copyright (C) 2026 Mark Higgins
-"""Tests for bgsage.settings (GNUbg path resolution and the settings file)."""
+"""Tests for neongammon.settings (GNUbg path resolution and the settings file)."""
 
 import json
 import os
@@ -13,8 +13,8 @@ project_dir = os.path.dirname(script_dir)
 sys.path.insert(0, os.path.join(project_dir, 'build'))
 sys.path.insert(0, os.path.join(project_dir, 'python'))
 
-from bgsage import settings  # noqa: E402
-from bgsage import gnubg  # noqa: E402
+from neongammon import settings  # noqa: E402
+from neongammon import gnubg  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -22,6 +22,8 @@ def isolated(tmp_path, monkeypatch):
     """Point the settings file at a temp dir and clear every override."""
     monkeypatch.setenv(settings.SETTINGS_ENV_VAR, str(tmp_path / 'settings.json'))
     monkeypatch.delenv(settings.GNUBG_ENV_VAR, raising=False)
+    monkeypatch.delenv(settings.LEGACY_GNUBG_ENV_VAR, raising=False)
+    monkeypatch.delenv(settings.LEGACY_SETTINGS_ENV_VAR, raising=False)
     monkeypatch.setattr(settings, '_override', None)
     monkeypatch.setattr(settings, 'detect_gnubg_path', lambda: '/detected/gnubg')
     yield tmp_path
@@ -103,3 +105,33 @@ def test_run_gnubg_uses_explicit_then_setting(monkeypatch):
     gnubg._run_gnubg('quit', gnubg_path='/per/call')
     assert calls == ['/from/code', '/per/call']
     assert gnubg.GnuBgAnalyzer(gnubg_path='/per/analyzer').gnubg_path == '/per/analyzer'
+
+
+def test_pre_rename_env_vars_are_still_read(isolated, monkeypatch):
+    monkeypatch.setenv(settings.LEGACY_GNUBG_ENV_VAR, '/from/old/env')
+    assert settings.gnubg_path() == '/from/old/env'
+    monkeypatch.setenv(settings.GNUBG_ENV_VAR, '/from/new/env')
+    assert settings.gnubg_path() == '/from/new/env'
+
+    monkeypatch.delenv(settings.SETTINGS_ENV_VAR)
+    monkeypatch.setenv(settings.LEGACY_SETTINGS_ENV_VAR, str(isolated / 'old.json'))
+    assert settings.settings_file() == isolated / 'old.json'
+
+
+def test_pre_rename_settings_file_is_read_then_superseded(isolated, monkeypatch):
+    monkeypatch.delenv(settings.SETTINGS_ENV_VAR)
+    monkeypatch.setenv('XDG_CONFIG_HOME', str(isolated))
+    old = isolated / 'bgsage' / 'settings.json'
+    new = isolated / 'neongammon' / 'settings.json'
+    old.parent.mkdir()
+    old.write_text(json.dumps({'gnubg_path': '/from/old/file'}))
+
+    assert settings.settings_file() == old
+    assert settings.gnubg_path() == '/from/old/file'
+
+    settings.set_gnubg_path('/saved/new', persist=True)
+    assert json.loads(new.read_text()) == {'gnubg_path': '/saved/new'}
+    assert json.loads(old.read_text()) == {'gnubg_path': '/from/old/file'}
+    monkeypatch.setattr(settings, '_override', None)
+    assert settings.settings_file() == new
+    assert settings.gnubg_path() == '/saved/new'

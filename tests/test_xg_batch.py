@@ -4,10 +4,10 @@
 
 Focus: the perspective convention. XG's checker-move rollout Result1 is from
 the post-move (opponent-on-roll) perspective, so checker_cache_record must
-negate the equity and invert the probabilities to match Sage's mover-perspective
+negate the equity and invert the probabilities to match Neongammon's mover-perspective
 benchmark. XG's stored N-ply eval, and cube rollouts, are already in the same
-perspective as Sage and must NOT be flipped. These were verified empirically
-against a real XG batch rollout (mean|-XG - Sage| = 0.008); the tests below pin
+perspective as Neongammon and must NOT be flipped. These were verified empirically
+against a real XG batch rollout (mean|-XG - Neongammon| = 0.008); the tests below pin
 the behaviour with synthetic records so it can't silently regress.
 """
 
@@ -22,7 +22,7 @@ sys.path.insert(0, str(_ROOT / "python"))
 sys.path.insert(0, str(_ROOT / "build"))
 sys.path.insert(0, str(_ROOT / "scripts"))
 
-from bgsage import xg_file  # noqa: E402
+from neongammon import xg_file  # noqa: E402
 import xg_batch_common as xbc  # noqa: E402
 
 
@@ -44,7 +44,7 @@ def _xg_result(win, gw, bw, gl, bl, equity):
 
 
 def test_checker_rollout_equity_is_negated():
-    # XG stores the post-move (opponent) equity +0.30; Sage's mover-perspective
+    # XG stores the post-move (opponent) equity +0.30; Neongammon's mover-perspective
     # value is therefore -0.30. probs are opponent-frame win=0.60 -> mover win 0.40.
     result_nd = _xg_result(win=0.60, gw=0.18, bw=0.01, gl=0.12, bl=0.005, equity=0.30)
     move_rec = {
@@ -137,7 +137,7 @@ def test_flag_policy_max_moves_cap():
 
 
 def test_flag_policy_missing_from_xg_stored():
-    # Sage's #2 move isn't in XG's stored list -> tracked, not flagged.
+    # Neongammon's #2 move isn't in XG's stored list -> tracked, not flagged.
     d = _decision([0.0, -0.01, -0.015])
     rec = _move_rec([[0] + [0] * 25, [2] + [0] * 25])  # missing board [1]
     plan = xbc.plan_checker_flags(d, rec, threshold=0.02, min_moves=2, max_moves=4)

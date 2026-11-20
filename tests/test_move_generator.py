@@ -22,7 +22,7 @@ for _p in (os.path.join(_ROOT, "build"), os.path.join(_ROOT, "python")):
 
 import bgbot_cpp  # noqa: E402
 
-from bgsage import STARTING_BOARD, flip_board  # noqa: E402
+from neongammon import STARTING_BOARD, flip_board  # noqa: E402
 
 ORDERED_ROLLS = [(a, b) for a in range(1, 7) for b in range(1, 7)]
 

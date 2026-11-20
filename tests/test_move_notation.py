@@ -2,7 +2,7 @@
 # Copyright (C) 2026 Mark Higgins
 """Move notation comes from a legal play of the dice, not from the board diff alone.
 
-Run from the repo root: ``py -3.14 -m pytest bgsage/tests/test_move_notation.py``.
+Run from the repo root: ``py -3.14 -m pytest neongammon/tests/test_move_notation.py``.
 The engine-backed tests skip when ``bgbot_cpp`` is not importable.
 """
 
@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'python'))
 
 import pytest
 
-from bgsage.text_export import (
+from neongammon.text_export import (
     _legal_single_die_moves,
     _resolve_legal_steps,
     compute_move_notation,

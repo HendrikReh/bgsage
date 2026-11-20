@@ -2,7 +2,7 @@ name: Build wheels
 
 on:
   # Release: pushing a v* tag builds wheels and attaches them to the GitHub
-  # release of that tag (no PyPI: the `bgsage` name there is upstream's).
+  # release of that tag (GitHub releases only, no PyPI).
   # Test-only: PRs to main and manual dispatch build wheels without publishing.
   # Plain pushes to main do NOT trigger CI — commit freely without burning runner time.
   push:

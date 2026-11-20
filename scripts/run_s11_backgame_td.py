@@ -67,7 +67,7 @@ for _p in (_PROJECT_ROOT / "python", _PROJECT_ROOT / "build", _SCRIPT_DIR):
 import bgbot_cpp  # noqa: E402
 
 from backgame_benchmark import read_start_positions  # noqa: E402
-from bgsage.weights import WeightConfigPair  # noqa: E402
+from neongammon.weights import WeightConfigPair  # noqa: E402
 
 #: Which reference-position folders seed each category's games.
 CATEGORY_FOLDERS: dict[str, list[str]] = {

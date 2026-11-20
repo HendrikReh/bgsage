@@ -10,10 +10,10 @@ then a linear interpolation of the two in the cube life index ``x``.
 
 Money-game reference:
     Rick Janowski, "Take-Points in Money Games" — reproduced in
-    ``docs/Janowski.docx`` and re-implemented in ``bgsage/cpp/src/cube.cpp``.
+    ``docs/Janowski.docx`` and re-implemented in ``neongammon/cpp/src/cube.cpp``.
 
 Match-play reference:
-    GNUbg's GetPoints, ``get_match_points()`` in ``bgsage/cpp/src/cube.cpp``.
+    GNUbg's GetPoints, ``get_match_points()`` in ``neongammon/cpp/src/cube.cpp``.
 """
 
 from dataclasses import dataclass, asdict

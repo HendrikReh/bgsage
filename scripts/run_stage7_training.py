@@ -36,15 +36,15 @@ import numpy as np
 from datetime import datetime
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
-bgsage_dir = os.path.dirname(script_dir)
+neongammon_dir = os.path.dirname(script_dir)
 
-# Resolve main project root: handles both direct (bgsage/scripts/) and
-# worktree (bgsage/.claude/worktrees/<name>/scripts/) layouts
-_parts = os.path.normpath(bgsage_dir).replace('\\', '/').split('/')
+# Resolve main project root: handles both direct (neongammon/scripts/) and
+# worktree (neongammon/.claude/worktrees/<name>/scripts/) layouts
+_parts = os.path.normpath(neongammon_dir).replace('\\', '/').split('/')
 if '.claude' in _parts:
     _idx = _parts.index('.claude')
-    bgsage_dir = '/'.join(_parts[:_idx])
-project_dir = os.path.dirname(bgsage_dir)
+    neongammon_dir = '/'.join(_parts[:_idx])
+project_dir = os.path.dirname(neongammon_dir)
 
 build_dirs = [
     os.path.join(project_dir, 'build'),
@@ -53,14 +53,14 @@ build_dirs = [
 for d in reversed(build_dirs):
     if os.path.isdir(d):
         sys.path.insert(0, d)
-sys.path.insert(0, os.path.join(project_dir, 'bgsage', 'python'))
+sys.path.insert(0, os.path.join(project_dir, 'neongammon', 'python'))
 
 import bgbot_cpp
-from bgsage import sl_train
-from bgsage.data import load_benchmark_file, load_gnubg_training_data
+from neongammon import sl_train
+from neongammon.data import load_benchmark_file, load_gnubg_training_data
 
-DATA_DIR = os.path.join(project_dir, 'bgsage', 'data')
-MODELS_DIR = os.path.join(project_dir, 'bgsage', 'models')
+DATA_DIR = os.path.join(project_dir, 'neongammon', 'data')
+MODELS_DIR = os.path.join(project_dir, 'neongammon', 'models')
 
 # Stage 7 network config
 N_INPUTS = 244

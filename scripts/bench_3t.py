@@ -3,7 +3,7 @@
 """3T (XG Roller++) cube-action optimization benchmark.
 
 Reads the cube-action reference positions from ``refpos.txt`` (one level up
-from the bgsage repo root) and evaluates each at the production 3T level
+from the neongammon repo root) and evaluates each at the production 3T level
 (``eval_level="truncated3"``). Always uses 16 threads (production hardware has
 16 CPUs).
 
@@ -31,7 +31,7 @@ from pathlib import Path
 
 # ── Path / DLL bootstrap (works from any CWD) ────────────────────────────────
 
-_REPO_ROOT = Path(__file__).resolve().parent.parent          # bgsage repo root
+_REPO_ROOT = Path(__file__).resolve().parent.parent          # neongammon repo root
 _BUILD_DIR = _REPO_ROOT / "build"
 _PY_PKG = _REPO_ROOT / "python"
 _REFPOS_DEFAULT = _REPO_ROOT.parent / "refpos.txt"           # parent (bgbot) folder
@@ -40,8 +40,8 @@ sys.path.insert(0, str(_BUILD_DIR))
 sys.path.insert(0, str(_PY_PKG))
 
 import bgbot_cpp                             # noqa: E402
-from bgsage import BgBotAnalyzer            # noqa: E402
-from bgsage.weights import PRODUCTION_MODEL  # noqa: E402
+from neongammon import BgBotAnalyzer            # noqa: E402
+from neongammon.weights import PRODUCTION_MODEL  # noqa: E402
 
 N_THREADS = 16
 EQUITY_BAND = 0.01

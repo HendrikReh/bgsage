@@ -13,8 +13,8 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "build"))
 sys.path.insert(0, str(REPO / "python"))
 
-from bgsage import BgBotAnalyzer
-from bgsage.text_export import compute_move_notation
+from neongammon import BgBotAnalyzer
+from neongammon.text_export import compute_move_notation
 
 BOARD = [0, 2, 2, 1, 2, 0, 2, 0, 2, 1, 0, 0,
          -4, 2, 0, 0, 0, -3, 0, -2, -4, 1, -2, 0, 0, 0]

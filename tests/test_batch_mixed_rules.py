@@ -20,11 +20,11 @@ for _p in (os.path.join(_ROOT, "build"), os.path.join(_ROOT, "python")):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from bgsage import (  # noqa: E402
+from neongammon import (  # noqa: E402
     STARTING_BOARD, batch_checker_play, batch_evaluate, batch_post_move_evaluate,
     flip_board,
 )
-from bgsage.batch import batch_cube_action  # noqa: E402
+from neongammon.batch import batch_cube_action  # noqa: E402
 
 CONTACT = [0, 0, 0, 0, 2, 2, 4, -2, 2, 0, 2, 0, -2, 3, -1, 0, -1, -2, 0, -2, -3, -2, 0, 0, 0, 0]
 

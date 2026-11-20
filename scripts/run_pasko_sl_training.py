@@ -10,12 +10,12 @@ the 1296-trial rollouts (same recipe as the Stage 9 back-game NNs).
 
 Starts from the TD weights (td_pasko.weights.best) and writes sl_pasko.weights /
 sl_pasko.weights.best. Score the result with:
-    python bgsage/scripts/score_pasko_benchmark.py --pasko-weights models/sl_pasko.weights.best
+    python neongammon/scripts/score_pasko_benchmark.py --pasko-weights models/sl_pasko.weights.best
 
 Run after the training rollout has finished (positions still missing from
 pasko-train-rollout are simply not trained on):
-    python bgsage/scripts/run_pasko_sl_training.py
-    python bgsage/scripts/run_pasko_sl_training.py --init models/td_pasko.weights --out sl_pasko_fromfinal
+    python neongammon/scripts/run_pasko_sl_training.py
+    python neongammon/scripts/run_pasko_sl_training.py --init models/td_pasko.weights --out sl_pasko_fromfinal
 """
 
 import argparse
@@ -27,19 +27,19 @@ import time
 
 # --- paths / imports ------------------------------------------------------
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-_BGSAGE_ROOT = os.path.dirname(_SCRIPT_DIR)
-_PARENT_ROOT = os.path.dirname(_BGSAGE_ROOT)
+_NEONGAMMON_ROOT = os.path.dirname(_SCRIPT_DIR)
+_PARENT_ROOT = os.path.dirname(_NEONGAMMON_ROOT)
 
-# Prefer bgsage/build; the parent build/ is only a fallback.
+# Prefer neongammon/build; the parent build/ is only a fallback.
 sys.path.insert(0, os.path.join(_PARENT_ROOT, 'build'))
-sys.path.insert(0, os.path.join(_BGSAGE_ROOT, 'build'))
+sys.path.insert(0, os.path.join(_NEONGAMMON_ROOT, 'build'))
 
 import bgbot_cpp
-from bgsage import sl_train
+from neongammon import sl_train
 import numpy as np
 
-DATA_DIR = os.path.join(_BGSAGE_ROOT, 'data')
-MODELS_DIR = os.path.join(_BGSAGE_ROOT, 'models')
+DATA_DIR = os.path.join(_NEONGAMMON_ROOT, 'data')
+MODELS_DIR = os.path.join(_NEONGAMMON_ROOT, 'models')
 N_HIDDEN = 400
 N_INPUTS = 244
 
@@ -70,19 +70,19 @@ def benchmark_er(bench_boards, bench_eq, weights_path):
 
 
 def _resolve(path):
-    return path if os.path.isabs(path) else os.path.join(_BGSAGE_ROOT, path)
+    return path if os.path.isabs(path) else os.path.join(_NEONGAMMON_ROOT, path)
 
 
 def main():
     parser = argparse.ArgumentParser(description="SL-train the Paskogammon net against Stage 9 rollouts")
     parser.add_argument('--train', default='pasko-train-rollout',
-                        help='Training rollout file in bgsage/data (default: pasko-train-rollout)')
+                        help='Training rollout file in neongammon/data (default: pasko-train-rollout)')
     parser.add_argument('--bench', default='pasko-benchmark-rollout',
-                        help='Benchmark rollout file in bgsage/data (default: pasko-benchmark-rollout)')
+                        help='Benchmark rollout file in neongammon/data (default: pasko-benchmark-rollout)')
     parser.add_argument('--init', default='models/td_pasko.weights.best',
-                        help='Initial weights, abs or relative to bgsage/ (default: models/td_pasko.weights.best)')
+                        help='Initial weights, abs or relative to neongammon/ (default: models/td_pasko.weights.best)')
     parser.add_argument('--out', default='sl_pasko',
-                        help='Output model name in bgsage/models (default: sl_pasko -> sl_pasko.weights[.best])')
+                        help='Output model name in neongammon/models (default: sl_pasko -> sl_pasko.weights[.best])')
     parser.add_argument('--batch-size', type=int, default=4096)
     parser.add_argument('--max-steps', type=int, default=0,
                         help='Cap total SL steps (0 = full schedule; use a small value to smoke-test).')
@@ -165,7 +165,7 @@ def main():
     print(f'=== Done: {total_steps:,} steps in {total_time/60:.1f} min ===')
     print(f'Best benchmark ER: {best_er:.2f}  (PR {best_er/2:.2f})')
     print(f'Best weights: {best_path}')
-    print(f'\nScore it: python bgsage/scripts/score_pasko_benchmark.py --pasko-weights models/{args.out}.weights.best')
+    print(f'\nScore it: python neongammon/scripts/score_pasko_benchmark.py --pasko-weights models/{args.out}.weights.best')
 
 
 if __name__ == '__main__':

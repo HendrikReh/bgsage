@@ -5,7 +5,7 @@
 
 The match-play analog of ``benchmark_pr_xg.py``. Rather than call XG
 position-by-position (it has no API), we read the ``.xg`` files XG's *Batch
-Analyze* produced for the Sage-vs-Sage match transcripts in
+Analyze* produced for the Neongammon-vs-Neongammon match transcripts in
 ``data/match_benchmark/{L}pt/xg/``, pick out XG's **best** decision for each
 position (its #1 ranked move, or its recommended cube action), and score *that*
 decision against the benchmark's SAVED reference analytics -- exactly as
@@ -23,7 +23,7 @@ matched to ``build/stage1/match_seed_<N>.json`` decisions by
 game, and game_number disambiguates the same board recurring across games of a
 match at different scores. Boards are reconciled to the mover's perspective
 (``board_before`` is player-1 perspective; flip on bot turns) and bars are
-normalised to bgsage's convention. Decisions whose reference lacks the precision
+normalised to neongammon's convention. Decisions whose reference lacks the precision
 their closeness requires (e.g. a not-yet-computed rollout) are skipped, same as
 ``benchmark_pr``.
 
@@ -43,12 +43,12 @@ _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _SCRIPT_DIR)
 
 # benchmark_money supplies the scoring/aggregate/report helpers; benchmark_match
-# supplies the path layout. Both defer their bgsage imports, but we DO need the
+# supplies the path layout. Both defer their neongammon imports, but we DO need the
 # engine's parser here, imported below.
 import benchmark_money as bm        # noqa: E402
 import benchmark_match as bmm       # noqa: E402
-from bgsage.board import flip_board          # noqa: E402
-from bgsage.xg_compare import parse_xg_match  # noqa: E402
+from neongammon.board import flip_board          # noqa: E402
+from neongammon.xg_compare import parse_xg_match  # noqa: E402
 
 log = logging.getLogger("benchmark_pr_xg_match")
 
@@ -79,7 +79,7 @@ def _match_lookup(stage1_path: Path) -> dict:
 
 
 def _norm_bars(board) -> tuple:
-    """Normalise XG's signed-bar convention to bgsage's (bars are non-negative)."""
+    """Normalise XG's signed-bar convention to neongammon's (bars are non-negative)."""
     b = list(board)
     b[0] = abs(b[0])
     b[25] = abs(b[25])
@@ -87,7 +87,7 @@ def _norm_bars(board) -> tuple:
 
 
 def _to_mover(board_before, player) -> tuple:
-    """XG ``board_before`` (player-1 perspective) -> mover's perspective, bgsage bars."""
+    """XG ``board_before`` (player-1 perspective) -> mover's perspective, neongammon bars."""
     b = list(board_before) if player == "user" else list(flip_board(board_before))
     return _norm_bars(b)
 

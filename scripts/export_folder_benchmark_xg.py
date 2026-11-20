@@ -2,11 +2,11 @@
 # SPDX-License-Identifier: MPL-2.0
 # Copyright (C) 2026 Mark Higgins
 """Get eXtreme Gammon's decisions for the back game / containment folder
-benchmarks, so XG can be scored on them exactly the way Sage is.
+benchmarks, so XG can be scored on them exactly the way Neongammon is.
 
 XG has no API. Instead every reference decision of a folder benchmark
 (``backgame_ref_positions/benchmark/<folder> rollout.jsonl``, the files
-``score_backgame_pr.py`` scores Sage against) is written as a ONE-DECISION GAME
+``score_backgame_pr.py`` scores Neongammon against) is written as a ONE-DECISION GAME
 inside a native ``.xg`` archive, a human runs XG's Batch Analyze over those files
 (XG writes its analysis into each record in place), and ``score`` reads XG's #1
 move / recommended cube action back out and scores it against the folder's
@@ -44,7 +44,7 @@ WHAT A HUMAN HAS TO DO
 HOW A DECISION IS ENCODED
 -------------------------
 Record templates are cloned from a real XG-batch-analyzed game
-(``data/money_benchmark/xg/seed_2.xg``: header "Sage" vs "Sage", unlimited
+(``data/money_benchmark/xg/seed_2.xg``: header "Neongammon" vs "Neongammon", unlimited
 length, Jacoby + Beaver on -- every folder decision is an unlimited game with
 both rules on). Each game is ``tsHeaderGame`` + one ``tsCube`` + one ``tsMove``
 + ``tsFooterGame``, exactly the layout the pasko position-eval shards used and
@@ -96,7 +96,7 @@ sub-decisions the rollout makes live. XG's cube pick follows the convention of
 good, 0 = no double, 1/2 = double), take iff ``DT <= DP``. A checker pick that is
 not in the reference's move list (the reference carries every legal move, so
 this means an encoding problem, not a bad move) is counted as a MISMATCH and
-charged the worst rollout-graded error in the list. As in the Sage scorer, the
+charged the worst rollout-graded error in the list. As in the Neongammon scorer, the
 full PR and the PR over rollout-graded picks only ("PR(RO)") bracket the truth:
 picks outside the reference player's filter set carry a 1-/2-ply equity.
 
@@ -118,14 +118,14 @@ from collections import Counter
 from pathlib import Path
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = _SCRIPT_DIR.parent          # = bgsage repo root
+_PROJECT_ROOT = _SCRIPT_DIR.parent          # = neongammon repo root
 # Final sys.path order: python, build, scripts.
 for _p in (_SCRIPT_DIR, _PROJECT_ROOT / "build", _PROJECT_ROOT / "python"):
     _sp = str(_p)
     if _sp not in sys.path:
         sys.path.insert(0, _sp)
 
-from bgsage import possible_moves, xg_file as xf  # noqa: E402
+from neongammon import possible_moves, xg_file as xf  # noqa: E402
 from benchmark_money import BLUNDER_THRESHOLD, PR_MULTIPLIER, _scored  # noqa: E402
 from export_pasko_benchmark_xg import (  # noqa: E402
     _build_move_rec, _templates, derive_half_moves, write_xg,
@@ -177,7 +177,7 @@ def cube_code(cube_value: int, cube_owner: str) -> int:
 
 
 def xg_code_to_point(code: int) -> int:
-    """XG move code -> bgsage point: -1 off -> 0, 24 bar -> 25, else code + 1."""
+    """XG move code -> neongammon point: -1 off -> 0, 24 bar -> 25, else code + 1."""
     return 0 if code == -1 else 25 if code == 24 else code + 1
 
 

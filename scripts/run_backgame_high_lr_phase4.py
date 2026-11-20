@@ -5,12 +5,12 @@
 Picks up from the best weights of the high-LR experiment.
 
 Usage:
-    python bgsage/scripts/run_backgame_high_lr_phase4.py
+    python neongammon/scripts/run_backgame_high_lr_phase4.py
 """
 import gc, os, shutil, sys, time
 sys.path.insert(0, 'build')
 import bgbot_cpp
-from bgsage import sl_train
+from neongammon import sl_train
 import numpy as np
 
 N_HIDDEN = 400
@@ -32,7 +32,7 @@ def run():
 
     # Load training data
     boards_list, probs_list = [], []
-    with open('bgsage/data/player-backgame-train-rollout') as f:
+    with open('neongammon/data/player-backgame-train-rollout') as f:
         for line in f:
             parts = line.split()
             if len(parts) < 31: continue
@@ -44,7 +44,7 @@ def run():
 
     # Load benchmark data
     bench_boards_list, bench_probs_list = [], []
-    with open('bgsage/data/player-backgame-benchmark-rollout') as f:
+    with open('neongammon/data/player-backgame-benchmark-rollout') as f:
         for line in f:
             parts = line.split()
             if len(parts) < 31: continue
@@ -62,8 +62,8 @@ def run():
     print(f'Pre-encoded in {time.time()-t_enc:.1f}s', flush=True)
 
     # Start from best weights
-    wpath = f'bgsage/models/{WNAME}.weights'
-    best_path = f'bgsage/models/{WNAME}.weights.best'
+    wpath = f'neongammon/models/{WNAME}.weights'
+    best_path = f'neongammon/models/{WNAME}.weights.best'
     if not os.path.exists(best_path):
         print(f'ERROR: {best_path} not found', flush=True)
         return

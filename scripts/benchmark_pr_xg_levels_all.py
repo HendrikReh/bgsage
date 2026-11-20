@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MPL-2.0
 # Copyright (C) 2026 Mark Higgins
 """Score every XG batch-analysis level against the money or match benchmark,
-and record XG's picks in the same form the Sage score caches use.
+and record XG's picks in the same form the Neongammon score caches use.
 
 XG has no API, so its decisions come from the ``.xg`` files its Batch Analyze
 wrote for the benchmark transcripts, one set per XG level:
@@ -16,8 +16,8 @@ For each level and decision XG's #1 ranked move (or its cube action) is scored
 against the benchmark's saved reference with the benchmark's own formulas, and
 the run writes, per level, the resume cache ``scores/xg_<level>.jsonl``
 ({key, scored}) plus ``scores/xg_<level>.picks.jsonl`` ({key, kind, pick}) --
-the same layout the Sage caches use -- so the XG-reference rescoring and the
-disputes report read XG's and Sage's picks the same way.
+the same layout the Neongammon caches use -- so the XG-reference rescoring and the
+disputes report read XG's and Neongammon's picks the same way.
 
     python scripts/benchmark_pr_xg_levels_all.py --benchmark money
     python scripts/benchmark_pr_xg_levels_all.py --benchmark match --match-length 5

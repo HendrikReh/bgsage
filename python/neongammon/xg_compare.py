@@ -2,7 +2,7 @@
 # Copyright (C) 2026 Mark Higgins
 """Parse eXtreme Gammon (.xg) batch-analyzed game files and compute PR stats.
 
-Used to benchmark Sage's evaluations against XG's: feed Sage-vs-Sage transcripts
+Used to benchmark Neongammon's evaluations against XG's: feed Neongammon-vs-Neongammon transcripts
 (produced by ``scripts/run_sage_vs_sage_games.py``) into XG's Batch Analyze with
 "Save Games after analyze" enabled, then run this module on the resulting .xg
 files to extract per-game error totals and Performance Rating (PR).

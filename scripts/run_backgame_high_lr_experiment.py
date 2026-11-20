@@ -8,12 +8,12 @@ every 2.5k epochs. Starts from a COPY of the current S9 player_bg weights
 so the production model is not affected.
 
 Usage:
-    python bgsage/scripts/run_backgame_high_lr_experiment.py
+    python neongammon/scripts/run_backgame_high_lr_experiment.py
 """
 import gc, os, shutil, sys, time
 sys.path.insert(0, 'build')
 import bgbot_cpp
-from bgsage import sl_train
+from neongammon import sl_train
 import numpy as np
 
 N_HIDDEN = 400
@@ -36,7 +36,7 @@ def run():
 
     # Load training data
     boards_list, probs_list = [], []
-    with open('bgsage/data/player-backgame-train-rollout') as f:
+    with open('neongammon/data/player-backgame-train-rollout') as f:
         for line in f:
             parts = line.split()
             if len(parts) < 31: continue
@@ -48,7 +48,7 @@ def run():
 
     # Load benchmark data
     bench_boards_list, bench_probs_list = [], []
-    with open('bgsage/data/player-backgame-benchmark-rollout') as f:
+    with open('neongammon/data/player-backgame-benchmark-rollout') as f:
         for line in f:
             parts = line.split()
             if len(parts) < 31: continue
@@ -66,9 +66,9 @@ def run():
     print(f'Pre-encoded in {time.time()-t_enc:.1f}s', flush=True)
 
     # Copy current S9 player_bg weights for the experiment
-    src = 'bgsage/models/sl_s9_player_bg.weights.best'
-    wpath = f'bgsage/models/{WNAME}.weights'
-    best_path = f'bgsage/models/{WNAME}.weights.best'
+    src = 'neongammon/models/sl_s9_player_bg.weights.best'
+    wpath = f'neongammon/models/{WNAME}.weights'
+    best_path = f'neongammon/models/{WNAME}.weights.best'
     shutil.copy2(src, wpath)
     shutil.copy2(src, best_path)
     print(f'Copied S9 player_bg weights to {wpath}', flush=True)

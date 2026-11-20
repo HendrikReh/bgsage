@@ -59,7 +59,7 @@ import os, sys
 sys.path.insert(0, {build!r})
 sys.path.insert(0, {pkg!r})
 
-from bgsage import BgBotAnalyzer
+from neongammon import BgBotAnalyzer
 
 BOARD = {board!r}
 

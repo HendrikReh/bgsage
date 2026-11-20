@@ -22,7 +22,7 @@ them in place, so this script
 
 Level tags follow ``stamp_xg_levels.py``: xg2ply, xg3ply, xg4ply, xgroller,
 xgrollerplus, xgrollerpp (XG's 2-ply, 3-ply, 4-ply, XG Roller, XG Roller+,
-XG Roller++ -- Sage 2P, 3P, 4P, 1T, 2T, 3T).
+XG Roller++ -- Neongammon 2P, 3P, 4P, 1T, 2T, 3T).
 
     python scripts/xg_folder_batch.py stamp
     python scripts/xg_folder_batch.py wait --level xg3ply    # after starting Batch Analyze

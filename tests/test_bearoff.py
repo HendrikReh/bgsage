@@ -10,8 +10,8 @@ sys.path.insert(0, os.path.join(_REPO, 'build'))
 sys.path.insert(0, os.path.join(_REPO, 'python'))
 
 import bgbot_cpp
-from bgsage import BgBotAnalyzer
-from bgsage.weights import bearoff_db_path
+from neongammon import BgBotAnalyzer
+from neongammon.weights import bearoff_db_path
 
 N_POSITIONS = 54264
 

@@ -16,13 +16,13 @@ cached data set of decisions whose analytics are computed at adaptive precision:
   * **full rollout** (1,296 paths, variance reduction, 3-ply checker + cube
     decisions) for the closest decisions, where errors actually show up.
 
-Once built, the data set is just data: scoring needs nothing Sage-specific. A bot is
-any subclass of :class:`BenchmarkBot`; :class:`SageBot` wraps the Open Sage engine,
+Once built, the data set is just data: scoring needs nothing Neongammon-specific. A bot is
+any subclass of :class:`BenchmarkBot`; :class:`NeongammonBot` wraps the Neongammon engine,
 and a developer can drop their own engine behind the same two-method interface.
 
 Two public entry points:
 
-  * :func:`build_benchmark_data` - simulate Sage-3P vs Sage-3P games and emit the
+  * :func:`build_benchmark_data` - simulate Neongammon-3P vs Neongammon-3P games and emit the
     reference data set (three adaptive-precision passes). Crash-safe and resumable:
     every stage persists results as they arrive and a re-run skips ahead to the
     first uncomputed work.
@@ -33,7 +33,7 @@ Two public entry points:
 
 Relationship to the older ``generate_benchmark_pr.py`` / ``score_benchmark_pr.py``
 (``data/benchmark_pr/``): that earlier system is **checker-only**, rolls out every
-candidate at a **single** 2-ply precision, is **Sage-specific**, and has no pluggable
+candidate at a **single** 2-ply precision, is **Neongammon-specific**, and has no pluggable
 bot. This module is a separate, more general system (checker **and** cube, adaptive
 precision, pluggable bot, resumable) and writes to its own ``data/money_benchmark/``
 directory; it does not read or modify the older one.
@@ -47,9 +47,9 @@ Usage::
     python scripts/benchmark_money.py score --level 3ply --n-threads 16
 
     # In code:
-    from benchmark_money import build_benchmark_data, benchmark_pr, SageBot
+    from benchmark_money import build_benchmark_data, benchmark_pr, NeongammonBot
     build_benchmark_data(n_games=200, n_threads=16)
-    result = benchmark_pr(SageBot(eval_level="3ply", parallel_threads=1), n_threads=16)
+    result = benchmark_pr(NeongammonBot(eval_level="3ply", parallel_threads=1), n_threads=16)
     print(result["total_pr"], result["checker_pr"], result["cube_pr"])
 """
 
@@ -70,24 +70,24 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Optional
 
 # ---------------------------------------------------------------------------
-# bgsage path setup - self-contained within the bgsage repo. Never reaches into
-# a parent project: weights, build artifacts and outputs all live under bgsage/.
+# neongammon path setup - self-contained within the neongammon repo. Never reaches into
+# a parent project: weights, build artifacts and outputs all live under neongammon/.
 # (Mirrors scripts/run_sage_vs_sage_games.py.)
 # ---------------------------------------------------------------------------
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = _SCRIPT_DIR.parent          # = bgsage repo root
-_BGSAGE_PYTHON = _PROJECT_ROOT / "python"   # = bgsage/python
-_BUILD_DIR = _PROJECT_ROOT / "build"        # = bgsage/build
+_PROJECT_ROOT = _SCRIPT_DIR.parent          # = neongammon repo root
+_NEONGAMMON_PYTHON = _PROJECT_ROOT / "python"   # = neongammon/python
+_BUILD_DIR = _PROJECT_ROOT / "build"        # = neongammon/build
 
-for _p in (_BGSAGE_PYTHON, _BUILD_DIR):
+for _p in (_NEONGAMMON_PYTHON, _BUILD_DIR):
     _sp = str(_p)
     if _sp not in sys.path:
         sys.path.insert(0, _sp)
 
 
 # ---------------------------------------------------------------------------
-# Output locations (all under bgsage/data/money_benchmark/)
+# Output locations (all under neongammon/data/money_benchmark/)
 # ---------------------------------------------------------------------------
 
 _DATA_DIR = _PROJECT_ROOT / "data" / "money_benchmark"
@@ -153,7 +153,7 @@ ROLLOUT_MAX_BATCHES = 16
 _ROLLOUT_BASE_SEED = 42
 _SEED_STEP = 0x9E3779B9
 
-#: Canonical game-plan labels (must match bgsage.classify_game_plan output).
+#: Canonical game-plan labels (must match neongammon.classify_game_plan output).
 GAME_PLANS = ["purerace", "racing", "attacking", "priming", "anchoring"]
 
 #: Tiers, weakest to strongest. The final entry uses the strongest tier reached.
@@ -181,7 +181,7 @@ class CheckerCandidate:
     """One candidate checker play returned by a bot.
 
     ``board`` is the 26-element post-move board in the **mover's perspective**
-    (positive = mover) - the same representation ``bgsage.possible_moves`` returns,
+    (positive = mover) - the same representation ``neongammon.possible_moves`` returns,
     so it matches the reference move list exactly. ``equity`` is the bot's own
     cubeful equity for ranking; the benchmark only uses ``equity`` to pick the bot's
     move (the candidate ranked first), and scores that move against the *reference*
@@ -211,7 +211,7 @@ class BenchmarkBot(ABC):
 
     Both methods receive boards/cube state in the player-on-roll (mover's)
     perspective and money-game cube semantics. Implementations must be **thread-safe**
-    for concurrent calls if scored with ``n_threads > 1`` (``SageBot`` is); otherwise
+    for concurrent calls if scored with ``n_threads > 1`` (``NeongammonBot`` is); otherwise
     score with ``n_threads=1``.
     """
 
@@ -232,8 +232,8 @@ class BenchmarkBot(ABC):
         """Return the bot's cube assessment for the player on roll."""
 
 
-class SageBot(BenchmarkBot):
-    """The Open Sage production engine as a :class:`BenchmarkBot`.
+class NeongammonBot(BenchmarkBot):
+    """The Neongammon production engine as a :class:`BenchmarkBot`.
 
     Args:
         eval_level: any ``BgBotAnalyzer`` level (``"1ply"``..``"4ply"``,
@@ -253,8 +253,8 @@ class SageBot(BenchmarkBot):
         model: Optional[str] = None,
         parallel_threads: int = 0,
     ):
-        from bgsage import BgBotAnalyzer
-        from bgsage.weights import WeightConfig
+        from neongammon import BgBotAnalyzer
+        from neongammon.weights import WeightConfig
 
         if weights is None and model is not None:
             weights = WeightConfig.from_model(model)
@@ -418,7 +418,7 @@ class _SimState:
 
 
 def _flip_sim(state: _SimState) -> None:
-    from bgsage import flip_board
+    from neongammon import flip_board
 
     state.board = list(flip_board(state.board))
     if state.cube_owner == "player":
@@ -437,7 +437,7 @@ def _get_analyzer(eval_level: str, parallel_threads: int):
     cached = _analyzer_cache.get(key)
     if cached is not None:
         return cached
-    from bgsage import BgBotAnalyzer
+    from neongammon import BgBotAnalyzer
 
     a = BgBotAnalyzer(eval_level=eval_level, cubeful=True, parallel_threads=parallel_threads)
     _analyzer_cache[key] = a
@@ -445,16 +445,16 @@ def _get_analyzer(eval_level: str, parallel_threads: int):
 
 
 def _simulate_and_capture(seed: int, parallel_threads: int) -> tuple[list[dict], dict]:
-    """Play one Sage-3P vs Sage-3P money game; capture every decision's 3P analytics.
+    """Play one Neongammon-3P vs Neongammon-3P money game; capture every decision's 3P analytics.
 
     Returns ``(decisions, xg_record)`` where ``decisions`` is the list of benchmark
     decision dicts (with 3P analytics) and ``xg_record`` is the match-history dict
-    ``bgsage.text_export.export_history_to_txt`` consumes.
+    ``neongammon.text_export.export_history_to_txt`` consumes.
     """
-    from bgsage import (
+    from neongammon import (
         STARTING_BOARD, check_game_over, classify_game_plan, possible_moves,
     )
-    from bgsage.text_export import compute_move_notation
+    from neongammon.text_export import compute_move_notation
 
     analyzer = _get_analyzer("3ply", parallel_threads)
     rng = random.Random(seed)
@@ -578,8 +578,8 @@ def _simulate_and_capture(seed: int, parallel_threads: int) -> tuple[list[dict],
         mult = {"single": 1, "gammon": 2, "backgammon": 3}[win_type]
         result_str, points = f"{side}-win-{win_type}", cube_at_end * mult
     xg_record = {
-        "player1_name": "Sage",
-        "player2_name": "Sage",
+        "player1_name": "Neongammon",
+        "player2_name": "Neongammon",
         "mode": "unlimited",
         "result": result_str,
         "result_points": points,
@@ -605,7 +605,7 @@ def _build_stage1_game(seed: int, write_txt: bool, parallel_threads: int) -> dic
     tmp_path.replace(out_path)
 
     if write_txt:
-        from bgsage.text_export import export_history_to_txt
+        from neongammon.text_export import export_history_to_txt
 
         (_XG_DIR / f"seed_{seed}.txt").write_bytes(export_history_to_txt(xg_record))
 
@@ -871,13 +871,13 @@ def _run_refinement_pass(
 
 
 def _make_3t_analyzer(n_threads: int):
-    from bgsage import BgBotAnalyzer
+    from neongammon import BgBotAnalyzer
 
     return BgBotAnalyzer(eval_level="truncated3", cubeful=True, parallel_threads=n_threads)
 
 
 def _make_rollout_analyzer(n_threads: int):
-    from bgsage import BgBotAnalyzer, TrialEvalConfig
+    from neongammon import BgBotAnalyzer, TrialEvalConfig
 
     return BgBotAnalyzer(
         eval_level="rollout",
@@ -1068,7 +1068,7 @@ def build_benchmark_data(
 ) -> dict:
     """Build the money-game benchmark data set (three adaptive-precision passes).
 
-    Pass 1: simulate ``n_games`` Sage-3P vs Sage-3P money games, capturing 3-ply
+    Pass 1: simulate ``n_games`` Neongammon-3P vs Neongammon-3P money games, capturing 3-ply
     analytics for every real decision (optionally writing an XG-import ``.txt`` per
     game). Pass 2: re-evaluate decisions whose 3-ply best-vs-2nd-best gap < 0.05 at
     3T. Pass 3: roll out (1,296 paths, VR, 3-ply checker + cube) decisions whose
@@ -1517,9 +1517,9 @@ def _main(argv: Optional[list[str]] = None) -> None:
     p_build.add_argument("--dataset", type=Path, default=DEFAULT_DATASET,
                          help="Output dataset path")
 
-    p_score = sub.add_parser("score", help="Score the Sage engine against the data set")
+    p_score = sub.add_parser("score", help="Score the Neongammon engine against the data set")
     p_score.add_argument("--level", default="3ply",
-                         help="SageBot eval level (1ply..4ply, truncated1/2/3, rollout)")
+                         help="NeongammonBot eval level (1ply..4ply, truncated1/2/3, rollout)")
     p_score.add_argument("--model", default=None, help="Model name (default: production)")
     p_score.add_argument("--n-threads", type=int, default=1,
                          help="Threads scoring decisions concurrently")
@@ -1540,7 +1540,7 @@ def _main(argv: Optional[list[str]] = None) -> None:
         )
     elif args.command == "score":
         # Internal threads = 1 so benchmark_pr's n_threads parallelizes across positions.
-        bot = SageBot(eval_level=args.level, model=args.model, parallel_threads=1)
+        bot = NeongammonBot(eval_level=args.level, model=args.model, parallel_threads=1)
         label = args.label or f"sage_{args.level}" + (f"_{args.model}" if args.model else "")
         result = benchmark_pr(bot, dataset_path=args.dataset, n_threads=args.n_threads,
                               label=label, max_seed=args.max_seed)

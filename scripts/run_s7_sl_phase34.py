@@ -37,14 +37,14 @@ if not os.path.isdir(build_dir):
     build_dir = os.path.join(project_dir, 'build')
 
 sys.path.insert(0, build_dir)
-sys.path.insert(0, os.path.join(project_dir, 'bgsage', 'python'))
+sys.path.insert(0, os.path.join(project_dir, 'neongammon', 'python'))
 
 import bgbot_cpp
-from bgsage import sl_train
-from bgsage.data import load_gnubg_training_data, board_from_gnubg_position_string
+from neongammon import sl_train
+from neongammon.data import load_gnubg_training_data, board_from_gnubg_position_string
 
-DATA_DIR = os.path.join(project_dir, 'bgsage', 'data')
-MODELS_DIR = os.path.join(project_dir, 'bgsage', 'models')
+DATA_DIR = os.path.join(project_dir, 'neongammon', 'data')
+MODELS_DIR = os.path.join(project_dir, 'neongammon', 'models')
 SCAN_DIR = os.path.join(MODELS_DIR, 's7_gpw_scan')
 
 N_INPUTS = 244

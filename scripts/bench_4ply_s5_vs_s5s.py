@@ -9,10 +9,10 @@ import sys
 import time
 
 sys.path.insert(0, "build")
-sys.path.insert(0, "bgsage/python")
+sys.path.insert(0, "neongammon/python")
 
 import bgbot_cpp
-from bgsage.weights import WeightConfig
+from neongammon.weights import WeightConfig
 
 BOARD = [0, 0, 0, 0, 2, -3, 4, 2, 2, 0, 0, 0, -4, 2, -2, 0, -1, 2, 0, -4, 0, -1, 0, 0, 0, 0]
 DIE1, DIE2 = 6, 5

@@ -7,9 +7,9 @@ from unittest.mock import patch
 import bgbot_cpp
 import pytest
 
-import bgsage
-from bgsage.analyzer import MONEY_CONTACT_CUBE_LIFE, MONEY_CONTACT_CUBE_LIFE_PIP_SLOPE
-from bgsage.weights import WeightConfig
+import neongammon
+from neongammon.analyzer import MONEY_CONTACT_CUBE_LIFE, MONEY_CONTACT_CUBE_LIFE_PIP_SLOPE
+from neongammon.weights import WeightConfig
 
 # Money benchmark positions (player on roll, centred cube). At 1-ply the
 # engine's default cube life doubles CONTACT; at 0.75 it does not.
@@ -67,7 +67,7 @@ def test_contact_x_changes_the_contact_decision(weights):
     ("3ply", 3, "cube_decision_nply_unified"),
 ])
 def test_analyzer_applies_the_money_policy_only(level, n_plies, binding):
-    analyzer = bgsage.BgBotAnalyzer(eval_level=level, parallel_threads=1)
+    analyzer = neongammon.BgBotAnalyzer(eval_level=level, parallel_threads=1)
     native = getattr(bgbot_cpp, binding)
     with patch.object(bgbot_cpp, binding, side_effect=native) as evaluate:
         analyzer.cube_action(CONTACT)
@@ -82,12 +82,12 @@ def test_analyzer_applies_the_money_policy_only(level, n_plies, binding):
 
 
 def test_batch_one_ply_matches_the_analyzer():
-    analyzer = bgsage.BgBotAnalyzer(eval_level="1ply")
+    analyzer = neongammon.BgBotAnalyzer(eval_level="1ply")
     positions = [{"board": CONTACT, "cube_value": 1, "cube_owner": "centered"},
                  {"board": CONTACT, "cube_value": 1, "cube_owner": "centered",
                   "away1": 5, "away2": 3}]
     # One batch for both: the money row keeps Jacoby beside the match row.
-    batch = bgsage.batch_evaluate(positions, eval_level="1ply", n_threads=1)
+    batch = neongammon.batch_evaluate(positions, eval_level="1ply", n_threads=1)
     for pos, b in zip(positions, batch):
         a = analyzer.cube_action(CONTACT, away1=pos.get("away1", 0), away2=pos.get("away2", 0))
         assert b.equity_nd == pytest.approx(a.equity_nd, abs=1e-6)
@@ -97,9 +97,9 @@ def test_batch_one_ply_matches_the_analyzer():
 
 @pytest.mark.parametrize("level", ["1ply", "2ply"])
 def test_batch_checker_play_matches_the_analyzer(level):
-    analyzer = bgsage.BgBotAnalyzer(eval_level=level, parallel_threads=1)
+    analyzer = neongammon.BgBotAnalyzer(eval_level=level, parallel_threads=1)
     a = analyzer.checker_play(CONTACT, 6, 2, cube_value=1, cube_owner="centered")
-    b = bgsage.batch_checker_play(
+    b = neongammon.batch_checker_play(
         [{"board": CONTACT, "die1": 6, "die2": 2, "cube_value": 1, "cube_owner": "centered"}],
         eval_level=level, n_threads=1)[0]
     assert list(b.moves[0].board) == list(a.moves[0].board)
@@ -112,26 +112,26 @@ def test_one_ply_cubeful_equity_follows_the_cube_life():
     # (At 2-ply checker play routes the tree from the pre-move board and the
     # cube analysis does not, so the two differ on this position with or
     # without the cube life; test_checker_cube_symmetry covers N-ply.)
-    analyzer = bgsage.BgBotAnalyzer(eval_level="1ply", parallel_threads=1)
+    analyzer = neongammon.BgBotAnalyzer(eval_level="1ply", parallel_threads=1)
     best = analyzer.checker_play(CONTACT, 6, 2, cube_value=1, cube_owner="centered").moves[0]
-    opp = analyzer.cube_action(bgsage.flip_board(list(best.board)), cube_value=1,
+    opp = analyzer.cube_action(neongammon.flip_board(list(best.board)), cube_value=1,
                                cube_owner="centered")
     assert best.equity == pytest.approx(-opp.optimal_equity, abs=1e-6)
 
 
 def test_batch_post_move_one_ply_matches_the_analyzer():
-    analyzer = bgsage.BgBotAnalyzer(eval_level="1ply")
-    post = bgsage.flip_board(CONTACT)
+    analyzer = neongammon.BgBotAnalyzer(eval_level="1ply")
+    post = neongammon.flip_board(CONTACT)
     a = analyzer.post_move_analytics(post, cube_owner="centered")
-    b = bgsage.batch_post_move_evaluate([{"board": post, "cube_owner": "centered"}],
+    b = neongammon.batch_post_move_evaluate([{"board": post, "cube_owner": "centered"}],
                                         eval_level="1ply", n_threads=1)[0]
     assert b.cubeful_equity == pytest.approx(a.cubeful_equity, abs=1e-5)
 
 
 @pytest.mark.parametrize("level", ["1ply", "2ply", "3ply"])
 @pytest.mark.parametrize("api,native", [
-    (bgsage.batch_evaluate, "batch_evaluate_positions"),
-    (bgsage.batch_post_move_evaluate, "batch_evaluate_post_move"),
+    (neongammon.batch_evaluate, "batch_evaluate_positions"),
+    (neongammon.batch_post_move_evaluate, "batch_evaluate_post_move"),
 ])
 def test_batch_root_janowski_uses_the_one_ply_cube_life(level, api, native):
     # The pre-roll and post-move batch paths apply Janowski at the root at
@@ -149,9 +149,9 @@ def test_batch_root_janowski_uses_the_one_ply_cube_life(level, api, native):
 def test_batch_cube_life_changes_money_rows_only():
     money = {"board": CONTACT, "cube_value": 1, "cube_owner": "centered"}
     match = dict(money, away1=5, away2=3)
-    with patch.dict(bgsage.analyzer.MONEY_CONTACT_CUBE_LIFE, clear=True):
-        flat = bgsage.batch_evaluate([money, match], eval_level="2ply", n_threads=1)
-    now = bgsage.batch_evaluate([money, match], eval_level="2ply", n_threads=1)
+    with patch.dict(neongammon.analyzer.MONEY_CONTACT_CUBE_LIFE, clear=True):
+        flat = neongammon.batch_evaluate([money, match], eval_level="2ply", n_threads=1)
+    now = neongammon.batch_evaluate([money, match], eval_level="2ply", n_threads=1)
     assert now[0].cubeful_equity != flat[0].cubeful_equity
     assert now[1].cubeful_equity == flat[1].cubeful_equity
 
@@ -213,10 +213,10 @@ def test_one_ply_checker_equity_follows_the_sloped_cube_life():
     # With the slope on, the best move's 1-ply cubeful equity is still exactly
     # minus the opponent's 1-ply cube analysis (both take x from the board).
     assert MONEY_CONTACT_CUBE_LIFE_PIP_SLOPE.get(1, 0.0) != 0.0
-    analyzer = bgsage.BgBotAnalyzer(eval_level="1ply", parallel_threads=1)
+    analyzer = neongammon.BgBotAnalyzer(eval_level="1ply", parallel_threads=1)
     for d1, d2 in [(6, 2), (5, 5), (4, 1)]:
         best = analyzer.checker_play(CONTACT, d1, d2, cube_value=1,
                                      cube_owner="centered").moves[0]
-        opp = analyzer.cube_action(bgsage.flip_board(list(best.board)), cube_value=1,
+        opp = analyzer.cube_action(neongammon.flip_board(list(best.board)), cube_value=1,
                                    cube_owner="centered")
         assert best.equity == pytest.approx(-opp.optimal_equity, abs=1e-6)

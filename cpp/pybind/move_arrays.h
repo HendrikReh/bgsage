@@ -11,7 +11,7 @@
 #include <vector>
 #include "bgbot/moves.h"
 
-namespace bgsage_python {
+namespace neongammon_python {
 
 struct MoveBoardHash {
     std::size_t operator()(const bgbot::Board& board) const noexcept {
@@ -83,4 +83,4 @@ inline void bind_move_arrays(pybind11::module_& module) {
         "All distinct legal endpoints and 21-roll bit masks, preserving first-seen order.");
 }
 
-}  // namespace bgsage_python
+}  // namespace neongammon_python
