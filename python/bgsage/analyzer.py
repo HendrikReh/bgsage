@@ -966,11 +966,43 @@ class _CubefulAnalyzer:
             and owner is not None
         )
 
-    def _searches_every_move(self, owner) -> bool:
-        """Whether every legal move goes through the cube-aware tree, so the
-        cubeless filter-and-search pass has nothing left to decide."""
-        return (self._uses_cube_aware_tree(owner)
-                and self._cubeful_ply not in CUBEFUL_FILTERED_PLIES)
+    def _checker_play_native(self, board, die1, die2, owner, cube_value, away1, away2,
+                             is_crawford, jacoby, beaver, max_cube_value, force_boards):
+        """N-ply cubeful checker play in the native routine batch_checker_play
+        runs per position (bgbot_cpp.checker_play_nply): at the depths in
+        CUBEFUL_FILTERED_PLIES the 1-ply filter (plus ``force_boards``), the
+        cubeless search of its survivors with promotion, the cube-aware tree
+        for the searched moves and 1-ply Janowski for the rest, then the
+        cubeful promotion; at other depths every legal move goes through the
+        cube-aware tree. The cube-tree calls are spread over the analyzer's
+        thread budget.
+
+        Why the filter at 2-ply: scoring every legal move in the cube-aware
+        2-ply tree let the pick fall on moves the filter had rejected (snake
+        folder, 2026-11-19: 103 of 795 picks, 0.04-0.06 worse under XG and
+        both rollout references). At 3-ply searching every move pays.
+        """
+        inner = self._inner
+        ply = self._cubeful_ply
+        moves = bgbot_cpp.checker_play_nply(
+            list(board), die1, die2, inner._strategy_1ply, inner._strategy_nply,
+            cube_value=cube_value, cube_owner=owner,
+            away1=away1, away2=away2, is_crawford=is_crawford,
+            max_cube_value=max_cube_value or 0,
+            force_boards=[list(b) for b in force_boards or ()],
+            filter_max_moves=inner.FILTER_MAX_MOVES,
+            filter_threshold=inner.FILTER_THRESHOLD,
+            jacoby=jacoby, beaver=beaver,
+            contact_x_1ply=_contact_cube_life(1, away1, away2),
+            contact_x_pip_slope_1ply=_contact_cube_slope(1, away1, away2),
+            contact_x_nply=_contact_cube_life(ply, away1, away2),
+            contact_x_pip_slope_nply=_contact_cube_slope(ply, away1, away2),
+            cubeful_filtered_plies=sorted(CUBEFUL_FILTERED_PLIES),
+            n_threads=getattr(inner, "_parallel_threads", 1) or 1,
+        )
+        for m in moves:
+            m["probs"] = list(m["probs"])
+        return moves
 
     def checker_play_analytics(
         self, board, die1, die2, cube_value=1, cube_owner="centered",
@@ -982,22 +1014,16 @@ class _CubefulAnalyzer:
         inner = self._inner
         is_rollout = isinstance(inner, _RolloutAnalyzer)
 
-        if self._searches_every_move(owner):
-            # Every legal move goes through the cube-aware tree below, which
-            # replaces its probs, both equities and depth label, and the list
-            # is then re-sorted by a total order: nothing of the cubeless
-            # filter-and-search pass would survive but the boards. So
-            # enumerate them instead of running that pass (12-24% of a 3-ply
-            # call, more with more threads). ``force_boards`` has nothing to
-            # force here: every board is searched.
-            results = [{"board": list(b)}
-                       for b in bgbot_cpp.possible_moves(board, die1, die2)]
-        else:
-            results = inner.checker_play_analytics(
-                board, die1, die2, cube_value, cube_owner, progress_callback,
-                away1=away1, away2=away2, is_crawford=is_crawford, jacoby=jacoby, beaver=beaver, max_cube_value=max_cube_value,
-                force_boards=force_boards,
-            )
+        if self._uses_cube_aware_tree(owner):
+            return self._checker_play_native(
+                board, die1, die2, owner, cube_value, away1, away2, is_crawford,
+                jacoby, beaver, max_cube_value, force_boards)
+
+        results = inner.checker_play_analytics(
+            board, die1, die2, cube_value, cube_owner, progress_callback,
+            away1=away1, away2=away2, is_crawford=is_crawford, jacoby=jacoby, beaver=beaver, max_cube_value=max_cube_value,
+            force_boards=force_boards,
+        )
         if not results:
             return results
 
@@ -1101,110 +1127,30 @@ class _CubefulAnalyzer:
             workers = max(2, os.cpu_count() or 2)
         workers = max(1, workers)
 
-        # When the inner analyzer is multi-ply with N > 1, route each candidate
-        # through cubeful_probs_and_equity_nply so the per-move probs come from
-        # the CUBE-AWARE tree (opponent move selection respects cube state /
-        # match equity). Otherwise the displayed probs are from MultiPlyStrategy's
-        # cubeless tree, where the opponent picks gammon-greedy moves in match
-        # play. The fix mirrors the post_move_analytics path.
-        use_cube_aware_probs = self._uses_cube_aware_tree(owner)
+        # The cube-aware N-ply path returned above (_checker_play_native);
+        # here each candidate's cubeless value is converted (1-ply Janowski,
+        # or the N-ply cubeful equity when no cube tree applies).
+        def _convert_move_legacy(m: dict) -> tuple[float, float]:
+            cubeless_eq = m["equity"]
+            cf_eq = self._cubeful_equity(
+                m["board"], m["probs"], owner,
+                cube_value=cube_value, away1=away1, away2=away2,
+                is_crawford=is_crawford, jacoby=jacoby, beaver=beaver, **_cube_limit_kwargs(max_cube_value),
+            )
+            return cubeless_eq, cf_eq
 
-        if use_cube_aware_probs:
-            total_threads = getattr(inner, "_parallel_threads", 1) or 1
-            db = getattr(inner, "_bearoff_db", None)
-            opp_owner = _FLIP_OWNER[owner]
-            strat_1ply = inner._strategy_1ply
-            cubeful_ply = self._cubeful_ply
-
-            # Parallelize ACROSS candidates with n_threads=1 inside each call.
-            # The cubeful tree at 3-ply on a single candidate is small (~10ms
-            # serial), so outer parallelism overlaps far more effectively than
-            # inner parallelism would. Avoid oversubscription by giving each
-            # candidate a single thread.
-            def _convert_move(m: dict) -> tuple[list, float, float]:
-                opp_pre_roll = bgbot_cpp.flip_board(m["board"])
-                r = bgbot_cpp.cubeful_probs_and_equity_nply(
-                    opp_pre_roll, opp_owner, strat_1ply, cubeful_ply,
-                    n_threads=1,
-                    cube_value=cube_value,
-                    away1=away2, away2=away1, is_crawford=is_crawford,
-                    jacoby=jacoby, beaver=beaver, **_cube_limit_kwargs(max_cube_value),
-                    contact_x=_contact_cube_life(cubeful_ply, away1, away2),
-                    contact_x_pip_slope=_contact_cube_slope(cubeful_ply, away1, away2),
-                    bearoff_db=db,
-                    root_board=board,   # root routing: the decision's pre-move board
-                )
-                opp_probs = r["probs"]
-                # invert opp's POV probs → player's POV
-                probs = [1.0 - opp_probs[0],
-                         opp_probs[3], opp_probs[4],
-                         opp_probs[1], opp_probs[2]]
-                cl_eq = (2.0 * probs[0] - 1.0
-                         + probs[1] - probs[3]
-                         + probs[2] - probs[4])
-                # cubeful_probs_and_equity_nply returns the opponent's equity at
-                # the flipped board; negate to get the current player's equity.
-                cf_eq = -r["equity"]
-                return probs, cl_eq, cf_eq
-
-            # At the depths in CUBEFUL_FILTERED_PLIES (2-ply) only the 1-ply
-            # filter's survivors go through the cube-aware tree; the moves it
-            # pruned keep 1-ply values converted by 1-ply Janowski, as in the
-            # cubeless path, and enter the search only through the
-            # stale-top-two promotion below (batch_checker_play_nply in the
-            # bindings repeats these steps; keep the two in step). Scoring every
-            # legal move at 2-ply let the pick fall on moves the filter had
-            # rejected: the more candidates compete, the more surely the
-            # maximum lands on an over-valued one. On the snake folder
-            # (2026-11-19) 103 of 795 cubeful 2-ply picks came from outside
-            # the filter, 0.11 behind the filtered pick at 1-ply and 0.04-0.06
-            # behind it under XG and both rollout references. At 3-ply the
-            # tree is accurate enough that searching every move pays.
-            filtered = cubeful_ply in CUBEFUL_FILTERED_PLIES
-            survivors = [m for m in results
-                         if not (filtered and m.get("is_1ply_only"))]
-            converted = _pool_map(_convert_move, survivors, total_threads)
-
-            for m, (probs, cl_eq, cf_eq) in zip(survivors, converted):
-                m["probs"] = probs
-                m["cubeless_equity"] = cl_eq
-                m["equity"] = cf_eq
-                m["eval_level"] = f"{inner._n_plies}-ply"
-                m.pop("is_1ply_only", None)
-            for m in results:
-                if m.get("is_1ply_only"):
-                    m["cubeless_equity"] = m["equity"]
-                    m["equity"] = self._cubeful_equity(
-                        m["board"], m["probs"], owner,
-                        cube_value=cube_value, away1=away1, away2=away2,
-                        is_crawford=is_crawford, jacoby=jacoby, beaver=beaver,
-                        **_cube_limit_kwargs(max_cube_value), ply=1,
-                    )
+        if isinstance(inner, _OnePlyAnalyzer):
+            converted = list(map(_convert_move_legacy, results))
         else:
-            def _convert_move_legacy(m: dict) -> tuple[float, float]:
-                cubeless_eq = m["equity"]
-                cf_eq = self._cubeful_equity(
-                    m["board"], m["probs"], owner,
-                    cube_value=cube_value, away1=away1, away2=away2,
-                    is_crawford=is_crawford, jacoby=jacoby, beaver=beaver, **_cube_limit_kwargs(max_cube_value),
-                )
-                return cubeless_eq, cf_eq
+            converted = _pool_map(_convert_move_legacy, results, workers)
 
-            if isinstance(inner, _OnePlyAnalyzer):
-                converted = list(map(_convert_move_legacy, results))
-            else:
-                converted = _pool_map(_convert_move_legacy, results, workers)
-
-            for m, (cubeless_eq, cf_eq) in zip(results, converted):
-                m["cubeless_equity"] = m["equity"]
-                m["equity"] = cf_eq
+        for m, (cubeless_eq, cf_eq) in zip(results, converted):
+            m["cubeless_equity"] = m["equity"]
+            m["equity"] = cf_eq
 
         results.sort(key=_move_order_key)
 
         def _nply_eval(b, board_ref):
-            if use_cube_aware_probs:
-                probs, cl_eq, cf_eq = _convert_move({"board": b})
-                return cf_eq, probs, f"{inner._n_plies}-ply", {"cubeless_equity": cl_eq}
             if isinstance(inner, _MultiPlyAnalyzer):
                 r = inner._strategy_nply.evaluate_board(b, board_ref)
                 eval_level = f"{inner._n_plies}-ply"
@@ -1222,8 +1168,8 @@ class _CubefulAnalyzer:
 
         # Same rule as _promote_second_best: no 1-ply value may sit in the top
         # two. A pruned move whose 1-ply cubeful value outranks a survivor is
-        # promoted (re-scored through the same cube-aware tree), so the filter
-        # decides which moves are searched, never the pick on its own.
+        # promoted (re-scored at N-ply), so the filter decides which moves are
+        # searched, never the pick on its own.
         while (r := _CubelessBase._first_stale_top_two(results)) is not None:
             ret = _nply_eval(r["board"], board)
             if ret is None:
