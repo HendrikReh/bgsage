@@ -1261,6 +1261,52 @@ that schedule at ~7.5 minutes against 2.5 minutes on the RTX. (That figure is
 computed from the step time; the validation run itself took 11 minutes with an
 earlier loop that synced the GPU after every epoch, 1.55x slower, same weights.)
 
+### Search distillation with a ranking loss (`scripts/rank_distill.py`, 2026-11-20)
+
+A go/no-go test for training on candidate sets instead of single positions,
+with NeonGammon's own 3-ply as a free teacher. `mine` played 8,057 stage11
+1-ply self-play games (15% exploration among the top 3) and kept 200,000
+contact decisions whose 1-ply top moves were close (up to 6 within 0.12),
+843,831 candidates labelled with their 3-ply cubeless post-move probs (13
+minutes on the M4 Pro). Benchmark PR sample boards were excluded. `train`
+fine-tuned the 13 contact pair nets (Adam, lr 1e-4, up to 20 epochs, best
+epoch by held-out pick regret against the teacher). 1-ply checker play routes
+every candidate to the pre-move board's net, so each net trains on its own
+decisions. Two losses:
+- `abs`: MSE of the five probs, the loss of every earlier run;
+- `rank`: MSE of the candidates' equities centred on their decision's mean,
+  plus `--anchor` x the abs loss.
+
+Scored on the Benchmark PR sample's 4,138 contact decisions (`score`), PR
+and paired difference to stage11 at the same depth:
+
+| Variant | vs XG 4-ply 1P / 2P / 3P | diff vs XG, 1P | 2P | 3P |
+|---|---|---|---|---|
+| stage11 | 2.466 / 1.406 / 0.639 | | | |
+| abs | 2.311 / 1.427 / 0.699 | -0.156 +- 0.063 | +0.021 +- 0.049 | +0.060 +- 0.032 |
+| rank, anchor 0.1 | 2.238 / 1.477 / 0.667 | -0.229 +- 0.084 | +0.071 +- 0.059 | +0.028 +- 0.039 |
+| rank, anchor 1.0 | 2.319 / 1.415 / 0.660 | -0.147 +- 0.083 | +0.008 +- 0.053 | +0.022 +- 0.033 |
+
+The Stage 5 rollout reference agrees in sign (1P: abs -0.18 +- 0.08,
+rank 0.1 -0.34 +- 0.10). Paired rank 0.1 - abs at 1P: -0.07 +- 0.08 vs XG,
+-0.15 +- 0.09 vs the rollout.
+
+What it shows:
+- Distilling 3-ply into the nets improves 1-ply picks, and the ranking loss
+  probably more than plain MSE (not significant on its own). So a
+  decision-level loss does carry over to decisions where the earlier
+  absolute-target runs did not.
+- 2-ply and 3-ply gain nothing; the abs loss costs 3-ply ~2 SE. The 2-ply
+  and 3-ply trees evaluate opponent positions one or two moves on, as
+  absolute values averaged over rolls, which the decision sets do not
+  constrain. A lower anchor (better 1-ply ranking) is the worse 2-ply net.
+- **The XG referee saturates at 3-ply.** stage11 3-ply scores 0.535 against
+  XG 4-ply on all 5,117 decisions, below XG's own #1 (0.64, ranked cubeful)
+  and far below the Stage 5 rollout's best moves (1.92). It cannot tell
+  whether a change helps at 3-ply; that needs a rollout-grade reference.
+
+Not shipped. The candidates are in `models/rank_diag/` (untracked).
+
 ### Cloud rollouts on Modal (`scripts/modal_rollout.py`)
 
 Rollout targets, not GPU time, are what training data costs (SL takes minutes

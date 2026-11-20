@@ -85,3 +85,4 @@ data/s11-bg-containment-general-s9-*
 # Experimental / rejected candidate weights (diagnostics, not production models)
 models/race_diag/
 models/s11_diag/
+models/rank_diag/
