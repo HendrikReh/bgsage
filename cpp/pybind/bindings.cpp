@@ -4398,7 +4398,7 @@ PYBIND11_MODULE(bgbot_cpp, m) {
         struct MoveResult {
             Board board;
             std::array<float, NUM_OUTPUTS> probs;
-            float cubeless_equity;
+            double cubeless_equity;   // double, as the analyzer's
             float cubeful_equity;
         };
         struct CPResult {
@@ -4427,7 +4427,7 @@ PYBIND11_MODULE(bgbot_cpp, m) {
                 struct Scored {
                     Board board;
                     std::array<float, NUM_OUTPUTS> probs;
-                    float cubeless_equity;
+                    double cubeless_equity;   // double, as the analyzer's
                     float cubeful_equity;
                 };
                 std::vector<Scored> scored(candidates.size());
@@ -4436,7 +4436,7 @@ PYBIND11_MODULE(bgbot_cpp, m) {
                 for (size_t j = 0; j < candidates.size(); ++j) {
                     auto post_probs = strategy_1ply.evaluate_probs(
                         candidates[j], inp.board);
-                    float cl_eq = NeuralNetwork::compute_equity(post_probs);
+                    double cl_eq = NeuralNetwork::compute_equity(post_probs);
                     bool race = is_race(candidates[j]);
                     auto [_pp, _op] = pip_counts(candidates[j]);
                     float x = resolve_cube_x(post_probs, ci, race, _pp, _op);
@@ -4507,7 +4507,10 @@ PYBIND11_MODULE(bgbot_cpp, m) {
                 d["equity"] = m.cubeful_equity;
                 d["cubeless_equity"] = m.cubeless_equity;
                 d["probs"] = m.probs;
-                d["equity_diff"] = m.cubeful_equity - best_eq;
+                // In double, as the analyzer subtracts the two (float) equities:
+                // a float subtraction rounds the difference.
+                d["equity_diff"] = static_cast<double>(m.cubeful_equity)
+                                   - static_cast<double>(best_eq);
                 d["eval_level"] = "1-ply";
                 moves_list.append(d);
             }
@@ -4575,7 +4578,7 @@ PYBIND11_MODULE(bgbot_cpp, m) {
         struct MoveResult {
             Board board;
             std::array<float, NUM_OUTPUTS> probs;
-            float cubeless_equity;
+            double cubeless_equity;   // double, as the analyzer's
             float cubeful_equity;
         };
         struct CPResult {
@@ -4604,7 +4607,7 @@ PYBIND11_MODULE(bgbot_cpp, m) {
                 struct Scored {
                     Board board;
                     std::array<float, NUM_OUTPUTS> probs;
-                    float cubeless_equity;
+                    double cubeless_equity;   // double, as the analyzer's
                     float cubeful_equity;
                 };
                 std::vector<Scored> scored(candidates.size());
@@ -4613,7 +4616,7 @@ PYBIND11_MODULE(bgbot_cpp, m) {
                 for (size_t j = 0; j < candidates.size(); ++j) {
                     auto post_probs = strategy_1ply.evaluate_probs(
                         candidates[j], inp.board);
-                    float cl_eq = NeuralNetwork::compute_equity(post_probs);
+                    double cl_eq = NeuralNetwork::compute_equity(post_probs);
                     bool race = is_race(candidates[j]);
                     auto [_pp, _op] = pip_counts(candidates[j]);
                     float x = resolve_cube_x(post_probs, ci, race, _pp, _op);
@@ -4680,7 +4683,10 @@ PYBIND11_MODULE(bgbot_cpp, m) {
                 d["equity"] = m.cubeful_equity;
                 d["cubeless_equity"] = m.cubeless_equity;
                 d["probs"] = m.probs;
-                d["equity_diff"] = m.cubeful_equity - best_eq;
+                // In double, as the analyzer subtracts the two (float) equities:
+                // a float subtraction rounds the difference.
+                d["equity_diff"] = static_cast<double>(m.cubeful_equity)
+                                   - static_cast<double>(best_eq);
                 d["eval_level"] = "1-ply";
                 moves_list.append(d);
             }

@@ -151,6 +151,16 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
 ### Fixed
 
+- **1-ply `batch_checker_play` returns the analyzer's list exactly.**
+  - The 1-ply batch overloads kept `cubeless_equity` in float and computed
+    `equity_diff` with a float subtraction. The analyzer keeps both in
+    double, so on 38 of 42 positions the two lists differed in the last
+    digits.
+  - Both are now double. `tests/test_batch_checker_play_parity.py` holds the
+    1-ply batch to the analyzer field for field over its 42 positions (money,
+    match, Crawford, a cube on either side, snake, bearoff). It used to
+    compare only four positions, without `equity_diff`.
+
 - **Evaluations with and without the bearoff database no longer share cache
   entries.**
   - `BearoffStrategy` reported its base strategy's identity, which keys the

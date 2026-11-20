@@ -72,7 +72,8 @@ FIXED = [dict(board=SNAKE, die1=6, die2=5, **CUBES[0]),
          dict(board=BEAROFF, die1=6, die2=1, **CUBES[0]),
          dict(board=NEAR_BEAROFF, die1=5, die2=3, **CUBES[0]),
          dict(board=NEAR_BEAROFF, die1=6, die2=6, **CUBES[1])]
-POSITIONS = {"2ply": _random_positions(36, seed=7) + FIXED,
+POSITIONS = {"1ply": _random_positions(36, seed=7) + FIXED,
+             "2ply": _random_positions(36, seed=7) + FIXED,
              "3ply": _random_positions(12, seed=7) + FIXED}
 
 
@@ -93,7 +94,7 @@ def _batch_moves(level, positions, n_threads=4, bearoff_db=None):
                                         bearoff_db=bearoff_db)]
 
 
-@pytest.fixture(scope="module", params=["2ply", "3ply"])
+@pytest.fixture(scope="module", params=["1ply", "2ply", "3ply"])
 def lists(request):
     level = request.param
     positions = POSITIONS[level]
@@ -111,7 +112,7 @@ def test_two_ply_searches_only_the_filtered_moves(lists):
     # were promoted; at 3-ply every move is searched.
     level, batch, _ = lists
     labels = {m["eval_level"] for moves in batch for m in moves}
-    assert labels == ({"2-ply", "1-ply"} if level == "2ply" else {"3-ply"})
+    assert labels == {"1ply": {"1-ply"}, "2ply": {"2-ply", "1-ply"}, "3ply": {"3-ply"}}[level]
     for moves in batch:
         assert all(m["eval_level"] == f"{level[0]}-ply" for m in moves[:2])
 
@@ -121,7 +122,7 @@ def test_the_fixture_exercises_promotion(lists):
     # 1-ply filter get searched: here several do, and some end up best.
     level, batch, _ = lists
     if level != "2ply":
-        pytest.skip("3-ply searches every move")
+        pytest.skip("only 2-ply filters and promotes")
     inner = BgBotAnalyzer(eval_level="2ply", cubeful=True, parallel_threads=2)._analyzer._inner
     promoted_best = promoted_any = 0
     for p, moves in zip(POSITIONS["2ply"], batch):
@@ -150,19 +151,13 @@ def test_the_filtered_depths_come_from_python():
     assert all(m["eval_level"] == "2-ply" for moves in batch for m in moves)
 
 
-def _without_diff(lists):
-    # The 1-ply batch overload computes equity_diff in float: last-digit noise.
-    return [[{k: v for k, v in m.items() if k != "equity_diff"} for m in moves]
-            for moves in lists]
-
-
 def test_without_the_bearoff_database():
     positions = FIXED[2:]
     assert _batch_moves("2ply", positions, bearoff_db=False) == \
         _analyzer_moves("2ply", positions, bearoff_db=False)
     for db in (False, True):
-        assert _without_diff(_batch_moves("1ply", positions, bearoff_db=db)) == \
-            _without_diff(_analyzer_moves("1ply", positions, bearoff_db=db))
+        assert _batch_moves("1ply", positions, bearoff_db=db) == \
+            _analyzer_moves("1ply", positions, bearoff_db=db)
     # And the database does change these positions.
     assert _batch_moves("2ply", positions, bearoff_db=False) != \
         _batch_moves("2ply", positions)
