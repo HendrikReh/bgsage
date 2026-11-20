@@ -46,6 +46,31 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
 ### Changed
 
+- **Single and batch N-ply checker play run one native routine.**
+  - `BgBotAnalyzer.checker_play` (cube-aware N-ply) and `batch_checker_play`
+    each had their own implementation of these steps, one in Python and one
+    in C++:
+    - the 2-ply candidate filter;
+    - the cubeless survivor search and its promotions;
+    - the cube-aware rescoring;
+    - the final top-two promotions.
+  - Both now go through `score_checker_position` in `bindings.cpp`. The
+    analyzer reaches it through the new `bgbot_cpp.checker_play_nply`, with
+    its forced boards, cube cap and thread budget; the cube-tree calls are
+    spread over the native pool. The batch runs it per position, and its
+    rows may now carry `max_cube_value` and `force_boards`.
+  - The Python orchestration of the cube-aware path is gone; the cubeless
+    and 1-ply paths are unchanged.
+  - Results are identical. On 75 cases, the full move lists equal the old
+    Python path's, field for field. The cases cover 2-, 3- and 4-ply, budgets
+    of 1, 2 and 4, money, match and Crawford, opponent-owned and capped
+    cubes, a root-routed snake, bearoff, a blocked roll and forced boards.
+  - Median per call on 24 positions: 2-ply 2.9 -> 2.7 ms (1 thread) and
+    2.5 -> 2.2 ms (4 threads); 3-ply unchanged.
+  - `tests/test_checker_play_shared_routine.py` holds single and batch to
+    the same lists and covers forced boards, the dead cube and the absence
+    of the Python pass. It replaces `tests/test_cubeful_full_width.py`.
+
 - **An explicit thread budget of one runs inline, and cheap batches start
   workers only for enough work.**
   - **Budget of one.** An N-ply `BgBotAnalyzer(parallel_threads=1)` was

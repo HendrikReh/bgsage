@@ -283,25 +283,271 @@ static std::shared_ptr<MultiPlyStrategy> make_multipy(
     return strat;
 }
 
-// N-ply batch checker play, shared by the two N-ply batch_checker_play
-// overloads (they differ only in the 1-ply strategy's static type). Each
-// position goes through the same steps as _CubefulAnalyzer.checker_play_analytics
-// over a _MultiPlyAnalyzer, so a batch returns the analyzer's ranked list
-// (bearoff positions aside: the batch attaches no bearoff database):
+// ======================== N-ply checker play ========================
+//
+// One position's N-ply checker play, shared by BgBotAnalyzer.checker_play
+// (bgbot_cpp.checker_play_nply) and the N-ply batch_checker_play overloads,
+// so single and batch analyses run one implementation:
 //
 //  * At the depths in `filtered_plies` (Python passes CUBEFUL_FILTERED_PLIES):
-//    1-ply cubeful scoring and the move filter; the cubeless N-ply search of
-//    the survivors with its stale-top-two promotion, which decides which
-//    moves the cube tree sees; the cube-aware N-ply tree for those moves,
-//    while the others keep their 1-ply values and 1-ply Janowski equity;
-//    then the cubeful stale-top-two promotion, one cube-tree call per
-//    promoted move.
+//    1-ply cubeful scoring and the move filter (plus any forced boards); the
+//    cubeless N-ply search of those moves with its stale-top-two promotion,
+//    which decides which moves the cube tree sees; the cube-aware N-ply tree
+//    for them, while the others keep their 1-ply values and 1-ply Janowski
+//    equity; then the cubeful stale-top-two promotion, one cube-tree call
+//    per promoted move.
 //  * At every other depth: every legal move through the cube-aware tree.
 //
 // The cube tree is cubeful_probs_and_equity_nply on the opponent's pre-roll
-// board, at the position's own cube value and routed from the decision's
-// pre-move board (root routing). Its cubeless equity is computed in double,
-// in the analyzer's order, so both paths break cubeful ties the same way.
+// board, at the position's own cube (and cap) and routed from the decision's
+// pre-move board (root routing). Cubeless equities are computed in double,
+// in the order Python used, so every caller breaks ties the same way.
+
+struct CheckerPosition {
+    Board board;
+    int die1 = 0, die2 = 0;
+    int cube_value = 1;
+    CubeOwner owner = CubeOwner::CENTERED;
+    MatchInfo match;
+    int max_cube_value = 0;            // 0 = no cap
+    std::vector<Board> force_boards;   // searched even if the filter drops them
+};
+
+struct CheckerSearch {
+    const Strategy* strategy_1ply;
+    const MultiPlyStrategy* strategy_nply;
+    int n_plies;
+    bool filtered;
+    MoveFilter filter;
+    bool jacoby, beaver;
+    float contact_x_1ply, contact_x_pip_slope_1ply;
+    float contact_x_nply, contact_x_pip_slope_nply;
+};
+
+struct ScoredMove {
+    Board board;
+    std::array<double, NUM_OUTPUTS> probs;
+    double cubeless_equity;
+    double cubeful_equity;
+    bool searched;   // false: still on its 1-ply values
+};
+
+static CheckerSearch make_checker_search(
+        const Strategy& strategy_1ply, const MultiPlyStrategy& strategy_nply,
+        int filter_max_moves, float filter_threshold, bool jacoby, bool beaver,
+        float contact_x_1ply, float contact_x_pip_slope_1ply,
+        float contact_x_nply, float contact_x_pip_slope_nply,
+        const std::vector<int>& filtered_plies) {
+    const int n_plies = strategy_nply.n_plies();
+    return CheckerSearch{
+        &strategy_1ply, &strategy_nply, n_plies,
+        std::find(filtered_plies.begin(), filtered_plies.end(), n_plies) != filtered_plies.end(),
+        MoveFilter{filter_max_moves, filter_threshold}, jacoby, beaver,
+        contact_x_1ply, contact_x_pip_slope_1ply, contact_x_nply, contact_x_pip_slope_nply};
+}
+
+// The ranked move list of one position. `candidate_threads` > 1 spreads the
+// cube-tree calls of the searched moves over the shared pool (single-position
+// analysis); batches pass 1 and parallelise across positions instead.
+static std::vector<ScoredMove> score_checker_position(
+        const CheckerPosition& pos, const CheckerSearch& cfg, int candidate_threads) {
+    const Strategy& strategy_1ply = *cfg.strategy_1ply;
+    const MultiPlyStrategy& strategy_nply = *cfg.strategy_nply;
+    const bool money = pos.match.is_money();
+    const bool dead_cube = pos.max_cube_value > 0 && pos.cube_value >= pos.max_cube_value;
+
+    // The analyzer's _move_order_key: cubeful equity, then cubeless equity,
+    // then the board, so the ranking never depends on generation order.
+    auto by_cubeful = [](const ScoredMove& a, const ScoredMove& b) {
+        if (a.cubeful_equity != b.cubeful_equity)
+            return a.cubeful_equity > b.cubeful_equity;
+        if (a.cubeless_equity != b.cubeless_equity)
+            return a.cubeless_equity > b.cubeless_equity;
+        return a.board < b.board;
+    };
+
+    CubeOwner opp_owner;
+    switch (pos.owner) {
+        case CubeOwner::PLAYER:   opp_owner = CubeOwner::OPPONENT; break;
+        case CubeOwner::OPPONENT: opp_owner = CubeOwner::PLAYER;   break;
+        default:                  opp_owner = CubeOwner::CENTERED; break;
+    }
+    const CubeInfo opp_ci{pos.cube_value, opp_owner, pos.match.flip(), -1.0f,
+                          cfg.jacoby, cfg.beaver, pos.max_cube_value,
+                          money ? cfg.contact_x_nply : -1.0f,
+                          money ? cfg.contact_x_pip_slope_nply : 0.0f};
+
+    // Probs, cubeless and cubeful equity of a post-move board from the
+    // cube-aware N-ply tree.
+    auto cube_tree = [&](ScoredMove& m) {
+        auto r = cubeful_probs_and_equity_nply(
+            flip(m.board), opp_ci, strategy_1ply, cfg.n_plies, cfg.filter,
+            /*n_threads=*/1, /*move_filter=*/nullptr, &pos.board);
+        const auto& o = r.probs;
+        m.probs = {1.0 - o[0], o[3], o[4], o[1], o[2]};
+        m.cubeless_equity = 2.0 * m.probs[0] - 1.0
+                            + m.probs[1] - m.probs[3]
+                            + m.probs[2] - m.probs[4];
+        m.cubeful_equity = -r.equity;
+        m.searched = true;
+    };
+    // The cube tree for several moves, over the pool when allowed.
+    auto cube_trees = [&](std::vector<ScoredMove*>& moves) {
+        const int n = static_cast<int>(moves.size());
+        if (candidate_threads > 1 && n > 1) {
+            multipy_parallel_for(n, std::min(candidate_threads, n),
+                                 [&](int k) { cube_tree(*moves[k]); });
+        } else {
+            for (auto* m : moves) cube_tree(*m);
+        }
+    };
+
+    auto candidates = possible_boards(pos.board, pos.die1, pos.die2);
+    std::vector<ScoredMove> out;
+    if (candidates.empty()) return out;
+    out.reserve(candidates.size());
+
+    if (!cfg.filtered) {
+        for (const auto& c : candidates) out.push_back({c, {}, 0.0, 0.0, false});
+        std::vector<ScoredMove*> all;
+        for (auto& m : out) all.push_back(&m);
+        cube_trees(all);
+        std::sort(out.begin(), out.end(), by_cubeful);
+        return out;
+    }
+
+    // 1-ply cubeful scoring (the analyzer's _score_candidates). A capped
+    // cube at its cap is dead: the cubeless value, money in double.
+    const CubeInfo ci{pos.cube_value, pos.owner, pos.match, -1.0f, cfg.jacoby, false,
+                      pos.max_cube_value, money ? cfg.contact_x_1ply : -1.0f,
+                      cfg.contact_x_pip_slope_1ply};
+    for (const auto& c : candidates) {
+        auto probs = strategy_1ply.evaluate_probs(c, pos.board);
+        std::array<double, NUM_OUTPUTS> p;
+        std::copy(probs.begin(), probs.end(), p.begin());
+        double cf;
+        if (dead_cube) {
+            cf = money
+                ? 2 * p[0] - 1 + p[1] - p[3] + p[2] - p[4]
+                : mwc2eq(cubeless_mwc(probs, pos.match.away1, pos.match.away2,
+                                      pos.cube_value, pos.match.is_crawford),
+                         pos.match.away1, pos.match.away2, pos.cube_value,
+                         pos.match.is_crawford);
+        } else {
+            auto [pp, op] = pip_counts(c);
+            cf = cl2cf(probs, ci, resolve_cube_x(probs, ci, is_race(c), pp, op));
+        }
+        out.push_back({c, p, NeuralNetwork::compute_equity(probs), cf, false});
+    }
+
+    // The filter, on the 1-ply cubeful values sorted stably as Python sorted
+    // them (equal values keep generation order).
+    std::stable_sort(out.begin(), out.end(),
+        [](const ScoredMove& a, const ScoredMove& b) {
+            return a.cubeful_equity > b.cubeful_equity;
+        });
+    const double best = out[0].cubeful_equity;
+    size_t keep = 0;
+    while (keep < out.size() && keep < static_cast<size_t>(cfg.filter.max_moves)
+           && best - out[keep].cubeful_equity < cfg.filter.threshold)
+        ++keep;
+    if (keep == 0) keep = 1;
+
+    // The cubeless N-ply pass: survivors and forced boards at N-ply, the rest
+    // on 1-ply cubeless values, ranked by cubeless equity then board, stale
+    // top two promoted. Only which moves it searched is kept; the cube tree
+    // replaces their values.
+    struct Cubeless { size_t idx; double equity; bool searched; };
+    std::vector<Cubeless> cubeless(out.size());
+    auto nply_equity = [&](size_t j) {
+        return NeuralNetwork::compute_equity(
+            strategy_nply.evaluate_probs(out[j].board, pos.board));
+    };
+    auto forced = [&](size_t j) {
+        return std::find(pos.force_boards.begin(), pos.force_boards.end(),
+                         out[j].board) != pos.force_boards.end();
+    };
+    for (size_t j = 0; j < out.size(); ++j) {
+        cubeless[j] = (j < keep || forced(j)) ? Cubeless{j, nply_equity(j), true}
+                                              : Cubeless{j, out[j].cubeless_equity, false};
+    }
+    auto by_cubeless = [&](const Cubeless& a, const Cubeless& b) {
+        if (a.equity != b.equity) return a.equity > b.equity;
+        return out[a.idx].board < out[b.idx].board;
+    };
+    std::sort(cubeless.begin(), cubeless.end(), by_cubeless);
+    for (;;) {
+        Cubeless* stale = nullptr;
+        for (size_t k = 0; k < cubeless.size() && k < 2; ++k)
+            if (!cubeless[k].searched) { stale = &cubeless[k]; break; }
+        if (!stale) break;
+        stale->equity = nply_equity(stale->idx);
+        stale->searched = true;
+        std::sort(cubeless.begin(), cubeless.end(), by_cubeless);
+    }
+
+    std::vector<ScoredMove*> searched;
+    for (const auto& c : cubeless)
+        if (c.searched) searched.push_back(&out[c.idx]);
+    cube_trees(searched);
+    std::sort(out.begin(), out.end(), by_cubeful);
+
+    // No 1-ply value may sit in the top two: a pruned move's 1-ply equity is
+    // not on the searched moves' scale, and when the deeper search lowers
+    // every searched move, the pruned one would win on a number the search
+    // never checked (snake benchmark, 2026-09-04: 312 of 795 cubeless 2-ply
+    // picks). Promote whichever of #1/#2 is stale, re-sort, repeat.
+    for (;;) {
+        ScoredMove* stale = nullptr;
+        for (size_t k = 0; k < out.size() && k < 2; ++k)
+            if (!out[k].searched) { stale = &out[k]; break; }
+        if (!stale) break;
+        cube_tree(*stale);
+        std::sort(out.begin(), out.end(), by_cubeful);
+    }
+    return out;
+}
+
+static py::list scored_moves_to_list(const std::vector<ScoredMove>& moves, int n_plies) {
+    const std::string nply_label = std::to_string(n_plies) + "-ply";
+    const double best_eq = moves.empty() ? 0.0 : moves[0].cubeful_equity;
+    py::list out;
+    for (const auto& m : moves) {
+        py::dict d;
+        d["board"] = board_to_list(m.board);
+        d["equity"] = m.cubeful_equity;
+        d["cubeless_equity"] = m.cubeless_equity;
+        d["probs"] = m.probs;
+        d["equity_diff"] = m.cubeful_equity - best_eq;
+        d["eval_level"] = m.searched ? nply_label : std::string("1-ply");
+        out.append(d);
+    }
+    return out;
+}
+
+static CheckerPosition checker_position_from_dict(const py::dict& inp) {
+    CheckerPosition p;
+    p.board = list_to_board(inp["board"].cast<std::vector<int>>());
+    p.die1 = inp["die1"].cast<int>();
+    p.die2 = inp["die2"].cast<int>();
+    p.cube_value = inp["cube_value"].cast<int>();
+    p.owner = inp["cube_owner"].cast<CubeOwner>();
+    if (inp.contains("away1")) {
+        p.match.away1 = inp["away1"].cast<int>();
+        p.match.away2 = inp["away2"].cast<int>();
+        if (inp.contains("is_crawford"))
+            p.match.is_crawford = inp["is_crawford"].cast<bool>();
+    }
+    if (inp.contains("max_cube_value"))
+        p.max_cube_value = inp["max_cube_value"].cast<int>();
+    if (inp.contains("force_boards"))
+        for (const auto& b : inp["force_boards"].cast<std::vector<std::vector<int>>>())
+            p.force_boards.push_back(list_to_board(b));
+    return p;
+}
+
+// N-ply batch checker play: score_checker_position per position, the
+// positions spread over n_threads workers (one thread per position).
 static py::list batch_checker_play_nply(
         py::list inputs,
         const Strategy& strategy_1ply,
@@ -316,229 +562,41 @@ static py::list batch_checker_play_nply(
         float contact_x_nply,
         float contact_x_pip_slope_nply,
         const std::vector<int>& filtered_plies) {
-
-    struct CPInput {
-        Board board;
-        int die1, die2;
-        int cube_value;
-        CubeOwner owner;
-        MatchInfo match;
-    };
     const int n = static_cast<int>(py::len(inputs));
-    std::vector<CPInput> parsed(n);
-    for (int i = 0; i < n; ++i) {
-        py::dict inp = inputs[i].cast<py::dict>();
-        auto checkers = inp["board"].cast<std::vector<int>>();
-        parsed[i].board = list_to_board(checkers);
-        parsed[i].die1 = inp["die1"].cast<int>();
-        parsed[i].die2 = inp["die2"].cast<int>();
-        parsed[i].cube_value = inp["cube_value"].cast<int>();
-        parsed[i].owner = inp["cube_owner"].cast<CubeOwner>();
-        if (inp.contains("away1")) {
-            parsed[i].match.away1 = inp["away1"].cast<int>();
-            parsed[i].match.away2 = inp["away2"].cast<int>();
-            if (inp.contains("is_crawford"))
-                parsed[i].match.is_crawford = inp["is_crawford"].cast<bool>();
-        }
-    }
-
-    const int n_plies = strategy_nply->n_plies();
-    const bool filtered = std::find(filtered_plies.begin(), filtered_plies.end(),
-                                    n_plies) != filtered_plies.end();
-    const MoveFilter filter{filter_max_moves, filter_threshold};
-
-    struct MoveResult {
-        Board board;
-        std::array<double, NUM_OUTPUTS> probs;
-        double cubeless_equity;
-        double cubeful_equity;
-        bool searched;   // false: still on its 1-ply values
-    };
-    std::vector<std::vector<MoveResult>> results(n);
-
-    // The analyzer's _move_order_key: cubeful equity, then cubeless equity,
-    // then the board, so the ranking never depends on generation order.
-    auto by_cubeful = [](const MoveResult& a, const MoveResult& b) {
-        if (a.cubeful_equity != b.cubeful_equity)
-            return a.cubeful_equity > b.cubeful_equity;
-        if (a.cubeless_equity != b.cubeless_equity)
-            return a.cubeless_equity > b.cubeless_equity;
-        return a.board < b.board;
-    };
-    auto stale_top_two = [](std::vector<MoveResult>& moves) -> MoveResult* {
-        for (size_t k = 0; k < moves.size() && k < 2; ++k)
-            if (!moves[k].searched) return &moves[k];
-        return nullptr;
-    };
-
-    // Probs, cubeless and cubeful equity of a post-move board from the
-    // cube-aware N-ply tree (the analyzer's _convert_move).
-    auto cube_tree = [&](const CPInput& inp, MoveResult& m) {
-        CubeOwner opp_owner;
-        switch (inp.owner) {
-            case CubeOwner::PLAYER:   opp_owner = CubeOwner::OPPONENT; break;
-            case CubeOwner::OPPONENT: opp_owner = CubeOwner::PLAYER;   break;
-            default:                  opp_owner = CubeOwner::CENTERED; break;
-        }
-        const bool money = inp.match.is_money();
-        CubeInfo opp_ci{inp.cube_value, opp_owner, inp.match.flip(), -1.0f, jacoby, beaver,
-                        0, money ? contact_x_nply : -1.0f,
-                        money ? contact_x_pip_slope_nply : 0.0f};
-        auto r = cubeful_probs_and_equity_nply(
-            flip(m.board), opp_ci, strategy_1ply, n_plies, filter,
-            /*n_threads=*/1, /*move_filter=*/nullptr, &inp.board);
-        const auto& o = r.probs;
-        m.probs = {1.0 - o[0], o[3], o[4], o[1], o[2]};
-        m.cubeless_equity = 2.0 * m.probs[0] - 1.0
-                            + m.probs[1] - m.probs[3]
-                            + m.probs[2] - m.probs[4];
-        m.cubeful_equity = -r.equity;
-        m.searched = true;
-    };
-
-    auto to_double = [](const std::array<float, NUM_OUTPUTS>& p) {
-        std::array<double, NUM_OUTPUTS> d;
-        std::copy(p.begin(), p.end(), d.begin());
-        return d;
-    };
-
+    std::vector<CheckerPosition> parsed(n);
+    for (int i = 0; i < n; ++i) parsed[i] = checker_position_from_dict(inputs[i].cast<py::dict>());
+    const CheckerSearch cfg = make_checker_search(
+        strategy_1ply, *strategy_nply, filter_max_moves, filter_threshold, jacoby, beaver,
+        contact_x_1ply, contact_x_pip_slope_1ply, contact_x_nply, contact_x_pip_slope_nply,
+        filtered_plies);
+    std::vector<std::vector<ScoredMove>> results(n);
     {
         py::gil_scoped_release release;
-
         if (n_threads <= 0) {
             n_threads = static_cast<int>(std::thread::hardware_concurrency());
             if (n_threads <= 0) n_threads = 1;
         }
         n_threads = std::min(n_threads, n);
-
-        auto process_position = [&](int i) {
-            const auto& inp = parsed[i];
-            auto& out = results[i];
-
-            auto candidates = possible_boards(inp.board, inp.die1, inp.die2);
-            if (candidates.empty()) return;
-            out.reserve(candidates.size());
-
-            if (!filtered) {
-                for (const auto& c : candidates) {
-                    MoveResult m{c, {}, 0.0, 0.0, false};
-                    cube_tree(inp, m);
-                    out.push_back(m);
-                }
-                std::sort(out.begin(), out.end(), by_cubeful);
-                return;
-            }
-
-            // 1-ply cubeful scoring (the analyzer's _score_candidates).
-            CubeInfo ci{inp.cube_value, inp.owner, inp.match, -1.0f, jacoby, false,
-                        0, inp.match.is_money() ? contact_x_1ply : -1.0f,
-                        contact_x_pip_slope_1ply};
-            for (const auto& c : candidates) {
-                auto probs = strategy_1ply.evaluate_probs(c, inp.board);
-                bool race = is_race(c);
-                auto [pp, op] = pip_counts(c);
-                float x = resolve_cube_x(probs, ci, race, pp, op);
-                out.push_back({c, to_double(probs), NeuralNetwork::compute_equity(probs),
-                               static_cast<double>(cl2cf(probs, ci, x)), false});
-            }
-
-            // The filter, on the 1-ply cubeful values sorted stably as the
-            // analyzer sorts them (equal values keep generation order).
-            std::stable_sort(out.begin(), out.end(),
-                [](const MoveResult& a, const MoveResult& b) {
-                    return a.cubeful_equity > b.cubeful_equity;
-                });
-            const double best = out[0].cubeful_equity;
-            size_t keep = 0;
-            while (keep < out.size() && keep < static_cast<size_t>(filter.max_moves)
-                   && best - out[keep].cubeful_equity < filter.threshold)
-                ++keep;
-            if (keep == 0) keep = 1;
-
-            // The cubeless N-ply pass (_MultiPlyAnalyzer.checker_play_analytics):
-            // survivors at N-ply, the rest on 1-ply cubeless values, ranked by
-            // cubeless equity then board, stale top two promoted. Only which
-            // moves it searched is kept; the cube tree replaces their values.
-            struct Cubeless { size_t idx; double equity; bool searched; };
-            std::vector<Cubeless> cubeless(out.size());
-            auto nply_equity = [&](size_t j) {
-                return NeuralNetwork::compute_equity(
-                    strategy_nply->evaluate_probs(out[j].board, inp.board));
-            };
-            for (size_t j = 0; j < out.size(); ++j) {
-                cubeless[j] = j < keep ? Cubeless{j, nply_equity(j), true}
-                                       : Cubeless{j, out[j].cubeless_equity, false};
-            }
-            auto by_cubeless = [&](const Cubeless& a, const Cubeless& b) {
-                if (a.equity != b.equity) return a.equity > b.equity;
-                return out[a.idx].board < out[b.idx].board;
-            };
-            std::sort(cubeless.begin(), cubeless.end(), by_cubeless);
-            for (;;) {
-                Cubeless* stale = nullptr;
-                for (size_t k = 0; k < cubeless.size() && k < 2; ++k)
-                    if (!cubeless[k].searched) { stale = &cubeless[k]; break; }
-                if (!stale) break;
-                stale->equity = nply_equity(stale->idx);
-                stale->searched = true;
-                std::sort(cubeless.begin(), cubeless.end(), by_cubeless);
-            }
-
-            for (const auto& c : cubeless)
-                if (c.searched) cube_tree(inp, out[c.idx]);
-            std::sort(out.begin(), out.end(), by_cubeful);
-
-            // No 1-ply value may sit in the top two: a pruned move's 1-ply
-            // equity is not on the searched moves' scale, and when the deeper
-            // search lowers every searched move, the pruned one would win on
-            // a number the search never checked (snake benchmark,
-            // 2026-09-04: 312 of 795 cubeless 2-ply picks). Promote whichever
-            // of #1/#2 is stale through the cube tree, re-sort, repeat.
-            while (MoveResult* stale = stale_top_two(out)) {
-                cube_tree(inp, *stale);
-                std::sort(out.begin(), out.end(), by_cubeful);
-            }
-        };
-
+        auto process = [&](int i) { results[i] = score_checker_position(parsed[i], cfg, 1); };
         if (n_threads <= 1) {
-            for (int i = 0; i < n; ++i) process_position(i);
+            for (int i = 0; i < n; ++i) process(i);
         } else {
             std::vector<std::thread> threads;
             threads.reserve(n_threads);
             std::atomic<int> next_pos{0};
             for (int t = 0; t < n_threads; ++t) {
                 threads.emplace_back([&]() {
-                    while (true) {
-                        int i = next_pos.fetch_add(1);
-                        if (i >= n) break;
-                        process_position(i);
-                    }
+                    for (int i; (i = next_pos.fetch_add(1)) < n;) process(i);
                 });
             }
             for (auto& th : threads) th.join();
         }
-
         strategy_nply->clear_cache();
     }
-
-    std::string nply_label = std::to_string(n_plies) + "-ply";
     py::list out;
     for (int i = 0; i < n; ++i) {
-        const auto& moves = results[i];
-        double best_eq = moves.empty() ? 0.0 : moves[0].cubeful_equity;
-        py::list moves_list;
-        for (const auto& m : moves) {
-            py::dict d;
-            d["board"] = board_to_list(m.board);
-            d["equity"] = m.cubeful_equity;
-            d["cubeless_equity"] = m.cubeless_equity;
-            d["probs"] = m.probs;
-            d["equity_diff"] = m.cubeful_equity - best_eq;
-            d["eval_level"] = m.searched ? nply_label : std::string("1-ply");
-            moves_list.append(d);
-        }
         py::dict pos_result;
-        pos_result["moves"] = moves_list;
+        pos_result["moves"] = scored_moves_to_list(results[i], cfg.n_plies);
         out.append(pos_result);
     }
     return out;
@@ -4852,6 +4910,58 @@ PYBIND11_MODULE(bgbot_cpp, m) {
        py::arg("beaver") = true,
        py::arg("contact_x_1ply") = -1.0f,
        py::arg("contact_x_pip_slope_1ply") = 0.0f);
+
+    // One position's N-ply checker play: the routine the batch runs per
+    // position (score_checker_position), with the analyzer's options.
+    m.def("checker_play_nply", [](
+            const std::vector<int>& board, int die1, int die2,
+            const Strategy& strategy_1ply,
+            std::shared_ptr<MultiPlyStrategy> strategy_nply,
+            int cube_value, CubeOwner cube_owner,
+            int away1, int away2, bool is_crawford, int max_cube_value,
+            const std::vector<std::vector<int>>& force_boards,
+            int filter_max_moves, float filter_threshold,
+            bool jacoby, bool beaver,
+            float contact_x_1ply, float contact_x_pip_slope_1ply,
+            float contact_x_nply, float contact_x_pip_slope_nply,
+            const std::vector<int>& cubeful_filtered_plies,
+            int n_threads) {
+        CheckerPosition pos;
+        pos.board = list_to_board(board);
+        pos.die1 = die1;
+        pos.die2 = die2;
+        pos.cube_value = cube_value;
+        pos.owner = cube_owner;
+        pos.match = MatchInfo{away1, away2, is_crawford};
+        pos.max_cube_value = max_cube_value;
+        for (const auto& b : force_boards) pos.force_boards.push_back(list_to_board(b));
+        const CheckerSearch cfg = make_checker_search(
+            strategy_1ply, *strategy_nply, filter_max_moves, filter_threshold, jacoby, beaver,
+            contact_x_1ply, contact_x_pip_slope_1ply, contact_x_nply, contact_x_pip_slope_nply,
+            cubeful_filtered_plies);
+        std::vector<ScoredMove> moves;
+        {
+            py::gil_scoped_release release;
+            moves = score_checker_position(pos, cfg, n_threads);
+            strategy_nply->clear_cache();
+        }
+        return scored_moves_to_list(moves, cfg.n_plies);
+    }, "N-ply cubeful checker play of one position: the ranked move list\n"
+       "(dicts with board, equity, cubeless_equity, probs, equity_diff,\n"
+       "eval_level), as batch_checker_play computes it per position.\n"
+       "n_threads spreads the cube-tree calls of the searched moves.",
+       py::arg("board"), py::arg("die1"), py::arg("die2"),
+       py::arg("strategy_1ply"), py::arg("strategy_nply"),
+       py::arg("cube_value") = 1, py::arg("cube_owner") = CubeOwner::CENTERED,
+       py::arg("away1") = 0, py::arg("away2") = 0, py::arg("is_crawford") = false,
+       py::arg("max_cube_value") = 0,
+       py::arg("force_boards") = std::vector<std::vector<int>>{},
+       py::arg("filter_max_moves") = 5, py::arg("filter_threshold") = 0.08f,
+       py::arg("jacoby") = true, py::arg("beaver") = true,
+       py::arg("contact_x_1ply") = -1.0f, py::arg("contact_x_pip_slope_1ply") = 0.0f,
+       py::arg("contact_x_nply") = -1.0f, py::arg("contact_x_pip_slope_nply") = 0.0f,
+       py::arg("cubeful_filtered_plies") = std::vector<int>{},
+       py::arg("n_threads") = 1);
 
     // N-ply overloads: see batch_checker_play_nply.
     m.def("batch_checker_play", [](

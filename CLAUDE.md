@@ -432,9 +432,12 @@ C++ batch checker play: `bgbot_cpp.batch_checker_play(inputs, strategy_1ply, [st
 filter_max_moves, filter_threshold, n_threads)` via pybind11; takes `list[dict]` with
 `{board, die1, die2, cube_value, cube_owner}`, returns `list[dict]` each with `moves` list
 sorted by cubeful equity desc. Overloads for 1-ply and for N-ply (1-ply strategy +
-MultiPlyStrategy). The N-ply ones (`batch_checker_play_nply` in `bindings.cpp`) take the
-analyzer's steps, so the Python wrapper returns `BgBotAnalyzer.checker_play`'s list field
-for field, with the bearoff database as with it off. At the depths in
+MultiPlyStrategy). The N-ply ones run, per position, the same native routine as
+`BgBotAnalyzer.checker_play` (`score_checker_position` in `bindings.cpp`; the analyzer
+reaches it through `bgbot_cpp.checker_play_nply`, with its forced boards, cube cap and
+thread budget), so the Python wrapper returns the analyzer's list field for field, with the
+bearoff database as with it off. Rows may carry `max_cube_value` and `force_boards`. At the
+depths in
 `cubeful_filtered_plies` (the wrapper passes `CUBEFUL_FILTERED_PLIES`, i.e. 2-ply) only the
 filter's survivors and promotions go through the cube-aware tree, the rest keep 1-ply
 values; at other depths every move does. `tests/test_batch_checker_play_parity.py`.
@@ -3067,8 +3070,8 @@ Open Sage net has shown in the region. **Why 2-ply scores worse than 1-ply
    `batch_checker_play` overloads — the app's analytics path — promoted only
    the runner-up in the same way. Both now promote whichever of the top two
    still carries a 1-ply value until both are full-depth
-   (`_first_stale_top_two` in `analyzer.py`, `stale_top_two` in
-   `batch_checker_play_nply` in `bindings.cpp`).
+   (`_first_stale_top_two` in `analyzer.py`, the promotion loops of
+   `score_checker_position` in `bindings.cpp`).
    The rollout path always had the right rule (promote #1 until it is
    rollout-grade); it is now the rule everywhere.
 

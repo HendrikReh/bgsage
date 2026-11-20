@@ -38,10 +38,16 @@ def test_one_ply_honors_explicit_thread_limit(threads, match_play):
     assert limits == []
 
 
-@pytest.mark.parametrize("threads", [2, 4])
-def test_two_ply_explicit_budgets_are_preserved(threads):
-    limits, _ = evaluate("2ply", threads)
-    assert limits == [threads]
+@pytest.mark.parametrize("level", ["2ply", "3ply"])
+@pytest.mark.parametrize("threads", [1, 2, 4])
+def test_n_ply_explicit_budgets_reach_the_native_routine(level, threads):
+    # Cube-aware N-ply checker play spreads its cube-tree calls natively
+    # (bgbot_cpp.checker_play_nply) over exactly the analyzer's budget.
+    import bgbot_cpp
+    with patch.object(bgbot_cpp, "checker_play_nply", wraps=bgbot_cpp.checker_play_nply) as native:
+        limits, _ = evaluate(level, threads)
+    assert limits == []
+    assert native.call_args.kwargs["n_threads"] == threads
 
 
 @pytest.mark.parametrize("threads", [1, 2, 4])
