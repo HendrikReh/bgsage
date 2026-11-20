@@ -431,8 +431,9 @@ class _MultiPlyAnalyzer(_CubelessBase):
         requested_threads = parallel_threads
         if parallel_threads <= 0 and n_plies > 1:
             requested_threads = _default_parallel_threads()
-        elif n_plies > 1:
-            requested_threads = max(2, parallel_threads)
+        # An explicit budget is kept as given, one included: a caller that
+        # parallelises across positions (the benchmarks) asks for one thread
+        # per analysis and gets inline evaluation, no worker pool.
         self._parallel_threads = requested_threads
         # Around the 1-ply strategy's loaded base: the weights are immutable,
         # so the checker side loads them once (the cube strategy keeps its
@@ -873,6 +874,15 @@ class _RolloutAnalyzer(_CubelessBase):
         return result
 
 
+def _pool_map(fn, items, workers: int) -> list:
+    """``map`` over ``items`` on a pool of ``workers`` threads, or inline when
+    the budget is one or there is at most one item (no pool to start)."""
+    if workers <= 1 or len(items) <= 1:
+        return list(map(fn, items))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        return list(pool.map(fn, items))
+
+
 class _CubefulAnalyzer:
     """Cubeful wrapper around any cubeless analyzer."""
 
@@ -1153,8 +1163,7 @@ class _CubefulAnalyzer:
             filtered = cubeful_ply in CUBEFUL_FILTERED_PLIES
             survivors = [m for m in results
                          if not (filtered and m.get("is_1ply_only"))]
-            with ThreadPoolExecutor(max_workers=total_threads) as pool:
-                converted = list(pool.map(_convert_move, survivors))
+            converted = _pool_map(_convert_move, survivors, total_threads)
 
             for m, (probs, cl_eq, cf_eq) in zip(survivors, converted):
                 m["probs"] = probs
@@ -1184,8 +1193,7 @@ class _CubefulAnalyzer:
             if isinstance(inner, _OnePlyAnalyzer):
                 converted = list(map(_convert_move_legacy, results))
             else:
-                with ThreadPoolExecutor(max_workers=workers) as pool:
-                    converted = list(pool.map(_convert_move_legacy, results))
+                converted = _pool_map(_convert_move_legacy, results, workers)
 
             for m, (cubeless_eq, cf_eq) in zip(results, converted):
                 m["cubeless_equity"] = m["equity"]
