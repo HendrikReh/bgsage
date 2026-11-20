@@ -18,6 +18,7 @@ Typical usage::
 
 from __future__ import annotations
 
+import functools
 import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -30,6 +31,7 @@ from .luck import roll_luck as _roll_luck
 from .types import (
     CheckerPlayResult,
     CubeActionResult,
+    CubeDecisionResult,
     LuckResult,
     MoveAnalysis,
     PostMoveAnalysis,
@@ -95,6 +97,15 @@ def _default_parallel_threads() -> int:
     except ValueError:
         return 0
     return max(parsed, 0)
+
+
+@functools.lru_cache(maxsize=None)
+def load_bearoff_db(path: str):
+    """The one-sided bearoff database at ``path``, loaded once per process
+    and shared (it is immutable once loaded; its data identity keys the
+    evaluation caches), or None when it does not load."""
+    db = bgbot_cpp.BearoffDB()
+    return db if db.load(path) else None
 
 
 # ---------------------------------------------------------------------------
@@ -424,8 +435,11 @@ class _MultiPlyAnalyzer(_CubelessBase):
         # parallelises across positions (the benchmarks) asks for one thread
         # per analysis and gets inline evaluation, no worker pool.
         self._parallel_threads = requested_threads
-        self._strategy_nply = bgbot_cpp.create_multipy(
-            weights.strategy_type, weights.weight_paths_list, weights.hidden_sizes_list,
+        # Around the 1-ply strategy's loaded base: the weights are immutable,
+        # so the checker side loads them once (the cube strategy keeps its
+        # own, see _cube_strategy).
+        self._strategy_nply = bgbot_cpp.create_multipy_from_base(
+            self._strategy_1ply,
             n_plies=n_plies,
             parallel_evaluate=parallel_evaluate,
             parallel_threads=self._parallel_threads,
@@ -492,7 +506,7 @@ class _MultiPlyAnalyzer(_CubelessBase):
         self, board, cube_value=1, cube_owner="centered",
         progress_callback=None,
         away1=0, away2=0, is_crawford=False, jacoby=True, beaver=True, max_cube_value=0,
-        incl_2ply_details=False,
+        incl_2ply_details=False, decision_only=False,
     ) -> dict:
         owner = resolve_owner(cube_owner)
         r = bgbot_cpp.cube_decision_nply_unified(
@@ -507,7 +521,14 @@ class _MultiPlyAnalyzer(_CubelessBase):
             contact_x_pip_slope=_contact_cube_slope(self._n_plies, away1, away2),
             bearoff_db=self._bearoff_db,
             incl_2ply_details=incl_2ply_details, strategy=self._cube_strategy,
+            decision_only=decision_only,
         )
+        if decision_only:
+            # No cubeless probability search: the decision fields only.
+            self._strategy_nply.clear_cache()
+            return {k: r[k] for k in ("equity_nd", "equity_dt", "equity_dp", "should_double",
+                                      "should_take", "optimal_equity", "is_beaver")} | {
+                "eval_level": f"{self._n_plies}-ply"}
         result = self._format_cube_result(r, eval_level=f"{self._n_plies}-ply")
 
         # Pass through 2-ply details if present
@@ -564,10 +585,8 @@ class _RolloutAnalyzer(_CubelessBase):
         self._prefilter_threshold = float(prefilter_threshold)
         self._strategy_2ply = None
         if self._prefilter_threshold > 0:
-            self._strategy_2ply = bgbot_cpp.create_multipy(
-                weights.strategy_type,
-                weights.weight_paths_list,
-                weights.hidden_sizes_list,
+            self._strategy_2ply = bgbot_cpp.create_multipy_from_base(
+                self._strategy_1ply,
                 n_plies=2,
                 parallel_evaluate=True,
                 parallel_threads=max(2, _default_parallel_threads()),
@@ -1394,9 +1413,7 @@ class BgBotAnalyzer:
         if bearoff_db:
             db_path = bearoff_db if isinstance(bearoff_db, str) else bearoff_db_path()
             if db_path:
-                self._bearoff_db = bgbot_cpp.BearoffDB()
-                if not self._bearoff_db.load(db_path):
-                    self._bearoff_db = None
+                self._bearoff_db = load_bearoff_db(db_path)
 
         if eval_level == "1ply":
             inner: _CubelessBase = _OnePlyAnalyzer(
@@ -1852,6 +1869,54 @@ class BgBotAnalyzer:
             equity_nd_se=raw.get("equity_nd_se"),
             equity_dt_se=raw.get("equity_dt_se"),
             details=raw.get("details"),
+        )
+
+    def cube_decision(
+        self,
+        board: list[int],
+        cube_value: int = 1,
+        cube_owner: str = "centered",
+        *,
+        away1: int = 0,
+        away2: int = 0,
+        is_crawford: bool = False,
+        jacoby: bool = True,
+        beaver: bool = True,
+        max_cube_value: int = 0,
+    ) -> CubeDecisionResult:
+        """The cube decision alone: what :meth:`cube_action` returns minus the
+        cubeless probabilities and their equity.
+
+        At 2-ply and deeper ``cube_action`` runs a second, cubeless N-ply
+        search for those fields after the cube tree has decided; this skips
+        it, which saves about half of a 2-ply call and two thirds of a 3-ply
+        one. Equities and flags equal ``cube_action``'s. At 1-ply and the
+        rollout levels it is ``cube_action`` with those fields dropped.
+        Arguments as in :meth:`cube_action`.
+        """
+        _validate_cube_limit(cube_value, max_cube_value)
+        if away1 > 0 or away2 > 0:
+            jacoby = False
+            beaver = False
+        kw = dict(away1=away1, away2=away2, is_crawford=is_crawford, jacoby=jacoby,
+                  beaver=beaver, **_cube_limit_kwargs(max_cube_value))
+        inner = getattr(self._analyzer, "_inner", self._analyzer)
+        if isinstance(inner, _MultiPlyAnalyzer):
+            raw = inner.cube_action_analytics(board, cube_value, cube_owner,
+                                              decision_only=True, **kw)
+        else:
+            raw = self._analyzer.cube_action_analytics(board, cube_value, cube_owner, **kw)
+        is_beaver = raw.get("is_beaver", False)
+        return CubeDecisionResult(
+            equity_nd=raw["equity_nd"],
+            equity_dt=raw["equity_dt"],
+            equity_dp=raw["equity_dp"],
+            should_double=raw["should_double"],
+            should_take=raw["should_take"],
+            optimal_equity=raw["optimal_equity"],
+            optimal_action=_optimal_action(raw["should_double"], raw["should_take"], is_beaver),
+            eval_level=raw["eval_level"],
+            is_beaver=is_beaver,
         )
 
     def roll_luck(

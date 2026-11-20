@@ -16,6 +16,34 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
 
 ## [Unreleased]
 
+### Added
+
+- **`BgBotAnalyzer.cube_decision()`**: the cube decision without the
+  cubeless probabilities.
+  - At 2-ply and deeper, `cube_action` runs a second, cubeless N-ply search
+    for `probs` and `cubeless_equity` after the cube tree has decided.
+    `cube_decision` skips it (`decision_only=True` on
+    `bgbot_cpp.cube_decision_nply_unified`) and returns a
+    `CubeDecisionResult`.
+  - Equities and flags are exactly `cube_action`'s. At 1-ply and the
+    rollout levels it is `cube_action` minus those fields.
+  - `simulate_game` uses it when a policy offers it and keeps `cube_action`
+    for custom players. Seeded games are unchanged.
+  - Median per call, Stage 11, 20 money positions:
+
+    | Call | `cube_action` | `cube_decision` |
+    |---|---|---|
+    | 2-ply, 1 thread | 2.21 ms | 0.84 ms |
+    | 3-ply, 1 thread | 16.1 ms | 6.3 ms |
+    | 3-ply, 4 threads | 9.7 ms | 3.8 ms |
+    | 4-ply, 4 threads | 214 ms | 75 ms |
+
+    Five simulated 2-ply money games take 0.74-0.76 s instead of 0.88-0.90 s.
+  - `tests/test_cube_decision.py` checks the parity at 1-4 ply for money
+    (with and without Jacoby and the beaver), match, Crawford, a cube cap,
+    a bearoff position and a root-routed snake, and checks seeded
+    simulation records.
+
 ### Changed
 
 - **An explicit thread budget of one runs inline, and cheap batches start
@@ -49,6 +77,53 @@ Timings below were measured on an M4 Pro Mac mini (10P+4E cores).
   - Results never depend on the thread count. This is checked at 1-4
     threads and auto, for the analyzer at 2-ply and 3-ply (money and match)
     and for both batch paths at 1-ply and 2-ply.
+
+- **The analyzer loads each model once on its checker side and shares the
+  bearoff database.**
+  - A 3-ply `BgBotAnalyzer` loaded Stage 11 three times:
+    - for its 1-ply strategy;
+    - again inside `create_multipy` for the N-ply strategy;
+    - once more for the cube strategy on its first cube action.
+
+    Every analyzer also read the bearoff database from disk.
+  - Now the N-ply strategy is built around the 1-ply strategy's base
+    (`create_multipy_from_base`), as is the rollout analyzer's 2-ply
+    prefilter strategy. The cube strategy keeps its own base, so its
+    evaluator configuration stays separate.
+  - The database is loaded once per process (`analyzer.load_bearoff_db`) and
+    shared with `BatchModels`. `BatchModels` now loads it on first use, so
+    an empty batch loads neither a model nor the database.
+  - Constructing a 3-ply analyzer takes 17-20 ms instead of 35-41 ms
+    (median of 15). First and later analyses are unchanged.
+  - `tests/test_analyzer_model_reuse.py` counts the model and database loads
+    at each stage. It also compares whole results (checker play, cube
+    action, post-move) against the old construction at 2-ply and 3-ply for
+    Stage 11, Stage 5, a custom database path and no database, including a
+    root-routed snake and a bearoff position.
+
+### Fixed
+
+- **Evaluations with and without the bearoff database no longer share cache
+  entries.**
+  - `BearoffStrategy` reported its base strategy's identity, which keys the
+    cubeful engine's per-thread cache and the rollout's shared cache derived
+    from it. So on one base strategy, a call with the database and one
+    without were served from the same entries, and whichever ran first
+    decided both.
+  - Example: a bearoff race at 2-ply, centered money cube. On a fresh
+    strategy the equity is +0.3049 without the database and +0.1085 with it.
+    On a warm thread the second call returned the first call's value.
+  - The legacy `MultiPlyStrategy` cache, salted by the base pointer alone,
+    had the same flaw for two N-ply strategies around one base.
+  - Now `BearoffDB` has a process-unique data identity, new on every load
+    or generate. The wrapper mixes it into the base's identity, a wrapper
+    over a wrapper of the same database shares that identity, and the
+    legacy cache key folds it in too.
+  - Normal analyzer and batch calls use one configuration per strategy and
+    are unchanged. `tests/test_bearoff_cache_identity.py` covers both call
+    orders against fresh-strategy references, distinct database instances,
+    nested wrappers and the legacy cache. Four of its tests fail on the
+    previous build.
 
 ### Documentation
 

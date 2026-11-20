@@ -55,6 +55,12 @@ public:
     // Check if DB has been loaded/generated.
     bool is_loaded() const { return loaded_; }
 
+    // Process-unique identity of the data currently held, for evaluation
+    // cache keys: a new value on every successful load() / generate(), so a
+    // reload that can change the data never serves entries computed from
+    // the old contents. 0 = nothing loaded.
+    uint64_t identity() const { return identity_; }
+
     // --- One-sided lookups ---
 
     // Get bearoff distribution for a one-sided position index.
@@ -142,6 +148,8 @@ private:
     std::vector<std::array<uint16_t, MAX_ROLLS>> gammon_distributions_;
 
     bool loaded_ = false;
+    uint64_t identity_ = 0;
+    static uint64_t next_identity();
 
     // Generation helpers
     void generate_position(unsigned int index,
@@ -157,9 +165,12 @@ class BearoffStrategy : public Strategy {
 public:
     BearoffStrategy(std::shared_ptr<Strategy> base, const BearoffDB* db);
 
-    // Bearoff interception doesn't change which evaluator the cache entries
-    // belong to — share them with the wrapped strategy.
-    uint64_t eval_identity() const override { return base_->eval_identity(); }
+    // The wrapper replaces the base's values at bearoff positions with the
+    // database's, so its cache entries belong to (base, database data), not
+    // to the base alone: an evaluation with the database must never serve
+    // one without it, or the other way round. A wrapper over a wrapper of
+    // the same database adds nothing and shares that identity.
+    uint64_t eval_identity() const override;
     int root_pin_for(const Board& root) const override { return base_->root_pin_for(root); }
 
     double evaluate(const Board& board, bool pre_move_is_race) const override;
@@ -198,6 +209,7 @@ public:
 
 private:
     std::shared_ptr<Strategy> base_;
+    bool wraps_same_db_ = false;   // base_ is a BearoffStrategy over db_
     const BearoffDB* db_;
 };
 

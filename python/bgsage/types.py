@@ -140,6 +140,22 @@ class CubeActionResult:
 
 
 @dataclass
+class CubeDecisionResult:
+    """The cube decision without the cubeless probabilities: the fields of
+    :class:`CubeActionResult` that ``BgBotAnalyzer.cube_decision`` returns."""
+
+    equity_nd: float
+    equity_dt: float
+    equity_dp: float
+    should_double: bool
+    should_take: bool
+    optimal_equity: float
+    optimal_action: str
+    eval_level: str
+    is_beaver: bool = False
+
+
+@dataclass
 class RollEquity:
     """Equity of one dice roll's best checker play, an input to luck.
 

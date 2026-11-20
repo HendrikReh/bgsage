@@ -34,6 +34,7 @@ from .board import (
 from .types import (
     CheckerPlayResult,
     CubeActionResult,
+    CubeDecisionResult,
     GamePlanResult,
     GameStats,
     MatchInfo,
@@ -76,6 +77,7 @@ __all__ = [
     "PostMoveAnalysis",
     "CheckerPlayResult",
     "CubeActionResult",
+    "CubeDecisionResult",
     "GamePlanResult",
     "GameStats",
     "MatchInfo",

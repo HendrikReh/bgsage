@@ -509,9 +509,11 @@ void cubeful_eval_recursive(
         // SharedPosCache keys derived from it) is shared across all engine
         // callers on a thread, so entries from different models must never
         // collide. The identity is a process-unique monotonic id (never an
-        // address — freed strategies' addresses get reused); equivalent
-        // wrappers (BearoffStrategy over the same NN) resolve to the same
-        // identity and share entries. The deep-prefilter context is folded
+        // address — freed strategies' addresses get reused). A
+        // BearoffStrategy mixes its database's data identity into the
+        // base's, so evaluations with and without the database never serve
+        // each other, while nested wrappers over the same database share
+        // one identity and its entries. The deep-prefilter context is folded
         // in too — the same node evaluated with and without the deep prune
         // has different values, so the two contexts must never serve each
         // other's entries.
