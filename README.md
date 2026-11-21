@@ -14,6 +14,9 @@ move in this situation, with all the analytics to back it up", or "is this a dou
 
 ## What it Contains
 
+See [ENGINE.md](ENGINE.md) for checker and cube policies by game situation,
+fallbacks, lookahead, move filters, and rollouts.
+
 Complete, seeded game and match simulation is available through
 `from neongammon import simulate_game, simulate_match, GameConfig`. It records
 positions, dice, cube actions and scores for custom research. See
