@@ -60,6 +60,28 @@ def test_take_flips_ownership_and_never_redoubles_nonowner():
     assert all(t['cube_action'] is None for t in turns[2:])
 
 
+def test_checker_selector_receives_cube_after_take():
+    class Selector:
+        cube_action = Policy(double=True).cube_action
+
+        def select_checker_move(self, board, *dice, **context):
+            assert context['cube_value'] == 2
+            assert context['cube_owner'] == 'opponent'
+            return sim.possible_moves(board, *dice)[0]
+
+    board = [0] * 26
+    board[1], board[24] = 1, -1
+    result = simulate_game(players=(Selector(), Policy()),
+                           config=GameConfig(start_board=tuple(board)))
+    assert result['points'] == 2 and result['winner'] == 1
+
+
+def test_checker_selector_must_choose_legal_board():
+    bad = NS(select_checker_move=lambda *a, **k: [0] * 26)
+    with pytest.raises(ValueError, match='illegal checker'):
+        simulate_game(players=(bad, bad))
+
+
 @pytest.mark.parametrize('jacoby,multiplier', [(True, 1), (False, 3)])
 def test_jacoby_only_when_undoubled(monkeypatch, jacoby, multiplier):
     # Keep native legality; isolate terminal scoring only.

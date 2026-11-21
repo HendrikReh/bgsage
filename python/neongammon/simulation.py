@@ -114,7 +114,11 @@ def simulate_game(*, seed: int = 42, config: GameConfig | None = None,
                   players=None, cancel: Callable[[], bool] | None = None) -> dict:
     """Return a JSON-serializable game with every cube/checker decision.
 
-    Policies implement ``checker_play`` and ``cube_action`` like BgBotAnalyzer.
+    Policies can implement ``select_checker_move`` to return a board directly,
+    or ``checker_play`` to return the usual analysis results. For the cube they
+    implement ``cube_decision`` or ``cube_action`` like BgBotAnalyzer.
+    Without explicit players, Jacoby money games prefer filtered PureTD
+    checker play when its native library and model are available.
     The responder policy evaluates the doubler's board: ``should_take`` is the
     opponent's response, as in the public cube API. Returned moves are checked
     against native legal moves. Same seed/policies/engine build reproduce dice
@@ -122,7 +126,17 @@ def simulate_game(*, seed: int = 42, config: GameConfig | None = None,
     """
     _integer('seed', seed, 0, 2147483647)
     cfg = config or GameConfig()
-    players = _players(players)
+    if players is None and cfg.jacoby and not cfg.match_length:
+        from .puretd import _default_money_policy
+
+        policy = _default_money_policy()
+        if policy is not None:
+            with policy:
+                return _play_game(seed, cfg, (policy, policy), cancel)
+    return _play_game(seed, cfg, _players(players), cancel)
+
+
+def _play_game(seed, cfg, players, cancel):
     rng = random.Random(seed)
     board = list(cfg.start_board or STARTING_BOARD)
     active = cfg.player_on_roll
@@ -182,10 +196,16 @@ def simulate_game(*, seed: int = 42, config: GameConfig | None = None,
         opening = False
         _check_cancel(cancel)
         legal = possible_moves(board, *dice)
-        result = players[active - 1].checker_play(list(board), *dice, **context)
-        if not result.moves or list(result.moves[0].board) not in legal:
+        policy = players[active - 1]
+        select = getattr(policy, "select_checker_move", None)
+        if select is None:
+            result = policy.checker_play(list(board), *dice, **context)
+            chosen = result.moves[0].board if result.moves else None
+        else:
+            chosen = select(list(board), *dice, **context)
+        post = list(chosen) if chosen is not None else None
+        if post not in legal:
             raise ValueError('policy returned an illegal checker move')
-        post = list(result.moves[0].board)
         turn.update(dice=list(dice), post_board=post,
                     checker_cube_value=cube, checker_cube_owner=owner)
         outcome = check_game_over(post)
