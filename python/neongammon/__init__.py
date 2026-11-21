@@ -43,6 +43,7 @@ from .types import (
     Probabilities,
 )
 from .gnubg import GnuBgAnalyzer
+from .puretd import PureTDPolicy
 from . import settings
 from .luck import luck_from_equities, roll_luck
 from .types import LuckResult, RollEquity
@@ -61,6 +62,7 @@ __all__ = [
     "BgBotAnalyzer",
     "RolloutCancelled",
     "GnuBgAnalyzer",
+    "PureTDPolicy",
     "BatchModels",
     "batch_checker_play",
     "batch_cube_action",
